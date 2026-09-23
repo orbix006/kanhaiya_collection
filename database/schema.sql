@@ -788,11 +788,12 @@ create table public.faqs (
 );
 
 create table public.site_policies (
-  id          uuid primary key default gen_random_uuid(),
-  type        public.site_policy_type not null unique,
-  title       text not null,
-  content     text not null,
-  updated_at  timestamptz not null default now()
+  id             uuid primary key default gen_random_uuid(),
+  type           public.site_policy_type not null unique,
+  title          text not null,
+  content        text not null,
+  display_order  int not null default 0,
+  updated_at     timestamptz not null default now()
 );
 
 create table public.site_settings (

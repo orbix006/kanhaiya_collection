@@ -1,17 +1,106 @@
-export default function HomePage() {
+import { createClient } from "@/lib/supabase/server";
+import {
+  getHomepageSections,
+  getActiveBanners,
+  getHomepageCategories,
+  getContinueBrowsingProducts,
+  getTopSellers,
+  getCategoryProductSections,
+  getActiveTestimonials,
+} from "@/lib/data/homepage";
+import { BannerCarousel } from "@/components/home/banner-carousel";
+import { CategoryGrid } from "@/components/home/category-grid";
+import { ContinueBrowsing } from "@/components/home/continue-browsing";
+import { TopSellersSection } from "@/components/home/top-sellers";
+import { CategoryProductRows } from "@/components/home/category-product-rows";
+import { TestimonialsSection } from "@/components/home/testimonials-section";
+
+export const dynamic = "force-dynamic";
+
+export default async function HomePage() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  // Fetch all homepage data in parallel
+  const [
+    sections,
+    banners,
+    homepageCategories,
+    continueBrowsingProducts,
+    topSellers,
+    categoryProductSections,
+    testimonials,
+  ] = await Promise.all([
+    getHomepageSections(),
+    getActiveBanners(),
+    getHomepageCategories(),
+    getContinueBrowsingProducts(user?.id),
+    getTopSellers(),
+    getCategoryProductSections(),
+    getActiveTestimonials(),
+  ]);
+
   return (
-    <div className="container mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
-      <div className="flex flex-col items-center justify-center text-center py-12 space-y-4">
-        <div className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors border-transparent bg-primary text-primary-foreground">
-          Phase 1.1 Active
-        </div>
-        <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">
-          Project Scaffold Established
-        </h1>
-        <p className="max-w-2xl text-muted-foreground text-base">
-          Next.js App Router, TypeScript, Tailwind CSS, and Supabase SSR are configured and ready.
-        </p>
-      </div>
+    <div className="flex flex-col min-h-screen">
+      {/* Sections dynamically rendered strictly according to homepage_sections.display_order */}
+      {sections.map((section) => {
+        if (!section.is_enabled) return null;
+
+        switch (section.key) {
+          case "banner":
+            return <BannerCarousel key={section.key} banners={banners} />;
+
+          case "shop_by_category":
+            return (
+              <CategoryGrid
+                key={section.key}
+                categories={homepageCategories}
+              />
+            );
+
+          case "continue_browsing":
+            // Render nothing for logged-out users or empty view history
+            if (!user || continueBrowsingProducts.length === 0) {
+              return null;
+            }
+            return (
+              <ContinueBrowsing
+                key={section.key}
+                products={continueBrowsingProducts}
+                isAuthenticated={true}
+              />
+            );
+
+          case "top_sellers":
+            return (
+              <TopSellersSection
+                key={section.key}
+                products={topSellers}
+              />
+            );
+
+          case "category_products":
+            return (
+              <CategoryProductRows
+                key={section.key}
+                categorySections={categoryProductSections}
+              />
+            );
+
+          case "wall_of_love":
+            return (
+              <TestimonialsSection
+                key={section.key}
+                testimonials={testimonials}
+              />
+            );
+
+          default:
+            return null;
+        }
+      })}
     </div>
   );
 }

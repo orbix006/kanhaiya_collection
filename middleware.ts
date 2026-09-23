@@ -6,35 +6,71 @@ export async function middleware(request: NextRequest) {
     request,
   });
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value)
-          );
-          supabaseResponse = NextResponse.next({
-            request,
-          });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
-          );
-        },
-      },
-    }
-  );
+  const supabaseUrl =
+    process.env.NEXT_PUBLIC_SUPABASE_URL ||
+    "https://placeholder-project.supabase.co";
+  const supabaseAnonKey =
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder-anon-key";
 
-  // Refresh auth session
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const isConfigured =
+    Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL) &&
+    process.env.NEXT_PUBLIC_SUPABASE_URL !== "https://placeholder-project.supabase.co";
 
   const pathname = request.nextUrl.pathname;
+
+  if (!isConfigured) {
+    const demoCookie = request.cookies.get("demo_user")?.value;
+    let demoUser: { email?: string; role?: string } | null = null;
+    if (demoCookie) {
+      try {
+        demoUser = JSON.parse(demoCookie);
+      } catch {
+        demoUser = null;
+      }
+    }
+
+    const protectedRoutes = ["/admin", "/account", "/cart", "/checkout"];
+    if (protectedRoutes.some((route) => pathname.startsWith(route))) {
+      if (!demoUser) {
+        const loginUrl = new URL("/login", request.url);
+        loginUrl.searchParams.set("redirect", pathname);
+        return NextResponse.redirect(loginUrl);
+      }
+
+      if (pathname.startsWith("/admin") && demoUser.role !== "admin") {
+        return NextResponse.redirect(new URL("/403", request.url));
+      }
+    }
+    return supabaseResponse;
+  }
+
+  const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+    cookies: {
+      getAll() {
+        return request.cookies.getAll();
+      },
+      setAll(cookiesToSet) {
+        cookiesToSet.forEach(({ name, value }) =>
+          request.cookies.set(name, value)
+        );
+        supabaseResponse = NextResponse.next({
+          request,
+        });
+        cookiesToSet.forEach(({ name, value, options }) =>
+          supabaseResponse.cookies.set(name, value, options)
+        );
+      },
+    },
+  });
+
+  // Refresh auth session
+  let user = null;
+  try {
+    const { data } = await supabase.auth.getUser();
+    user = data.user;
+  } catch {
+    user = null;
+  }
 
   // Admin route protection (/admin)
   if (pathname.startsWith("/admin")) {

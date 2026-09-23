@@ -48,6 +48,8 @@ export async function signupAction(prevState: any, formData: FormData) {
   return { success: "Account created successfully! Please check your email for confirmation, or proceed to log in." };
 }
 
+import { cookies } from "next/headers";
+
 export async function loginAction(prevState: any, formData: FormData) {
   const email = (formData.get("email") as string)?.trim();
   const password = formData.get("password") as string;
@@ -55,6 +57,25 @@ export async function loginAction(prevState: any, formData: FormData) {
 
   if (!email || !password) {
     return { error: "Email and password are required." };
+  }
+
+  const isConfigured =
+    Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL) &&
+    process.env.NEXT_PUBLIC_SUPABASE_URL !== "https://placeholder-project.supabase.co";
+
+  if (!isConfigured) {
+    const cookieStore = await cookies();
+    cookieStore.set(
+      "demo_user",
+      JSON.stringify({
+        id: "demo-user-id",
+        email,
+        role: email.includes("admin") ? "admin" : "user",
+      }),
+      { path: "/", httpOnly: true }
+    );
+    revalidatePath("/", "layout");
+    redirect(redirectPath);
   }
 
   const supabase = await createClient();
@@ -73,6 +94,9 @@ export async function loginAction(prevState: any, formData: FormData) {
 }
 
 export async function logoutAction() {
+  const cookieStore = await cookies();
+  cookieStore.delete("demo_user");
+
   const supabase = await createClient();
   await supabase.auth.signOut();
   revalidatePath("/", "layout");

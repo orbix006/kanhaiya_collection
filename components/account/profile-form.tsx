@@ -3,7 +3,7 @@
 import { useActionState, useState } from "react";
 import { updateProfileAction } from "@/app/(public)/account/actions";
 import { ImageUploader } from "@/components/ui/image-uploader";
-import { Loader2, Save, MapPin } from "lucide-react";
+import { Loader2, Save, MapPin, Package } from "lucide-react";
 import Link from "next/link";
 
 interface ProfileFormProps {
@@ -33,13 +33,22 @@ export function ProfileForm({
           <h1 className="text-2xl font-bold tracking-tight text-foreground">Account Settings</h1>
           <p className="text-sm text-muted-foreground">Manage your personal profile and preferences</p>
         </div>
-        <Link
-          href="/account/addresses"
-          className="inline-flex items-center gap-2 h-10 px-4 rounded-lg border border-border bg-card hover:bg-muted text-sm font-medium text-foreground transition-colors self-start sm:self-auto"
-        >
-          <MapPin className="h-4 w-4 text-primary" />
-          <span>Manage Address Book</span>
-        </Link>
+        <div className="flex items-center gap-2.5 self-start sm:self-auto">
+          <Link
+            href="/account/orders"
+            className="inline-flex items-center gap-2 h-10 px-4 rounded-lg border border-border bg-card hover:bg-muted text-sm font-medium text-foreground transition-colors"
+          >
+            <Package className="h-4 w-4 text-primary" />
+            <span>My Orders</span>
+          </Link>
+          <Link
+            href="/account/addresses"
+            className="inline-flex items-center gap-2 h-10 px-4 rounded-lg border border-border bg-card hover:bg-muted text-sm font-medium text-foreground transition-colors"
+          >
+            <MapPin className="h-4 w-4 text-primary" />
+            <span>Address Book</span>
+          </Link>
+        </div>
       </div>
 
       {state?.error && (
