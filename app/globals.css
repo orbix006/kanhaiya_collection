@@ -22,6 +22,30 @@
   --ring: #C8891A;
 }
 
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #120D08;
+    --foreground: #F8F1E3;
+    --card: #1A130D;
+    --card-foreground: #F8F1E3;
+    --popover: #1A130D;
+    --popover-foreground: #F8F1E3;
+    --primary: #E09E2B;
+    --primary-foreground: #120D08;
+    --secondary: #241A12;
+    --secondary-foreground: #F8F1E3;
+    --muted: #241A12;
+    --muted-foreground: #B59F89;
+    --accent: #2D2015;
+    --accent-foreground: #F8F1E3;
+    --destructive: #EF4444;
+    --destructive-foreground: #FFFFFF;
+    --border: #38291D;
+    --input: #38291D;
+    --ring: #E09E2B;
+  }
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -44,12 +68,6 @@
   --color-ring: var(--ring);
   --font-serif: var(--font-serif);
   --font-sans: var(--font-sans);
-}
-
-/* Force light theme always - remove dark mode overrides completely */
-html {
-  color-scheme: light;
-  background-color: #FFFDF7;
 }
 
 body {
@@ -76,4 +94,20 @@ h1, h2, h3, h4, h5, h6 {
 .mandala-overlay {
   background-image: radial-gradient(rgba(200, 137, 26, 0.06) 1px, transparent 0);
   background-size: 24px 24px;
+}
+
+/* Custom subtle scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(200, 137, 26, 0.25);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(200, 137, 26, 0.45);
 }

@@ -52,6 +52,17 @@ export function ImageUploader({
     const objectUrl = URL.createObjectURL(file);
     setPreview(objectUrl);
 
+    const isConfigured =
+      Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL) &&
+      process.env.NEXT_PUBLIC_SUPABASE_URL !== "https://placeholder-project.supabase.co";
+
+    if (!isConfigured) {
+      // In local demo / test environment without live Supabase cloud:
+      // use local objectUrl for immediate rich preview and state update
+      onUploadComplete(objectUrl);
+      return;
+    }
+
     // Upload to Supabase Storage
     setIsUploading(true);
     try {
