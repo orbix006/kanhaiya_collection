@@ -1,8 +1,33 @@
-export default function AdminDashboardPage() {
+import React from "react";
+import {
+  getAllBanners,
+  getAllCategories,
+  getAllProducts,
+  getFestiveOffer,
+} from "@/lib/store";
+import { AdminPanel } from "@/components/admin/admin-panel";
+
+export const revalidate = 0; // Dynamic server rendering for admin portal
+
+export const metadata = {
+  title: "Admin Panel | Kanhaiya Collection",
+  description: "Administrative Management Portal for Banners, Categories, and Festive Offers",
+};
+
+export default async function AdminDashboardPage() {
+  const [banners, categories, products, festiveData] = await Promise.all([
+    getAllBanners(),
+    getAllCategories(),
+    getAllProducts(),
+    getFestiveOffer(),
+  ]);
+
   return (
-    <div className="container mx-auto max-w-7xl px-4 py-16">
-      <h1 className="text-3xl font-bold tracking-tight">Admin Dashboard</h1>
-      <p className="text-muted-foreground mt-2">Protected Admin Area (Phase 2.1 Authorized)</p>
-    </div>
+    <AdminPanel
+      initialBanners={banners}
+      initialCategories={categories}
+      initialProducts={products}
+      initialFestiveOffer={festiveData.offer}
+    />
   );
 }

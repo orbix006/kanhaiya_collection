@@ -1,6 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
+import { BrandStatement } from "@/components/layout/brand-statement";
+import { LocationProvider } from "@/components/layout/location-context";
+import { LocationModal } from "@/components/layout/location-modal";
 
 export default async function PublicLayout({
   children,
@@ -23,10 +26,15 @@ export default async function PublicLayout({
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-background text-foreground">
-      <Header user={user} profile={profile} />
-      <main className="flex-1">{children}</main>
-      <Footer />
-    </div>
+    <LocationProvider>
+      <div className="flex min-h-screen flex-col bg-background text-foreground">
+        <Header user={user} profile={profile} />
+        <main className="flex-1">{children}</main>
+        {/* Dedicated Visual Brand Section Immediately Before Footer */}
+        <BrandStatement />
+        <Footer />
+        <LocationModal />
+      </div>
+    </LocationProvider>
   );
 }

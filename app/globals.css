@@ -1,26 +1,79 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #FFFDF7;
+  --foreground: #3B2416;
+  --card: #FFFFFF;
+  --card-foreground: #3B2416;
+  --popover: #FFFFFF;
+  --popover-foreground: #3B2416;
+  --primary: #C8891A;
+  --primary-foreground: #FFFFFF;
+  --secondary: #FFF8EC;
+  --secondary-foreground: #3B2416;
+  --muted: #FFF8EC;
+  --muted-foreground: #806B57;
+  --accent: #F4E8D3;
+  --accent-foreground: #3B2416;
+  --destructive: #B91C1C;
+  --destructive-foreground: #FFFFFF;
+  --border: #E8DCC8;
+  --input: #E8DCC8;
+  --ring: #C8891A;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --font-serif: var(--font-serif);
+  --font-sans: var(--font-sans);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* Force light theme always - remove dark mode overrides completely */
+html {
+  color-scheme: light;
+  background-color: #FFFDF7;
 }
 
 body {
-  background: var(--background);
+  background-color: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
+  font-weight: 400;
+  overflow-x: hidden;
+}
+
+/* Editorial display font hierarchy */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-serif), Georgia, serif;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+/* Devotional decorative subtle patterns */
+.bg-devotional-pattern {
+  background-color: #FFFDF7;
+  background-image: radial-gradient(circle at center, rgba(200, 137, 26, 0.04) 0%, transparent 70%);
+}
+
+.mandala-overlay {
+  background-image: radial-gradient(rgba(200, 137, 26, 0.06) 1px, transparent 0);
+  background-size: 24px 24px;
 }

@@ -4,7 +4,7 @@ import { useActionState, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { loginAction } from "../actions";
-import { Store, Loader2, ArrowRight } from "lucide-react";
+import { Loader2, ArrowRight } from "lucide-react";
 
 function LoginForm() {
   const searchParams = useSearchParams();
@@ -14,35 +14,57 @@ function LoginForm() {
   const [state, formAction, isPending] = useActionState(loginAction, null);
 
   return (
-    <div className="w-full max-w-md p-6 sm:p-8 space-y-6 bg-card border border-border rounded-2xl shadow-xl">
+    <div className="w-full max-w-md p-6 sm:p-8 space-y-6 bg-[#FFFFFF] border border-[#E8DCC8] rounded-2xl shadow-[0_8px_30px_rgba(59,36,22,0.06)] font-sans">
       <div className="flex flex-col items-center text-center space-y-2">
-        <Link href="/" className="flex items-center gap-2 font-bold text-2xl tracking-tight text-foreground">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
-            <Store className="h-6 w-6" />
+        <Link href="/" className="flex items-center gap-2 group transition-opacity">
+          <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-[#F8F1E3] to-[#E8DCC8] ring-1 ring-[#C8891A]/30">
+            <svg
+              className="h-6 w-6 text-[#C8891A]"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path
+                d="M12 2c.5 2 2.5 3.5 2.5 5.5A2.5 2.5 0 0 1 12 10a2.5 2.5 0 0 1-2.5-2.5C9.5 5.5 11.5 4 12 2z"
+                fill="#C8891A"
+                fillOpacity="0.85"
+              />
+              <path d="M4 14c0 3.866 3.582 7 8 7s8-3.134 8-7H4z" fill="#8B4513" fillOpacity="0.15" />
+              <path d="M4 14h16" />
+            </svg>
           </div>
-          <span>Kanhaiya Collection</span>
+          <span className="font-serif text-2xl font-semibold tracking-tight text-[#3B2416]">
+            Kanhaiya Collection
+          </span>
         </Link>
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">Welcome back</h1>
-        <p className="text-sm text-muted-foreground">Sign in to your account to continue</p>
+        <h1 className="font-serif text-2xl font-semibold tracking-tight text-[#3B2416] pt-2">
+          Welcome Back
+        </h1>
+        <p className="text-xs sm:text-sm text-[#806B57] font-normal font-sans">
+          Sign in to your account to continue
+        </p>
       </div>
 
       {message && (
-        <div className="p-3 text-sm rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-600 dark:text-blue-400">
+        <div className="p-3 text-xs sm:text-sm rounded-xl bg-[#F8F1E3] border border-[#C8891A]/30 text-[#8B4513] font-normal">
           {message}
         </div>
       )}
 
       {state?.error && (
-        <div className="p-3 text-sm rounded-lg bg-destructive/10 border border-destructive/20 text-destructive">
+        <div className="p-3 text-xs sm:text-sm rounded-xl bg-red-50 border border-red-200 text-red-700 font-normal">
           {state.error}
         </div>
       )}
 
-      <form action={formAction} className="space-y-4">
+      <form action={formAction} className="space-y-4 font-sans">
         <input type="hidden" name="redirect" value={redirect} />
 
-        <div className="space-y-1.5">
-          <label className="text-sm font-medium text-foreground" htmlFor="email">
+        <div className="space-y-1.5 text-left">
+          <label className="text-xs font-medium uppercase tracking-wider text-[#806B57]" htmlFor="email">
             Email Address
           </label>
           <input
@@ -51,18 +73,18 @@ function LoginForm() {
             type="email"
             required
             placeholder="you@example.com"
-            className="w-full h-11 px-3.5 rounded-lg border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+            className="w-full h-11 px-3.5 rounded-xl border border-[#E8DCC8] bg-[#FFFDF7] text-sm text-[#3B2416] placeholder-[#806B57]/60 font-normal focus:outline-none focus:ring-2 focus:ring-[#C8891A]/30"
           />
         </div>
 
-        <div className="space-y-1.5">
+        <div className="space-y-1.5 text-left">
           <div className="flex items-center justify-between">
-            <label className="text-sm font-medium text-foreground" htmlFor="password">
+            <label className="text-xs font-medium uppercase tracking-wider text-[#806B57]" htmlFor="password">
               Password
             </label>
             <Link
               href="/forgot-password"
-              className="text-xs text-primary font-medium hover:underline"
+              className="text-xs text-[#C8891A] font-medium hover:underline"
             >
               Forgot password?
             </Link>
@@ -73,31 +95,32 @@ function LoginForm() {
             type="password"
             required
             placeholder="••••••••"
-            className="w-full h-11 px-3.5 rounded-lg border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+            className="w-full h-11 px-3.5 rounded-xl border border-[#E8DCC8] bg-[#FFFDF7] text-sm text-[#3B2416] placeholder-[#806B57]/60 font-normal focus:outline-none focus:ring-2 focus:ring-[#C8891A]/30"
           />
         </div>
 
         <button
           type="submit"
           disabled={isPending}
-          className="w-full h-11 inline-flex items-center justify-center gap-2 rounded-lg bg-primary text-primary-foreground font-medium text-sm hover:bg-primary/90 transition-colors disabled:opacity-50"
+          className="w-full h-11 inline-flex items-center justify-center gap-2 rounded-xl bg-[#C8891A] text-white font-medium text-sm hover:bg-[#B37814] transition-all disabled:opacity-50 shadow-sm"
         >
           {isPending ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" />
-              Signing in...
+              <span>Signing in...</span>
             </>
           ) : (
             <>
-              Sign In <ArrowRight className="h-4 w-4" />
+              <span>Sign In</span>
+              <ArrowRight className="h-4 w-4" />
             </>
           )}
         </button>
       </form>
 
-      <div className="text-center text-sm text-muted-foreground pt-2">
+      <div className="text-center text-xs text-[#806B57] pt-2 font-sans font-normal">
         Don&apos;t have an account?{" "}
-        <Link href="/signup" className="font-semibold text-primary hover:underline">
+        <Link href="/signup" className="font-medium text-[#C8891A] hover:underline">
           Sign up
         </Link>
       </div>
@@ -107,7 +130,7 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Loading login form...</div>}>
+    <Suspense fallback={<div className="p-8 text-center text-[#806B57] font-sans">Loading login form...</div>}>
       <LoginForm />
     </Suspense>
   );
