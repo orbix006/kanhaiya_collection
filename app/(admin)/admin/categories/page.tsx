@@ -1,34 +1,37 @@
 import { createClient } from "@/lib/supabase/server";
 import { CategoryManager } from "@/components/admin/category-manager";
 import { getAllActiveCategories } from "@/lib/data/homepage";
+import { SEED_CATEGORIES, loadMockCategories, loadMockProducts } from "@/lib/mock-data/admin-store";
 import { FolderTree, Sparkles } from "lucide-react";
 import type { Category } from "@/lib/data/homepage";
+
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminCategoriesPage() {
-  const supabase = await createClient();
-
   const isConfigured =
     Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL) &&
     process.env.NEXT_PUBLIC_SUPABASE_URL !== "https://placeholder-project.supabase.co";
 
-  let categories: Category[] = [];
+  const mockCats = loadMockCategories();
+  let categories: Category[] = (mockCats && mockCats.length > 0 ? mockCats : SEED_CATEGORIES) as unknown as Category[];
 
   if (isConfigured) {
-    const { data: dbCats, error } = await supabase
-      .from("categories")
-      .select("*")
-      .order("display_order", { ascending: true });
+    try {
+      const supabase = await createClient();
+      const { data: dbCats, error } = await supabase
+        .from("categories")
+        .select("*")
+        .order("display_order", { ascending: true });
 
-    if (error || !dbCats || dbCats.length === 0) {
-      categories = await getAllActiveCategories();
-    } else {
-      categories = dbCats as Category[];
+      if (!error && dbCats && dbCats.length > 0) {
+        categories = dbCats as Category[];
+      }
+    } catch {
+      // Use mock categories
     }
-  } else {
-    categories = await getAllActiveCategories();
   }
+
 
   return (
     <div className="space-y-8">

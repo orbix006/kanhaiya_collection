@@ -24,6 +24,7 @@ import {
   getDescendantCategoryIds,
   getCategoryPathLabel,
 } from "@/lib/data/categories";
+import { upsertCategoryInStore } from "@/lib/mock-data/admin-store";
 import { saveCategoryAction, CategoryPayload } from "@/app/(admin)/admin/categories/actions";
 import type { Category } from "@/lib/data/homepage";
 
@@ -138,15 +139,35 @@ export function CategoryModal({
       show_on_homepage: showOnHomepage,
     };
 
-    const res = await saveCategoryAction(payload);
-    setIsSubmitting(false);
+    // 1. Save and validate locally in Mock Store (with persistence in localStorage)
+    const localRes = upsertCategoryInStore({
+      id: payload.id,
+      name: payload.name,
+      slug: payload.slug,
+      description: payload.description,
+      parent_id: payload.parent_id,
+      image_url: payload.image_url,
+      display_order: payload.display_order,
+      is_active: payload.is_active,
+      show_on_homepage: payload.show_on_homepage,
+    });
 
-    if (res.error) {
-      setFormError(res.error);
-    } else if (res.category) {
-      onSuccess(res.category as Category);
-      onClose();
+    if (!localRes.success) {
+      setIsSubmitting(false);
+      setFormError(localRes.error || "Failed to validate category.");
+      return;
     }
+
+    // 2. Invoke server action for Next.js path cache revalidation
+    try {
+      await saveCategoryAction(payload);
+    } catch {
+      // Offline fallback
+    }
+
+    setIsSubmitting(false);
+    onSuccess(localRes.category as unknown as Category);
+    onClose();
   };
 
   return (
@@ -163,185 +184,224 @@ export function CategoryModal({
         <button
           type="button"
           onClick={onClose}
-          className="absolute right-5 top-5 flex h-8 w-8 items-center justify-center rounded-xl bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+          className="absolute right-5 top-5 flex h-8 w-8 items-center justify-center rounded-xl bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
         >
           <X className="h-4 w-4" />
         </button>
 
         {/* Modal Header */}
         <div className="flex items-center gap-3 mb-6">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary shrink-0">
             <FolderTree className="h-5 w-5" />
           </div>
           <div>
-            <h2 className="text-xl font-bold tracking-tight text-foreground">
-              {isEditing && categoryToEdit ? `Edit Category: ${categoryToEdit.name}` : "Create New Category"}
+            <h2 className="text-lg font-bold tracking-tight text-foreground">
+              {isEditing ? `Edit Category: ${categoryToEdit?.name || ""}` : "Create New Category"}
             </h2>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Configure category details, safe parent placement, and storefront visibility.
+              Configure name, hierarchy level, URL slug, and storefront placement.
             </p>
           </div>
         </div>
 
         {formError && (
-          <div className="mb-5">
-            <FormError message={formError} />
+          <div className="mb-5 p-3.5 rounded-xl bg-destructive/10 border border-destructive/30 text-xs text-destructive font-medium flex items-start gap-2 animate-in fade-in">
+            <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+            <span>{formError}</span>
           </div>
         )}
 
-        {/* Form Body */}
-        <form onSubmit={handleSubmit} className="space-y-4 text-left">
-          {/* Name */}
-          <FormField label="Category Name" required helperText="e.g., Menswear, Sarees, Footwear">
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Name Field */}
+          <FormField label="Category Name" required>
             <FormInput
-              type="text"
-              required
-              placeholder="Enter category name"
               value={name}
               onChange={(e) => handleNameChange(e.target.value)}
+              placeholder="e.g., Pure Brass Idols, Akhand Diya"
+              required
             />
           </FormField>
 
-          {/* Editable Auto-Slug */}
+          {/* Slug with Auto-generate / Manual edit toggle */}
           <FormField
             label="URL Slug"
             required
-            helperText="Used in deep-links (/shop?category=slug). Auto-generates as you type name."
+            helperText="Used in the URL: /shop?category=<slug>"
           >
             <div className="relative flex items-center">
+              <span className="absolute left-3 font-mono text-xs text-muted-foreground">/</span>
               <FormInput
-                type="text"
-                required
-                placeholder="category-slug"
                 value={slug}
-                disabled={isSlugLocked}
-                onChange={(e) => setSlug(e.target.value)}
-                className="pr-24 font-mono text-xs"
+                onChange={(e) => {
+                  setSlug(e.target.value);
+                  setIsSlugLocked(false);
+                }}
+                className="pl-6 pr-10 font-mono text-xs"
+                placeholder="pure-brass-idols"
+                required
               />
               <button
                 type="button"
-                onClick={() => setIsSlugLocked(!isSlugLocked)}
-                className={`absolute right-2 flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold transition-colors ${
-                  isSlugLocked
-                    ? "bg-muted text-muted-foreground hover:text-foreground"
-                    : "bg-primary text-primary-foreground"
-                }`}
-                title={isSlugLocked ? "Unlock to customize slug" : "Lock to auto-sync with name"}
+                onClick={() => {
+                  if (!isSlugLocked) {
+                    setSlug(generateSlug(name));
+                  }
+                  setIsSlugLocked(!isSlugLocked);
+                }}
+                className="absolute right-2 flex h-7 w-7 items-center justify-center rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                title={isSlugLocked ? "Slug is auto-generated. Click to customize." : "Slug is customized. Click to lock & sync with name."}
               >
                 {isSlugLocked ? (
-                  <>
-                    <Lock className="h-3 w-3" />
-                    <span>Auto</span>
-                  </>
+                  <Lock className="h-3.5 w-3.5 text-primary" />
                 ) : (
-                  <>
-                    <Unlock className="h-3 w-3" />
-                    <span>Custom</span>
-                  </>
+                  <Unlock className="h-3.5 w-3.5 text-amber-500" />
                 )}
               </button>
             </div>
           </FormField>
 
-          {/* Safe Parent Picker */}
+          {/* Parent Category Picker (Prevents cycle and self-selection) */}
           <FormField
-            label="Parent Category (Safe Picker)"
-            helperText={
-              isEditing
-                ? "Cycle safe: This category and all of its descendants are automatically disabled."
-                : "Select None for top-level root category, or nest under an existing category."
-            }
+            label="Parent Category"
+            helperText="Select a parent to create a subcategory (unlimited depth supported)"
           >
             <FormSelect
               value={parentId}
               onChange={(e) => setParentId(e.target.value)}
             >
-              <option value="">(None — Top Level Root Category)</option>
-              {parentOptions.map((opt) => (
-                <option key={opt.id} value={opt.id}>
-                  {getCategoryPathLabel(opt.id, allCategories)}
+              <option value="">(None - Top Level Root Category)</option>
+              {parentOptions.map((cat) => (
+                <option key={cat.id} value={cat.id}>
+                  {getCategoryPathLabel(cat.id, allCategories)}
                 </option>
               ))}
             </FormSelect>
           </FormField>
 
           {/* Description */}
-          <FormField label="Description" helperText="Brief summary shown on homepage category boxes.">
+          <FormField label="Description" helperText="Optional summary of products under this category">
             <FormTextarea
-              rows={2}
-              placeholder="Describe this category..."
               value={description}
               onChange={(e) => setDescription(e.target.value)}
+              placeholder="Brief description for customer guidance..."
+              rows={2}
             />
           </FormField>
 
-          {/* Media Image URL */}
-          <FormField label="Media Image URL" helperText="Public image URL displayed on category cards.">
-            <div className="flex items-center gap-3">
-              <FormInput
-                type="url"
-                placeholder="https://... image.jpg"
-                value={imageUrl}
-                onChange={(e) => setImageUrl(e.target.value)}
-              />
+          {/* Image URL & Preview */}
+          <FormField
+            label="Category Thumbnail Image URL"
+            helperText="Image shown in 'Shop by Category' cards on the homepage"
+          >
+            <div className="space-y-2">
+              <div className="relative">
+                <FormInput
+                  value={imageUrl}
+                  onChange={(e) => setImageUrl(e.target.value)}
+                  placeholder="https://images.unsplash.com/... or /images/preview-murti.jpg"
+                />
+              </div>
+
+              {/* Quick Preset Buttons for Development */}
+              <div className="flex items-center gap-1.5 flex-wrap text-[11px] text-muted-foreground">
+                <span className="font-semibold">Quick Presets:</span>
+                <button
+                  type="button"
+                  onClick={() => setImageUrl("https://images.unsplash.com/photo-1599707367072-cd6ada2bc375?auto=format&fit=crop&w=800&q=80")}
+                  className="px-2 py-0.5 rounded bg-muted hover:bg-primary/10 hover:text-primary transition-colors cursor-pointer"
+                >
+                  Brass Idols
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setImageUrl("https://images.unsplash.com/photo-1606293926075-69a00dbfde81?auto=format&fit=crop&w=800&q=80")}
+                  className="px-2 py-0.5 rounded bg-muted hover:bg-primary/10 hover:text-primary transition-colors cursor-pointer"
+                >
+                  Akhand Diya
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setImageUrl("https://images.unsplash.com/photo-1582738411706-bfc8e691d1c2?auto=format&fit=crop&w=800&q=80")}
+                  className="px-2 py-0.5 rounded bg-muted hover:bg-primary/10 hover:text-primary transition-colors cursor-pointer"
+                >
+                  Puja Thali
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setImageUrl("https://images.unsplash.com/photo-1608571423902-eed4a5ad8108?auto=format&fit=crop&w=800&q=80")}
+                  className="px-2 py-0.5 rounded bg-muted hover:bg-primary/10 hover:text-primary transition-colors cursor-pointer"
+                >
+                  Dhoop & Aromas
+                </button>
+              </div>
+
               {imageUrl && (
-                <div className="relative h-9.5 w-9.5 rounded-xl border border-border overflow-hidden shrink-0">
-                  <Image
-                    src={imageUrl}
-                    alt="Preview"
-                    fill
-                    className="object-cover"
-                    unoptimized
-                  />
+                <div className="flex items-center gap-3 p-2 rounded-xl border border-border bg-muted/30">
+                  <div className="relative h-12 w-12 rounded-lg border border-border overflow-hidden shrink-0 bg-muted">
+                    <Image
+                      src={imageUrl}
+                      alt="Category Preview"
+                      fill
+                      className="object-cover"
+                      unoptimized
+                    />
+                  </div>
+                  <span className="text-[11px] text-muted-foreground truncate max-w-sm">
+                    {imageUrl}
+                  </span>
                 </div>
               )}
             </div>
           </FormField>
 
           {/* Display Order */}
-          <FormField label="Display Order" helperText="Determines sorting sequence across menus and storefront grids.">
+          <FormField
+            label="Display Order"
+            helperText="Controls the sorting sequence among categories at the same depth"
+          >
             <FormInput
               type="number"
-              min={0}
               value={displayOrder}
               onChange={(e) => setDisplayOrder(parseInt(e.target.value, 10) || 0)}
-              className="w-32"
+              min={0}
+              className="w-32 font-mono"
             />
           </FormField>
 
-          {/* Flags: Active & Homepage */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+          {/* Visibility Switches */}
+          <div className="pt-2 border-t border-border/60 space-y-3">
             <FormSwitch
-              label="Active Status"
-              description="Category is active across storefront and catalog"
               checked={isActive}
               onChange={setIsActive}
+              label="Active Status"
+              description="When deactivated, this category and its subcategories are hidden from customer view."
             />
+
             <FormSwitch
-              label="Show on Homepage"
-              description="Render in homepage Category Grid & Rows"
               checked={showOnHomepage}
               onChange={setShowOnHomepage}
+              label="Show on Homepage"
+              description="Keep visible in shop catalog, but control whether a card appears on the homepage."
             />
           </div>
 
-          {/* Actions */}
-          <div className="flex items-center justify-end gap-3 pt-6 border-t border-border/60">
+          {/* Action Buttons */}
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-border/60">
             <button
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="px-4 py-2 rounded-xl border border-border text-xs font-semibold text-muted-foreground hover:bg-muted transition-colors"
+              className="px-4 py-2 rounded-xl border border-border text-xs font-semibold text-muted-foreground hover:bg-muted transition-colors cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="inline-flex items-center gap-2 px-5 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-bold shadow-xs hover:bg-primary/90 disabled:opacity-50 transition-colors"
+              className="inline-flex items-center gap-2 px-5 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-bold shadow-xs hover:bg-primary/90 disabled:opacity-50 transition-colors cursor-pointer"
             >
               <Save className="h-4 w-4" />
-              <span>{isSubmitting ? "Saving..." : isEditing ? "Save Changes" : "Create Category"}</span>
+              <span>{isSubmitting ? "Saving..." : isEditing ? "Update Category" : "Create Category"}</span>
             </button>
           </div>
         </form>

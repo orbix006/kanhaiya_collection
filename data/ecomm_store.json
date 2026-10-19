@@ -1,293 +1,669 @@
 {
   "banners": [
     {
-      "id": "banner-1",
-      "title": "Janmashtami Collection",
-      "subtitle": "Celebrate divine love and eternal devotion with consecrated brass idols and sacred flute offerings.",
-      "cta_text": "Explore Collection",
-      "cta_link": "/shop?category=idols",
-      "image_url": "/images/janmashtami-campaign.jpg",
-      "mobile_image_url": "/images/janmashtami-mobile.jpg",
-      "is_active": true,
+      "id": "ban-rk-collection",
+      "image_url": "https://images.unsplash.com/photo-1599707367072-cd6ada2bc375?auto=format&fit=crop&w=1600&q=80",
+      "title": "Divine Brass Radha Krishna Murtis — Handcrafted in Varanasi",
+      "link_url": "/shop?category=idols",
       "display_order": 1,
-      "start_date": null,
-      "end_date": null,
-      "created_at": "2026-10-03T16:28:24.135Z",
-      "updated_at": "2026-10-08T22:30:00.000Z"
+      "is_active": true,
+      "created_at": "2026-10-01T10:00:00.000Z",
+      "updated_at": "2026-10-01T10:00:00.000Z"
     },
     {
-      "id": "banner-2",
-      "title": "Diwali Deepotsav Collection",
-      "subtitle": "Bring sacred light, consecrated brass akhand diyas and timeless warmth home.",
-      "cta_text": "Shop Now",
-      "cta_link": "/shop?category=pooja-essentials",
-      "image_url": "/images/diwali-campaign.jpg",
-      "mobile_image_url": null,
-      "is_active": true,
+      "id": "ban-akhand-diya",
+      "image_url": "https://images.unsplash.com/photo-1606293926075-69a00dbfde81?auto=format&fit=crop&w=1600&q=80",
+      "title": "Sacred Akhand Diyas & Artisan Pooja Thalis for Home Mandir",
+      "link_url": "/shop?category=pooja-essentials",
       "display_order": 2,
-      "start_date": null,
-      "end_date": null,
-      "created_at": "2026-10-05T16:28:24.136Z",
-      "updated_at": "2026-10-08T22:30:00.000Z"
+      "is_active": true,
+      "created_at": "2026-10-02T10:00:00.000Z",
+      "updated_at": "2026-10-02T10:00:00.000Z"
     },
     {
-      "id": "banner-3",
-      "title": "Sacred Temple Brassware & Aromas",
-      "subtitle": "Artisan engraved puja thalis, pure cow-dung dhoop cones and natural Vrindavan chandan.",
-      "cta_text": "Discover Pooja Essentials",
-      "cta_link": "/shop?category=sacred-aromas",
-      "image_url": "/images/temple-atmosphere.jpg",
-      "mobile_image_url": null,
-      "is_active": true,
+      "id": "ban-sacred-aromas",
+      "image_url": "https://images.unsplash.com/photo-1608571423902-eed4a5ad8108?auto=format&fit=crop&w=1600&q=80",
+      "title": "Pure Temple Chandan & Handcrafted Cow-Dung Sambrani Dhoop",
+      "link_url": "/shop?category=sacred-aromas",
       "display_order": 3,
-      "start_date": null,
-      "end_date": null,
-      "created_at": "2026-10-07T16:28:24.136Z",
-      "updated_at": "2026-10-08T22:30:00.000Z"
+      "is_active": true,
+      "created_at": "2026-10-03T10:00:00.000Z",
+      "updated_at": "2026-10-03T10:00:00.000Z"
+    },
+    {
+      "id": "ban-temple-brass",
+      "image_url": "https://images.unsplash.com/photo-1582738411706-bfc8e691d1c2?auto=format&fit=crop&w=1600&q=80",
+      "title": "Heavy Cast Mandir Ghanti Bells & Consecrated Kalashes",
+      "link_url": "/shop?category=temple-brassware",
+      "display_order": 4,
+      "is_active": true,
+      "created_at": "2026-10-04T10:00:00.000Z",
+      "updated_at": "2026-10-04T10:00:00.000Z"
     }
   ],
   "categories": [
     {
-      "id": "cat-1",
+      "id": "cat-idols",
+      "parent_id": null,
       "name": "Idols & Murtis",
       "slug": "idols",
       "description": "Handcrafted sacred Radha Krishna, Bal Gopal and Ganesha brass idols",
-      "image_url": "/images/preview-murti.jpg",
+      "image_url": "https://images.unsplash.com/photo-1599707367072-cd6ada2bc375?auto=format&fit=crop&w=800&q=80",
       "display_order": 1,
       "is_active": true,
       "show_on_homepage": true,
-      "created_at": "2026-09-28T16:28:24.136Z",
-      "updated_at": "2026-09-28T16:28:24.136Z"
+      "created_at": "2026-09-28T10:00:00.000Z",
+      "updated_at": "2026-09-28T10:00:00.000Z"
     },
     {
-      "id": "cat-2",
+      "id": "cat-pooja",
+      "parent_id": null,
       "name": "Pooja Essentials",
       "slug": "pooja-essentials",
       "description": "Pure brass engraved thalis, akhand diyas, ghanti bells and aarti vessels",
-      "image_url": "/images/preview-thali.jpg",
+      "image_url": "https://images.unsplash.com/photo-1606293926075-69a00dbfde81?auto=format&fit=crop&w=800&q=80",
       "display_order": 2,
       "is_active": true,
       "show_on_homepage": true,
-      "created_at": "2026-09-29T16:28:24.136Z",
-      "updated_at": "2026-09-29T16:28:24.136Z"
+      "created_at": "2026-09-29T10:00:00.000Z",
+      "updated_at": "2026-09-29T10:00:00.000Z"
     },
     {
-      "id": "cat-3",
-      "name": "Sacred Aromas",
+      "id": "cat-aromas",
+      "parent_id": null,
+      "name": "Sacred Aromas & Dhoop",
       "slug": "sacred-aromas",
       "description": "Natural temple chandan, pure cow dung dhoop, sambrani and incense cones",
-      "image_url": "/images/temple-atmosphere.jpg",
+      "image_url": "https://images.unsplash.com/photo-1608571423902-eed4a5ad8108?auto=format&fit=crop&w=800&q=80",
       "display_order": 3,
       "is_active": true,
       "show_on_homepage": true,
-      "created_at": "2026-09-30T16:28:24.136Z",
-      "updated_at": "2026-09-30T16:28:24.136Z"
+      "created_at": "2026-09-30T10:00:00.000Z",
+      "updated_at": "2026-09-30T10:00:00.000Z"
     },
     {
-      "id": "cat-4",
+      "id": "cat-temple-brass",
+      "parent_id": null,
       "name": "Temple Brassware",
       "slug": "temple-brassware",
       "description": "Heavy cast brass mandir bells, shankh stands and ceremonial kalashes",
-      "image_url": "/images/hero-flute.jpg",
+      "image_url": "https://images.unsplash.com/photo-1582738411706-bfc8e691d1c2?auto=format&fit=crop&w=800&q=80",
       "display_order": 4,
       "is_active": true,
       "show_on_homepage": true,
-      "created_at": "2026-10-01T16:28:24.136Z",
-      "updated_at": "2026-10-01T16:28:24.136Z"
+      "created_at": "2026-10-01T10:00:00.000Z",
+      "updated_at": "2026-10-01T10:00:00.000Z"
     },
     {
-      "id": "cat-5",
-      "name": "Decorative & Aasans",
-      "slug": "decorative",
+      "id": "cat-decor",
+      "parent_id": null,
+      "name": "Mandir Aasans & Textiles",
+      "slug": "mandir-aasans",
       "description": "Pure silk deity robes, handwoven mandir prayer rugs and altar textiles",
-      "image_url": "/images/preview-murti.jpg",
+      "image_url": "https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=800&q=80",
       "display_order": 5,
       "is_active": true,
       "show_on_homepage": true,
-      "created_at": "2026-10-02T16:28:24.136Z",
-      "updated_at": "2026-10-02T16:28:24.136Z"
+      "created_at": "2026-10-02T10:00:00.000Z",
+      "updated_at": "2026-10-02T10:00:00.000Z"
+    },
+    {
+      "id": "cat-brass-idols",
+      "parent_id": "cat-idols",
+      "name": "Pure Brass Idols",
+      "slug": "pure-brass-idols",
+      "description": "Solid cast pure brass deity murtis polished with golden luster",
+      "image_url": "https://images.unsplash.com/photo-1599707367072-cd6ada2bc375?auto=format&fit=crop&w=600&q=80",
+      "display_order": 1,
+      "is_active": true,
+      "show_on_homepage": true,
+      "created_at": "2026-10-02T11:00:00.000Z",
+      "updated_at": "2026-10-02T11:00:00.000Z"
+    },
+    {
+      "id": "cat-silver-idols",
+      "parent_id": "cat-idols",
+      "name": "Silver Plated Idols",
+      "slug": "silver-plated-idols",
+      "description": "Electroplated pure silver deity idols for festive gifts and home shrines",
+      "image_url": "https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=600&q=80",
+      "display_order": 2,
+      "is_active": true,
+      "show_on_homepage": false,
+      "created_at": "2026-10-02T11:30:00.000Z",
+      "updated_at": "2026-10-02T11:30:00.000Z"
+    },
+    {
+      "id": "cat-diyas",
+      "parent_id": "cat-pooja",
+      "name": "Akhand Diyas & Deepams",
+      "slug": "akhand-diyas",
+      "description": "Traditional continuous flame lamps with brass bases",
+      "image_url": "https://images.unsplash.com/photo-1606293926075-69a00dbfde81?auto=format&fit=crop&w=600&q=80",
+      "display_order": 1,
+      "is_active": true,
+      "show_on_homepage": true,
+      "created_at": "2026-10-02T12:00:00.000Z",
+      "updated_at": "2026-10-02T12:00:00.000Z"
+    },
+    {
+      "id": "cat-thalis",
+      "parent_id": "cat-pooja",
+      "name": "Puja Thali Sets",
+      "slug": "puja-thali-sets",
+      "description": "Complete ceremonial puja sets with engraved brass accessories",
+      "image_url": "https://images.unsplash.com/photo-1582738411706-bfc8e691d1c2?auto=format&fit=crop&w=600&q=80",
+      "display_order": 2,
+      "is_active": true,
+      "show_on_homepage": true,
+      "created_at": "2026-10-02T12:30:00.000Z",
+      "updated_at": "2026-10-02T12:30:00.000Z"
+    },
+    {
+      "id": "cat-organic-dhoop",
+      "parent_id": "cat-pooja",
+      "name": "Organic Cow Dung Dhoop",
+      "slug": "organic-dhoop",
+      "description": "Desi Gir cow dung and Ayurvedic botanical dhoop cones",
+      "image_url": "https://images.unsplash.com/photo-1608571423902-eed4a5ad8108?auto=format&fit=crop&w=600&q=80",
+      "display_order": 3,
+      "is_active": true,
+      "show_on_homepage": true,
+      "created_at": "2026-10-02T13:00:00.000Z",
+      "updated_at": "2026-10-19T12:38:31.381Z"
+    },
+    {
+      "id": "cat-radha-krishna",
+      "parent_id": "cat-brass-idols",
+      "name": "Radha Krishna Murti",
+      "slug": "radha-krishna-murti",
+      "description": "Divine Radha Krishna brass statues with flute and crown",
+      "image_url": "https://images.unsplash.com/photo-1599707367072-cd6ada2bc375?auto=format&fit=crop&w=400&q=80",
+      "display_order": 1,
+      "is_active": true,
+      "show_on_homepage": true,
+      "created_at": "2026-10-03T10:00:00.000Z",
+      "updated_at": "2026-10-19T12:38:31.408Z"
+    },
+    {
+      "id": "cat-laddu-gopal",
+      "parent_id": "cat-brass-idols",
+      "name": "Laddu Gopal & Bal Gopal",
+      "slug": "laddu-gopal-murti",
+      "description": "Intricately detailed Bal Gopal crawling and blessing idols",
+      "image_url": "https://images.unsplash.com/photo-1606293926075-69a00dbfde81?auto=format&fit=crop&w=400&q=80",
+      "display_order": 2,
+      "is_active": true,
+      "show_on_homepage": true,
+      "created_at": "2026-10-03T10:30:00.000Z",
+      "updated_at": "2026-10-19T12:38:31.408Z"
+    },
+    {
+      "id": "cat-glass-diya",
+      "parent_id": "cat-diyas",
+      "name": "Glass Chimney Akhand Diya",
+      "slug": "glass-chimney-diya",
+      "description": "Windproof borosilicate glass chimney akhand deepam",
+      "image_url": "https://images.unsplash.com/photo-1606293926075-69a00dbfde81?auto=format&fit=crop&w=400&q=80",
+      "display_order": 1,
+      "is_active": true,
+      "show_on_homepage": true,
+      "created_at": "2026-10-03T11:00:00.000Z",
+      "updated_at": "2026-10-03T11:00:00.000Z"
+    },
+    {
+      "id": "cat-hanging-diya",
+      "parent_id": "cat-diyas",
+      "name": "Mandir Hanging Bell Diya",
+      "slug": "hanging-bell-diya",
+      "description": "Ceiling suspension brass chain diyas with ghungroo bells",
+      "image_url": "https://images.unsplash.com/photo-1582738411706-bfc8e691d1c2?auto=format&fit=crop&w=400&q=80",
+      "display_order": 2,
+      "is_active": true,
+      "show_on_homepage": false,
+      "created_at": "2026-10-03T11:30:00.000Z",
+      "updated_at": "2026-10-03T11:30:00.000Z"
+    },
+    {
+      "id": "cat-sambrani-cups",
+      "parent_id": "cat-organic-dhoop",
+      "name": "Havan Sambrani Cups",
+      "slug": "sambrani-cups",
+      "description": "Natural herbal loban and sambrani burning cups for temple sanctity",
+      "image_url": "https://images.unsplash.com/photo-1608571423902-eed4a5ad8108?auto=format&fit=crop&w=400&q=80",
+      "display_order": 1,
+      "is_active": true,
+      "show_on_homepage": true,
+      "created_at": "2026-10-03T12:00:00.000Z",
+      "updated_at": "2026-10-03T12:00:00.000Z"
     }
   ],
   "products": [
     {
-      "id": "prod-1",
-      "category_id": "cat-1",
-      "name": "Handcrafted Brass Krishna Idol with Flute",
-      "slug": "krishna-idol",
-      "description": "Intricately detailed pure brass Krishna idol playing the sacred flute with divine ornamentation. Consecrated with holy mantras.",
+      "id": "prod-1792413511500-5krv",
+      "category_id": null,
+      "name": "Consecrated Brass Maha Meru Yantra (5 Inch)",
+      "slug": "consecrated-brass-maha-meru-5-inch",
+      "description": "Consecrated Brass Maha Meru Yantra (5 Inch) - Handcrafted authentic piece from Kanhaiya Collection.",
       "brand": "Kanhaiya Collection",
+      "sku": "KC-DMA-007",
+      "batch_number": "BATCH-202610-0007",
       "base_price": 3499,
-      "compare_at_price": 4299,
-      "stock_quantity": 15,
-      "sold_count": 142,
+      "compare_at_price": null,
+      "stock_quantity": 12,
+      "sold_count": 0,
+      "is_active": true,
+      "is_featured_top_seller": false,
+      "top_seller_display_order": null,
+      "avg_rating": 0,
+      "review_count": 0,
+      "meta_title": null,
+      "meta_description": null,
+      "created_at": "2026-10-19T12:38:31.500Z",
+      "updated_at": "2026-10-19T12:38:31.500Z",
+      "category": null,
+      "images": [
+        {
+          "id": "img-y1",
+          "product_id": "prod-1792413511500-5krv",
+          "image_url": "https://images.unsplash.com/photo-yantra-1.jpg",
+          "alt_text": "Yantra view",
+          "display_order": 1,
+          "is_primary": true,
+          "created_at": "2026-10-19T12:38:31.467Z"
+        }
+      ],
+      "variants": []
+    },
+    {
+      "id": "prod-1",
+      "category_id": "cat-radha-krishna",
+      "name": "Pure Brass Radha Krishna Murti (9 Inch)",
+      "slug": "pure-brass-radha-krishna-murti-9-inch",
+      "description": "Handcrafted sacred Radha Krishna idol sculpted in pure heavy brass. Adorned with sacred flute, intricate mukut, and sanctified posture.",
+      "brand": "Kanhaiya Collection",
+      "sku": "KC-RKM-09",
+      "batch_number": "BATCH-202609-0001",
+      "base_price": 4999,
+      "compare_at_price": 5999,
+      "stock_quantity": 4,
+      "sold_count": 38,
       "is_active": true,
       "is_featured_top_seller": true,
       "top_seller_display_order": 1,
-      "image_url": "/images/preview-murti.jpg",
-      "created_at": "2026-09-26T16:28:24.136Z",
-      "updated_at": "2026-10-08T16:28:24.136Z"
+      "avg_rating": 5,
+      "review_count": 1,
+      "meta_title": "Pure Brass Radha Krishna Murti (9 Inch) | Kanhaiya Collection",
+      "meta_description": "Order authentic handcrafted brass Radha Krishna murti for your mandir shrine.",
+      "created_at": "2026-09-28T12:00:00.000Z",
+      "updated_at": "2026-10-01T12:00:00.000Z",
+      "images": [
+        {
+          "id": "img-1-1",
+          "product_id": "prod-1",
+          "image_url": "https://images.unsplash.com/photo-1599707367072-cd6ada2bc375?auto=format&fit=crop&w=800&q=80",
+          "alt_text": "Front view of pure brass Radha Krishna murti",
+          "display_order": 1,
+          "is_primary": true,
+          "created_at": "2026-09-28T12:00:00.000Z"
+        },
+        {
+          "id": "img-1-2",
+          "product_id": "prod-1",
+          "image_url": "https://images.unsplash.com/photo-1606293926075-69a00dbfde81?auto=format&fit=crop&w=800&q=80",
+          "alt_text": "Detail of sacred flute and ornamentation",
+          "display_order": 2,
+          "is_primary": false,
+          "created_at": "2026-09-28T12:05:00.000Z"
+        }
+      ],
+      "variants": [
+        {
+          "id": "var-1-1",
+          "product_id": "prod-1",
+          "variant_name": "Antique Gold / 9 Inch",
+          "sku": "KC-RKM-09-AG",
+          "attributes": {
+            "size": "9 Inch",
+            "finish": "Antique Gold"
+          },
+          "price": 4999,
+          "compare_at_price": 5999,
+          "stock_quantity": 4,
+          "image_url": "https://images.unsplash.com/photo-1599707367072-cd6ada2bc375?auto=format&fit=crop&w=800&q=80",
+          "is_active": true,
+          "created_at": "2026-09-28T12:00:00.000Z",
+          "updated_at": "2026-09-28T12:00:00.000Z"
+        },
+        {
+          "id": "var-1-2",
+          "product_id": "prod-1",
+          "variant_name": "Polished Brass / 12 Inch",
+          "sku": "KC-RKM-12-PB",
+          "attributes": {
+            "size": "12 Inch",
+            "finish": "Polished Brass"
+          },
+          "price": 7499,
+          "compare_at_price": 8999,
+          "stock_quantity": 2,
+          "image_url": "https://images.unsplash.com/photo-1599707367072-cd6ada2bc375?auto=format&fit=crop&w=800&q=80",
+          "is_active": true,
+          "created_at": "2026-09-28T12:00:00.000Z",
+          "updated_at": "2026-09-28T12:00:00.000Z"
+        }
+      ]
     },
     {
       "id": "prod-2",
-      "category_id": "cat-2",
-      "name": "Artisan Engraved Akhand Diya",
-      "slug": "brass-diya",
-      "description": "Traditional solid brass akhand diya with steady flame glass chimney and floral engraving. Designed for long ritual burning.",
+      "category_id": "cat-glass-diya",
+      "name": "Akhand Brass Diya with Borosilicate Glass Chimney",
+      "slug": "akhand-brass-diya-glass-chimney",
+      "description": "Engineered for steady 24-hour burning. Thermal shock resistant borosilicate glass chimney keeps the holy flame safe from air currents.",
       "brand": "Kanhaiya Collection",
-      "base_price": 899,
-      "compare_at_price": 1199,
-      "stock_quantity": 45,
-      "sold_count": 310,
-      "is_active": true,
-      "is_featured_top_seller": true,
-      "top_seller_display_order": 2,
-      "image_url": "/images/hero-flute.jpg",
-      "created_at": "2026-09-27T16:28:24.136Z",
-      "updated_at": "2026-10-08T16:28:24.136Z"
-    },
-    {
-      "id": "prod-3",
-      "category_id": "cat-2",
-      "name": "Royal Brass Puja Thali Set (7 Pieces)",
-      "slug": "artisan-puja-thali",
-      "description": "Exquisite hand-hammered brass puja thali complete with ghanti bell, aarti diya, kumkum katori, agarbatti stand, and spoon.",
-      "brand": "Kanhaiya Collection",
-      "base_price": 1899,
-      "compare_at_price": 2499,
-      "stock_quantity": 20,
-      "sold_count": 195,
-      "is_active": true,
-      "is_featured_top_seller": false,
-      "top_seller_display_order": null,
-      "image_url": "/images/preview-thali.jpg",
-      "created_at": "2026-09-28T16:28:24.136Z",
-      "updated_at": "2026-10-08T16:28:24.136Z"
-    },
-    {
-      "id": "prod-4",
-      "category_id": "cat-3",
-      "name": "Pure Temple Chandan & Guggul Dhoop",
-      "slug": "pure-chandan-dhoop",
-      "description": "Slow-burning organic dhoop sticks made with natural Vrindavan sandalwood dust, desi ghee, and holy Ayurvedic herbs.",
-      "brand": "Kanhaiya Collection",
-      "base_price": 450,
-      "compare_at_price": 550,
-      "stock_quantity": 80,
-      "sold_count": 260,
-      "is_active": true,
-      "is_featured_top_seller": false,
-      "top_seller_display_order": null,
-      "image_url": "/images/temple-atmosphere.jpg",
-      "created_at": "2026-09-29T16:28:24.136Z",
-      "updated_at": "2026-10-08T16:28:24.136Z"
-    },
-    {
-      "id": "prod-5",
-      "category_id": "cat-1",
-      "name": "Radha Krishna Panchaloha Sacred Murti",
-      "slug": "radha-krishna-murti",
-      "description": "Consecrated five-metal sacred couple murti with delicate smiling expressions, peacock feather crown, and lotus pedestal.",
-      "brand": "Kanhaiya Collection",
-      "base_price": 5999,
-      "compare_at_price": 7499,
+      "sku": "KC-AKD-01",
+      "batch_number": "BATCH-202609-0002",
+      "base_price": 1299,
+      "compare_at_price": 1599,
       "stock_quantity": 8,
       "sold_count": 85,
       "is_active": true,
+      "is_featured_top_seller": true,
+      "top_seller_display_order": 2,
+      "avg_rating": 5,
+      "review_count": 1,
+      "meta_title": "Akhand Brass Diya with Borosilicate Glass Chimney | Kanhaiya Collection",
+      "meta_description": "Order heavy brass akhand diya with steady flame glass chimney.",
+      "created_at": "2026-09-29T11:00:00.000Z",
+      "updated_at": "2026-10-02T11:00:00.000Z",
+      "images": [
+        {
+          "id": "img-2-1",
+          "product_id": "prod-2",
+          "image_url": "https://images.unsplash.com/photo-1606293926075-69a00dbfde81?auto=format&fit=crop&w=800&q=80",
+          "alt_text": "Akhand brass diya burning steadily with glass chimney",
+          "display_order": 1,
+          "is_primary": true,
+          "created_at": "2026-09-29T11:00:00.000Z"
+        }
+      ],
+      "variants": [
+        {
+          "id": "var-2-1",
+          "product_id": "prod-2",
+          "variant_name": "Medium (5.5 Inch)",
+          "sku": "KC-AKD-01-M",
+          "attributes": {
+            "size": "Medium 5.5 Inch"
+          },
+          "price": 1299,
+          "compare_at_price": 1599,
+          "stock_quantity": 8,
+          "image_url": "https://images.unsplash.com/photo-1606293926075-69a00dbfde81?auto=format&fit=crop&w=800&q=80",
+          "is_active": true,
+          "created_at": "2026-09-29T11:00:00.000Z",
+          "updated_at": "2026-09-29T11:00:00.000Z"
+        },
+        {
+          "id": "var-2-2",
+          "product_id": "prod-2",
+          "variant_name": "Large (7.5 Inch)",
+          "sku": "KC-AKD-01-L",
+          "attributes": {
+            "size": "Large 7.5 Inch"
+          },
+          "price": 1799,
+          "compare_at_price": 2199,
+          "stock_quantity": 6,
+          "image_url": "https://images.unsplash.com/photo-1606293926075-69a00dbfde81?auto=format&fit=crop&w=800&q=80",
+          "is_active": true,
+          "created_at": "2026-09-29T11:00:00.000Z",
+          "updated_at": "2026-09-29T11:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "prod-3",
+      "category_id": "cat-thalis",
+      "name": "Pure Brass Asthamangala Puja Thali Set (11 Pieces)",
+      "slug": "brass-asthamangala-puja-thali-set",
+      "description": "Complete ceremonial brass puja thali with embossed Om and Gayatri mantra. Includes ghanti bell, panchamrit loti, aarti diya, and katoris.",
+      "brand": "Kanhaiya Collection",
+      "sku": "KC-PTH-11",
+      "batch_number": "BATCH-202609-0003",
+      "base_price": 3499,
+      "compare_at_price": 4299,
+      "stock_quantity": 12,
+      "sold_count": 42,
+      "is_active": true,
       "is_featured_top_seller": false,
       "top_seller_display_order": null,
-      "image_url": "/images/preview-murti.jpg",
-      "created_at": "2026-09-30T16:28:24.136Z",
-      "updated_at": "2026-10-08T16:28:24.136Z"
+      "avg_rating": 4,
+      "review_count": 1,
+      "meta_title": "Pure Brass Asthamangala Puja Thali Set (11 Pieces)",
+      "meta_description": "11-piece consecrated puja thali set in solid polished brass.",
+      "created_at": "2026-09-30T10:00:00.000Z",
+      "updated_at": "2026-10-02T10:00:00.000Z",
+      "images": [
+        {
+          "id": "img-3-1",
+          "product_id": "prod-3",
+          "image_url": "https://images.unsplash.com/photo-1582738411706-bfc8e691d1c2?auto=format&fit=crop&w=800&q=80",
+          "alt_text": "11 piece brass asthamangala puja thali set arranged for aarti",
+          "display_order": 1,
+          "is_primary": true,
+          "created_at": "2026-09-30T10:00:00.000Z"
+        }
+      ],
+      "variants": [
+        {
+          "id": "var-3-1",
+          "product_id": "prod-3",
+          "variant_name": "Standard 11-Piece",
+          "sku": "KC-PTH-11-STD",
+          "attributes": {
+            "configuration": "11 Pieces Standard"
+          },
+          "price": 3499,
+          "compare_at_price": 4299,
+          "stock_quantity": 12,
+          "image_url": "https://images.unsplash.com/photo-1582738411706-bfc8e691d1c2?auto=format&fit=crop&w=800&q=80",
+          "is_active": true,
+          "created_at": "2026-09-30T10:00:00.000Z",
+          "updated_at": "2026-09-30T10:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "prod-4",
+      "category_id": "cat-sambrani-cups",
+      "name": "Natural Loban & Guggal Organic Cow Dung Dhoop Cups",
+      "slug": "natural-loban-guggal-dhoop-cups",
+      "description": "Handcrafted using indigenous Gir cow dung, camphor, loban resin, and sambrani. Sanctifies temple aura and purifies indoor air.",
+      "brand": "Kanhaiya Collection",
+      "sku": "KC-DHP-24",
+      "batch_number": "BATCH-202609-0004",
+      "base_price": 349,
+      "compare_at_price": 449,
+      "stock_quantity": 120,
+      "sold_count": 210,
+      "is_active": true,
+      "is_featured_top_seller": true,
+      "top_seller_display_order": 3,
+      "avg_rating": 0,
+      "review_count": 0,
+      "meta_title": "Natural Loban & Guggal Organic Cow Dung Dhoop Cups",
+      "meta_description": "Pure cow dung sambrani dhoop cups for havan and daily mandir aarti.",
+      "created_at": "2026-10-01T09:00:00.000Z",
+      "updated_at": "2026-10-03T09:00:00.000Z",
+      "images": [
+        {
+          "id": "img-4-1",
+          "product_id": "prod-4",
+          "image_url": "https://images.unsplash.com/photo-1608571423902-eed4a5ad8108?auto=format&fit=crop&w=800&q=80",
+          "alt_text": "Organic dhoop cups filled with pure loban resin",
+          "display_order": 1,
+          "is_primary": true,
+          "created_at": "2026-10-01T09:00:00.000Z"
+        }
+      ],
+      "variants": [
+        {
+          "id": "var-4-1",
+          "product_id": "prod-4",
+          "variant_name": "Pack of 24 Cups",
+          "sku": "KC-DHP-24-BOX",
+          "attributes": {
+            "quantity": "24 Cups"
+          },
+          "price": 349,
+          "compare_at_price": 449,
+          "stock_quantity": 80,
+          "image_url": "https://images.unsplash.com/photo-1608571423902-eed4a5ad8108?auto=format&fit=crop&w=800&q=80",
+          "is_active": true,
+          "created_at": "2026-10-01T09:00:00.000Z",
+          "updated_at": "2026-10-01T09:00:00.000Z"
+        },
+        {
+          "id": "var-4-2",
+          "product_id": "prod-4",
+          "variant_name": "Family Pack of 48 Cups",
+          "sku": "KC-DHP-48-BOX",
+          "attributes": {
+            "quantity": "48 Cups"
+          },
+          "price": 649,
+          "compare_at_price": 799,
+          "stock_quantity": 40,
+          "image_url": "https://images.unsplash.com/photo-1608571423902-eed4a5ad8108?auto=format&fit=crop&w=800&q=80",
+          "is_active": true,
+          "created_at": "2026-10-01T09:00:00.000Z",
+          "updated_at": "2026-10-01T09:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "prod-5",
+      "category_id": "cat-temple-brass",
+      "name": "Heavy Temple Brass Hanging Bell with Garuda Finial",
+      "slug": "heavy-temple-brass-hanging-bell",
+      "description": "Deeply resonant cast bronze and brass temple bell. High pitch frequency tuned to 432Hz for spiritual meditation and aarti.",
+      "brand": "Kanhaiya Collection",
+      "sku": "KC-BEL-05",
+      "batch_number": "BATCH-202609-0005",
+      "base_price": 2899,
+      "compare_at_price": 3499,
+      "stock_quantity": 7,
+      "sold_count": 53,
+      "is_active": true,
+      "is_featured_top_seller": false,
+      "top_seller_display_order": null,
+      "avg_rating": 0,
+      "review_count": 0,
+      "meta_title": "Heavy Temple Brass Hanging Bell with Garuda Finial",
+      "meta_description": "Heavy acoustic resonance brass temple bell for home mandir ceiling mount.",
+      "created_at": "2026-10-02T08:00:00.000Z",
+      "updated_at": "2026-10-04T08:00:00.000Z",
+      "images": [
+        {
+          "id": "img-5-1",
+          "product_id": "prod-5",
+          "image_url": "https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=800&q=80",
+          "alt_text": "Solid brass hanging bell with heavy brass suspension link",
+          "display_order": 1,
+          "is_primary": true,
+          "created_at": "2026-10-02T08:00:00.000Z"
+        }
+      ],
+      "variants": [
+        {
+          "id": "var-5-1",
+          "product_id": "prod-5",
+          "variant_name": "4 Inch / 1.2 Kg",
+          "sku": "KC-BEL-04-12",
+          "attributes": {
+            "weight": "1.2 Kg",
+            "size": "4 Inch"
+          },
+          "price": 2899,
+          "compare_at_price": 3499,
+          "stock_quantity": 7,
+          "image_url": "https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=800&q=80",
+          "is_active": true,
+          "created_at": "2026-10-02T08:00:00.000Z",
+          "updated_at": "2026-10-02T08:00:00.000Z"
+        }
+      ]
     },
     {
       "id": "prod-6",
-      "category_id": "cat-1",
-      "name": "Ashtadhatu Bal Gopal (Laddu Gopal) Seva Murti",
-      "slug": "laddu-gopal-murti",
-      "description": "Auspicious Bal Gopal idol in crawling posture holding makhan. Ideal for daily seva, bathing, and devotional dressing rituals.",
+      "category_id": "cat-decor",
+      "name": "Handcrafted Zari Embroidered Silk Mandir Aasan (Pack of 2)",
+      "slug": "zari-embroidered-silk-mandir-aasan",
+      "description": "Pure Banarasi silk altar cloth featuring golden zari border and peacock feather motifs. Ideal seat for Laddu Gopal and deity idols.",
       "brand": "Kanhaiya Collection",
-      "base_price": 1499,
-      "compare_at_price": 1899,
-      "stock_quantity": 30,
-      "sold_count": 175,
+      "sku": "KC-ASN-02",
+      "batch_number": "BATCH-202609-0006",
+      "base_price": 899,
+      "compare_at_price": 1199,
+      "stock_quantity": 35,
+      "sold_count": 94,
       "is_active": true,
       "is_featured_top_seller": false,
       "top_seller_display_order": null,
-      "image_url": "/images/preview-murti.jpg",
-      "created_at": "2026-10-01T16:28:24.136Z",
-      "updated_at": "2026-10-08T16:28:24.136Z"
-    },
-    {
-      "id": "prod-7",
-      "category_id": "cat-5",
-      "name": "Vedic Gold-Border Raw Silk Mandir Aasan",
-      "slug": "mandir-silk-aasan",
-      "description": "Lustrous raw silk altar seat for deities featuring zari embroidery and auspicious lotus motifs. Keeps spiritual energy pure.",
-      "brand": "Kanhaiya Collection",
-      "base_price": 1199,
-      "compare_at_price": 1499,
-      "stock_quantity": 25,
-      "sold_count": 98,
-      "is_active": true,
-      "is_featured_top_seller": false,
-      "top_seller_display_order": null,
-      "image_url": "/images/preview-thali.jpg",
-      "created_at": "2026-10-02T16:28:24.136Z",
-      "updated_at": "2026-10-08T16:28:24.136Z"
-    },
-    {
-      "id": "prod-8",
-      "category_id": "cat-4",
-      "name": "Heavy Temple Brass Hanging Bell with Chain",
-      "slug": "temple-brass-bell",
-      "description": "Resonant brass ghanta producing deep meditative reverberation. Includes heavy link brass chain for mandir ceiling installation.",
-      "brand": "Kanhaiya Collection",
-      "base_price": 2799,
-      "compare_at_price": 3299,
-      "stock_quantity": 12,
-      "sold_count": 115,
-      "is_active": true,
-      "is_featured_top_seller": false,
-      "top_seller_display_order": null,
-      "image_url": "/images/hero-flute.jpg",
-      "created_at": "2026-10-04T16:28:24.136Z",
-      "updated_at": "2026-10-08T16:28:24.136Z"
-    },
-    {
-      "id": "prod-9",
-      "category_id": "cat-3",
-      "name": "Natural Loban & Sambrani Cup Dhoop (Box of 24)",
-      "slug": "sambrani-cup-dhoop",
-      "description": "Purifying herbal charcoal cups filled with natural guggal resin and sambrani. Cleanses negative vibrations and sanctifies air.",
-      "brand": "Kanhaiya Collection",
-      "base_price": 399,
-      "compare_at_price": 499,
-      "stock_quantity": 60,
-      "sold_count": 180,
-      "is_active": true,
-      "is_featured_top_seller": false,
-      "top_seller_display_order": null,
-      "image_url": "/images/temple-atmosphere.jpg",
-      "created_at": "2026-10-06T16:28:24.136Z",
-      "updated_at": "2026-10-08T16:28:24.136Z"
-    },
-    {
-      "id": "prod-10",
-      "category_id": "cat-5",
-      "name": "Gold Embossed Tanjore Radha Krishna Altar Frame",
-      "slug": "radha-krishna-frame",
-      "description": "22-karat gold foil foil-work traditional Tanjore devotional altar frame with teakwood border and protective glass cover.",
-      "brand": "Kanhaiya Collection",
-      "base_price": 2199,
-      "compare_at_price": 2799,
-      "stock_quantity": 14,
-      "sold_count": 72,
-      "is_active": true,
-      "is_featured_top_seller": false,
-      "top_seller_display_order": null,
-      "image_url": "/images/preview-murti.jpg",
-      "created_at": "2026-10-07T16:28:24.136Z",
-      "updated_at": "2026-10-08T16:28:24.136Z"
+      "avg_rating": 5,
+      "review_count": 1,
+      "meta_title": "Handcrafted Zari Embroidered Silk Mandir Aasan",
+      "meta_description": "Rich Banarasi silk aasan for temple shrine and deity seats.",
+      "created_at": "2026-10-03T07:00:00.000Z",
+      "updated_at": "2026-10-04T07:00:00.000Z",
+      "images": [
+        {
+          "id": "img-6-1",
+          "product_id": "prod-6",
+          "image_url": "https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=800&q=80",
+          "alt_text": "Golden yellow and crimson Banarasi silk deity aasans",
+          "display_order": 1,
+          "is_primary": true,
+          "created_at": "2026-10-03T07:00:00.000Z"
+        }
+      ],
+      "variants": [
+        {
+          "id": "var-6-1",
+          "product_id": "prod-6",
+          "variant_name": "Pitambari Yellow / 12x12 Inch",
+          "sku": "KC-ASN-02-YL",
+          "attributes": {
+            "color": "Pitambari Yellow",
+            "dimensions": "12x12 Inch"
+          },
+          "price": 899,
+          "compare_at_price": 1199,
+          "stock_quantity": 20,
+          "image_url": "https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=800&q=80",
+          "is_active": true,
+          "created_at": "2026-10-03T07:00:00.000Z",
+          "updated_at": "2026-10-03T07:00:00.000Z"
+        },
+        {
+          "id": "var-6-2",
+          "product_id": "prod-6",
+          "variant_name": "Sinduri Red / 12x12 Inch",
+          "sku": "KC-ASN-02-RD",
+          "attributes": {
+            "color": "Sinduri Red",
+            "dimensions": "12x12 Inch"
+          },
+          "price": 899,
+          "compare_at_price": 1199,
+          "stock_quantity": 15,
+          "image_url": "https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=800&q=80",
+          "is_active": true,
+          "created_at": "2026-10-03T07:00:00.000Z",
+          "updated_at": "2026-10-03T07:00:00.000Z"
+        }
+      ]
     }
   ],
   "festive_offer": {
@@ -300,6 +676,244 @@
       "prod-3",
       "prod-8"
     ],
-    "updated_at": "2026-10-08T17:15:26.593Z"
-  }
+    "updated_at": "2026-10-18T08:54:18.925Z"
+  },
+  "announcements": [
+    {
+      "id": "ann-1",
+      "text": "Shubh Deepavali Special: Complimentary Brass Diya Set with sacred orders above ₹2,499. Use code DIWALI108.",
+      "is_active": true,
+      "display_order": 1,
+      "created_at": "2026-10-01T10:00:00.000Z",
+      "updated_at": "2026-10-01T10:00:00.000Z"
+    },
+    {
+      "id": "ann-2",
+      "text": "Free Nationwide Sacred Dispatch across India on all consecrated Puja Thalis, Akhand Diyas & Murtis.",
+      "is_active": true,
+      "display_order": 2,
+      "created_at": "2026-10-02T10:00:00.000Z",
+      "updated_at": "2026-10-02T10:00:00.000Z"
+    },
+    {
+      "id": "ann-3",
+      "text": "Authentic Shilpa Shastra Brass Idols hand-sculpted by master sthapatis and artisans in Varanasi.",
+      "is_active": true,
+      "display_order": 3,
+      "created_at": "2026-10-03T10:00:00.000Z",
+      "updated_at": "2026-10-03T10:00:00.000Z"
+    }
+  ],
+  "festive_campaigns": [
+    {
+      "id": "camp-deepotsav",
+      "name": "Deepotsav & Sacred Diwali Offerings",
+      "description": "Bless your home mandir this season with consecrated brassware and auspicious puja essentials. Enjoy complimentary brass diya with select festival items.",
+      "image_url": "https://images.unsplash.com/photo-1606293926075-69a00dbfde81?auto=format&fit=crop&w=1200&q=80",
+      "product_ids": [
+        "prod-1",
+        "prod-2",
+        "prod-3",
+        "prod-8"
+      ],
+      "discount_tag": "Festive Grace",
+      "discount_percent": 15,
+      "is_active": true,
+      "display_order": 1,
+      "created_at": "2026-10-01T10:00:00.000Z",
+      "updated_at": "2026-10-01T10:00:00.000Z"
+    },
+    {
+      "id": "camp-janmashtami",
+      "name": "Janmashtami Bal Gopal Shringar Mahotsav",
+      "description": "Special celebration collection featuring handcrafted brass Bal Gopal murtis, designer jhulas, and natural Vrindavan chandan.",
+      "image_url": null,
+      "product_ids": [
+        "prod-1",
+        "prod-4",
+        "prod-5"
+      ],
+      "discount_tag": "Devotional Joy",
+      "discount_percent": null,
+      "is_active": true,
+      "display_order": 2,
+      "created_at": "2026-10-05T10:00:00.000Z",
+      "updated_at": "2026-10-05T10:00:00.000Z"
+    },
+    {
+      "id": "camp-navratri",
+      "name": "Navratri Temple Brassware Specials",
+      "description": "Authentic Ashtadhatu aarti thalis, heavy resonant ghanti bells, and temple kalashes for nine auspicious nights of divine worship.",
+      "image_url": "https://images.unsplash.com/photo-1582738411706-bfc8e691d1c2?auto=format&fit=crop&w=1200&q=80",
+      "product_ids": [
+        "prod-2",
+        "prod-3",
+        "prod-6"
+      ],
+      "discount_tag": "Shakti Mahotsav",
+      "discount_percent": 10,
+      "is_active": false,
+      "display_order": 3,
+      "created_at": "2026-10-08T10:00:00.000Z",
+      "updated_at": "2026-10-08T10:00:00.000Z"
+    }
+  ],
+  "contactSubmissions": [
+    {
+      "id": "sub-1",
+      "name": "Sunil Narang",
+      "email": "sunil.narang@example.com",
+      "phone": "+91 98220 11223",
+      "message": "Seeking custom 24-inch brass Radha Krishna murti consecrated for new temple consecration in Varanasi.",
+      "status": "new",
+      "created_at": "2026-10-19T08:38:29.952Z",
+      "updated_at": "2026-10-19T08:38:29.952Z"
+    },
+    {
+      "id": "sub-2",
+      "name": "Ananya Deshmukh",
+      "email": "ananya.d@example.com",
+      "phone": "+91 97110 33445",
+      "message": "Would like to inquire about wholesale Akhand Diya gift packaging for Diwali corporate gifting.",
+      "status": "in_progress",
+      "created_at": "2026-10-18T00:38:29.952Z",
+      "updated_at": "2026-10-19T00:38:29.952Z"
+    },
+    {
+      "id": "sub-3",
+      "name": "Rajendra Prasad Goel",
+      "email": "rp.goel@heritagefoundation.org",
+      "phone": "+91 98334 55667",
+      "message": "Requesting certified chemical test report and brass purity guarantee certificate for temple bell installation.",
+      "status": "resolved",
+      "created_at": "2026-10-16T12:38:29.952Z",
+      "updated_at": "2026-10-18T18:38:29.952Z"
+    },
+    {
+      "id": "sub-4",
+      "name": "Dr. Malini Iyer",
+      "email": "malini.iyer@aims.edu.in",
+      "phone": "+91 94450 67890",
+      "message": "Can the Ashtalakshmi puja thali set be engraved with custom family kuladevata shlokas on the outer rim?",
+      "status": "new",
+      "created_at": "2026-10-19T10:38:29.952Z",
+      "updated_at": "2026-10-19T10:38:29.952Z"
+    }
+  ],
+  "leads": [
+    {
+      "id": "lead-1",
+      "name": "Sri Vrindavan Dham Trust",
+      "email": "trust@vrindavandham.org",
+      "phone": "+91 98100 44321",
+      "source": "Temple Bulk Order Inquiry",
+      "message": "Requested catalog and pricing schedule for 50+ brass murtis and 200 akhand deepams.",
+      "status": "new",
+      "created_at": "2026-10-19T06:38:29.952Z",
+      "updated_at": "2026-10-19T06:38:29.952Z"
+    },
+    {
+      "id": "lead-2",
+      "name": "Omkar Spiritual Boutique",
+      "email": "orders@omkarboutique.in",
+      "phone": "+91 98200 99887",
+      "source": "Wholesale Partner Portal",
+      "message": "Commercial retail inquiries for stocking Kanhaiya certified sambrani dhoop cones in Mumbai outlets.",
+      "status": "contacted",
+      "created_at": "2026-10-17T12:38:29.952Z",
+      "updated_at": "2026-10-18T16:38:29.952Z"
+    },
+    {
+      "id": "lead-3",
+      "name": "Aditi Mathur",
+      "email": "aditi.mathur@gmail.com",
+      "phone": "+91 91670 12345",
+      "source": "newsletter",
+      "message": "Subscribed to auspicious muhurat alerts and festival restock drops.",
+      "status": "converted",
+      "created_at": "2026-10-16T04:38:29.952Z",
+      "updated_at": "2026-10-18T12:38:29.952Z"
+    },
+    {
+      "id": "lead-4",
+      "name": "Gaurav Khandelwal",
+      "email": "gaurav.k@exports.com",
+      "phone": "+91 99880 76543",
+      "source": "popup",
+      "message": "Inquired about international air express shipping rates for Germany delivery.",
+      "status": "closed",
+      "created_at": "2026-10-14T12:38:29.952Z",
+      "updated_at": "2026-10-18T00:38:29.952Z"
+    }
+  ],
+  "responseNotes": [
+    {
+      "id": "note-1",
+      "inquiry_id": "sub-2",
+      "entity_type": "contact_submission",
+      "note": "Discussed bulk packaging options for Akhand Diya gift boxes over phone with Ananya. Sent digital catalog sample via mock note.",
+      "responder": "Admin (Amber)",
+      "created_at": "2026-10-19T00:38:29.952Z"
+    },
+    {
+      "id": "note-2",
+      "inquiry_id": "sub-3",
+      "entity_type": "contact_submission",
+      "note": "Emailed metallurgical brass certification doc and purity report. Client acknowledged receipt.",
+      "responder": "Admin (Amber)",
+      "created_at": "2026-10-18T18:38:29.952Z"
+    },
+    {
+      "id": "note-3",
+      "inquiry_id": "lead-2",
+      "entity_type": "lead",
+      "note": "Followed up with Omkar Spiritual Boutique buyer regarding sambrani cones consignment terms.",
+      "responder": "Admin (Amber)",
+      "created_at": "2026-10-18T16:38:29.952Z"
+    }
+  ],
+  "sitePolicies": [
+    {
+      "id": "pol-privacy",
+      "type": "privacy",
+      "title": "Privacy Policy",
+      "content": "### 1. Introduction & Devotional Commitment\nAt Kanhaiya Collection, protecting your privacy and spiritual sanctity is fundamental to our core values. This policy explains how we collect, store, and safeguard your personal details when you browse our sacred catalog or place orders.\n\n### 2. Information We Collect\n- **Personal Details**: Your full name, delivery address, contact telephone, and email address for order fulfillment.\n- **Payment Security**: Payment card and UPI transactions are encrypted and processed by RBI-authorized payment gateways. We never store credit/debit card numbers or CVVs on our servers.\n- **Account Preferences**: Saved addresses, wishlist items, and order history for smooth repeat worship preparations.\n\n### 3. Data Protection Standards\nWe do not sell, rent, or trade your contact information to external advertisers. All stored data is protected using industrial 256-bit SSL encryption.\n\n### 4. Your Rights\nYou may request an export of your stored personal details or request deletion of your account at any time by writing to care@kanhaiyacollection.com.",
+      "updated_at": "2026-10-01T10:00:00.000Z"
+    },
+    {
+      "id": "pol-terms",
+      "type": "terms",
+      "title": "Terms of Service",
+      "content": "### 1. Agreement to Spiritual Terms\nBy visiting Kanhaiya Collection or placing orders for brass murtis, akhand deepams, and puja accessories, you agree to comply with all applicable terms, conditions, and Indian commercial laws.\n\n### 2. Handcrafted Artisan Uniqueness\nBecause our brass statues, thalis, and bells are individually hand-cast and buffed by traditional artisans, minor variations in tone, weight, and polish are natural hallmarks of genuine handcrafting rather than defects.\n\n### 3. Pricing & Sacred Catalog Accuracy\nAll prices are displayed in Indian Rupees (INR) and are inclusive of GST. While we strive for extreme catalog accuracy, errors in stock or pricing will be promptly corrected upon discovery with immediate notification to the customer.\n\n### 4. Intellectual Property\nAll photographs, sacred descriptions, 3D idol scans, and logo emblems are proprietary intellectual property of Kanhaiya Collection and may not be copied or repurposed without written authorization.",
+      "updated_at": "2026-10-01T10:00:00.000Z"
+    },
+    {
+      "id": "pol-shipping",
+      "type": "shipping",
+      "title": "Shipping & Delivery Policy",
+      "content": "### 1. Dispatch & Transit Timelines\nAll standard orders are dispatched from our Varanasi artisan center within **24 to 48 business hours** following order confirmation.\n- **Metro Cities (Delhi, Mumbai, Bengaluru, Kolkata, Chennai)**: 2 to 4 business days.\n- **Rest of India**: 4 to 6 business days.\n- **International Deliveries**: 4 to 7 business days via air express courier.\n\n### 2. Free Shipping Threshold\nWe offer complimentary shipping across India on all prepaid orders exceeding **₹1,999**. For smaller orders under ₹1,999, a nominal flat rate of ₹99 is charged.\n\n### 3. Consecrated Fragile Packing\nBrass idols and borosilicate glass chimneys receive multi-layer bubble cushioning, styrofoam bracing, and rigid corrugated boxing to ensure unbroken arrival.",
+      "updated_at": "2026-10-01T10:00:00.000Z"
+    },
+    {
+      "id": "pol-return",
+      "type": "return",
+      "title": "Return & Refund Policy",
+      "content": "### 1. 7-Day Hassle-Free Returns\nWe desire that your sacred murti brings complete serenity to your home mandir. If you wish to return or exchange an item, you may request a return within **7 days of delivery**.\n\n### 2. Return Eligibility\n- The item must be in its original, undamaged condition with authentic brass tag seals, pooja boxes, and protective packaging intact.\n- Custom-engraved temple thalis or bespoke sanctum murtis cannot be returned unless damaged during transit.\n\n### 3. Refund Process\n- Reverse courier pickups are scheduled within 48 hours of return acceptance.\n- Refunds are credited to the original payment source (UPI/Bank/Card) within 3–5 working days following inspection at our fulfillment warehouse.",
+      "updated_at": "2026-10-01T10:00:00.000Z"
+    },
+    {
+      "id": "pol-cancellation",
+      "type": "cancellation",
+      "title": "Cancellation Policy",
+      "content": "### 1. Order Cancellation Window\nYou may cancel your sacred order free of charge at any time before the consignment is dispatched from our fulfillment center (typically within **24 hours** of order placement).\n\n### 2. How to Request Cancellation\n- Navigate to your account order history and click **Cancel Order**, or\n- Email **care@kanhaiyacollection.com** or call **+91 98290 12345** with your order number.\n\n### 3. Post-Dispatch Cancellations\nOnce an order has been handed over to our courier partner and a tracking AWB has been issued, it cannot be canceled in transit. You may instead refuse delivery upon arrival or initiate a return within 7 days.\n\n### 4. Refund on Cancellation\nFor prepaid orders canceled prior to dispatch, an immediate 100% refund is initiated back to your original payment mode (UPI, card, or net banking) and typically reflects within 24–48 banking hours.",
+      "updated_at": "2026-10-01T10:00:00.000Z"
+    },
+    {
+      "id": "pol-refund",
+      "type": "refund",
+      "title": "Refund Policy",
+      "content": "### 1. 7-Day Refund Commitment\nWe want you to have complete peace of mind when acquiring sacred brass idols, thalis, and temple textiles from Kanhaiya Collection. If you are not entirely satisfied, you may request a full refund within **7 days of delivery**.\n\n### 2. Refund Verification & Quality Inspection\n- All returned sacred items undergo inspection at our artisan center within 48 business hours of receipt.\n- Returned goods must be unblemished, in original brass tag seals, pooja boxes, and protective packaging.\n\n### 3. Refund Timelines & Payment Channels\n- **Prepaid Orders (UPI, Net Banking, Credit/Debit Cards)**: Credited to the original payment source within **3 to 5 business days**.\n- **Cash on Delivery (COD) Orders**: Refunded securely via instant UPI transfer or direct NEFT bank transfer upon receiving your verified bank details.\n\n### 4. Damaged or In-Transit Defect Protection\nIn the rare event of transit damage to brass idols or glass chimneys, report within 48 hours of delivery with photos to **care@kanhaiyacollection.com** for an instant priority replacement or full refund.",
+      "updated_at": "2026-10-01T10:00:00.000Z"
+    }
+  ]
 }

@@ -58,8 +58,28 @@ export function ImageUploader({
 
     if (!isConfigured) {
       // In local demo / test environment without live Supabase cloud:
-      // use local objectUrl for immediate rich preview and state update
-      onUploadComplete(objectUrl);
+      // Upload to local dev file route /api/dev-upload to save to public/uploads/
+      setIsUploading(true);
+      try {
+        const formData = new FormData();
+        formData.append("file", file);
+        const res = await fetch("/api/dev-upload", {
+          method: "POST",
+          body: formData,
+        });
+        const data = await res.json();
+        if (data.url) {
+          setPreview(data.url);
+          onUploadComplete(data.url);
+        } else {
+          // Fallback to objectUrl
+          onUploadComplete(objectUrl);
+        }
+      } catch {
+        onUploadComplete(objectUrl);
+      } finally {
+        setIsUploading(false);
+      }
       return;
     }
 

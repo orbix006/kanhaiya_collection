@@ -20,7 +20,7 @@ export default async function AdminPoliciesPage() {
             Site Policies & Governance
           </h1>
           <p className="text-xs sm:text-sm text-muted-foreground mt-1 max-w-2xl">
-            Edit content for the 4 core customer policy documents: Privacy Policy, Terms of Service, Shipping & Delivery, and Returns & Refunds.
+            Edit content for the 4 required customer policy documents: Terms of Service, Privacy Policy, Cancellation Policy, and Refund Policy.
           </p>
         </div>
 

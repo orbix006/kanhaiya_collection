@@ -42,6 +42,13 @@ export interface OrderCustomerInfo {
   avatar_url: string | null;
 }
 
+export interface OrderActionLog {
+  action: string;
+  status: OrderStatus;
+  timestamp: string;
+  note?: string;
+}
+
 export interface OrderDetails {
   id: string;
   user_id: string;
@@ -64,6 +71,10 @@ export interface OrderDetails {
   items: OrderItemSnapshot[];
   customer?: OrderCustomerInfo | null;
   can_cancel: boolean;
+  notes?: string | null;
+  admin_action_taken?: boolean;
+  action_history?: OrderActionLog[];
+  stock_decremented?: boolean;
 }
 
 export interface AdminOrderFilterParams {

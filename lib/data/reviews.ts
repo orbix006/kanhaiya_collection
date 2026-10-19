@@ -187,60 +187,12 @@ export async function getAdminReviews(
     process.env.NEXT_PUBLIC_SUPABASE_URL !== "https://placeholder-project.supabase.co";
 
   if (!isConfigured) {
-    const all = initDemoReviewsIfEmpty();
-    let filtered = [...all];
-
-    if (filterParams?.status === "pending") {
-      filtered = filtered.filter((r) => !r.is_approved);
-    } else if (filterParams?.status === "approved") {
-      filtered = filtered.filter((r) => r.is_approved);
-    }
-
-    if (filterParams?.verification === "verified") {
-      filtered = filtered.filter((r) => r.is_verified_purchase);
-    } else if (filterParams?.verification === "unverified") {
-      filtered = filtered.filter((r) => !r.is_verified_purchase);
-    }
-
-    if (filterParams?.rating && filterParams.rating !== "all") {
-      filtered = filtered.filter((r) => r.rating === Number(filterParams.rating));
-    }
-
-    if (filterParams?.searchQuery?.trim()) {
-      const q = filterParams.searchQuery.toLowerCase().trim();
-      filtered = filtered.filter(
-        (r) =>
-          r.product_name.toLowerCase().includes(q) ||
-          r.author_name.toLowerCase().includes(q) ||
-          (r.review_text && r.review_text.toLowerCase().includes(q)) ||
-          (r.order_number && r.order_number.toLowerCase().includes(q))
-      );
-    }
-
-    filtered.sort(
-      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-    );
-
-    const approvedReviews = all.filter((r) => r.is_approved);
-    const averageRating =
-      approvedReviews.length > 0
-        ? Number(
-            (
-              approvedReviews.reduce((sum, r) => sum + r.rating, 0) /
-              approvedReviews.length
-            ).toFixed(1)
-          )
-        : 0;
-
-    const stats: AdminReviewStats = {
-      totalCount: all.length,
-      pendingCount: all.filter((r) => !r.is_approved).length,
-      approvedCount: approvedReviews.length,
-      averageRating,
-      verifiedCount: all.filter((r) => r.is_verified_purchase).length,
+    const { loadMockReviews } = await import("@/lib/mock-data/admin-store");
+    const result = loadMockReviews(filterParams);
+    return {
+      reviews: result.reviews as AdminReviewItem[],
+      stats: result.stats,
     };
-
-    return { reviews: filtered, stats };
   }
 
   const supabase = await createClient();

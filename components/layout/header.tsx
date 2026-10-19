@@ -16,6 +16,7 @@ import {
 import { logoutAction } from "@/app/(auth)/actions";
 import { useLocation } from "./location-context";
 import { SearchBar } from "./search-bar";
+import { AnnouncementRibbon } from "./announcement-ribbon";
 
 interface HeaderProps {
   user?: {
@@ -44,6 +45,9 @@ export function Header({ user, profile }: HeaderProps) {
 
   return (
     <header className="sticky top-0 z-40 w-full bg-[#FFFDF7]/95 backdrop-blur-md shadow-[0_2px_14px_rgba(59,36,22,0.04)] border-b border-[#E8DCC8]/50 transition-all">
+      {/* 2. Text-Only Offer & Discount Announcement Strip Above Website Header */}
+      <AnnouncementRibbon />
+
       <div className="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         {/* Main Desktop & Tablet Header Bar */}
         <div className="flex h-20 items-center justify-between gap-3 sm:gap-6">
@@ -79,13 +83,11 @@ export function Header({ user, profile }: HeaderProps) {
                 >
                   <path
                     d="M12 2c.5 2 2.5 3.5 2.5 5.5A2.5 2.5 0 0 1 12 10a2.5 2.5 0 0 1-2.5-2.5C9.5 5.5 11.5 4 12 2z"
-                    fill="#C8891A"
-                    fillOpacity="0.85"
+                    className="diya-flame"
                   />
                   <path
                     d="M4 14c0 3.866 3.582 7 8 7s8-3.134 8-7H4z"
-                    fill="#8B4513"
-                    fillOpacity="0.15"
+                    className="diya-base"
                   />
                   <path d="M4 14h16" />
                 </svg>

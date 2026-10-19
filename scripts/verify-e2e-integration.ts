@@ -290,7 +290,7 @@ async function runE2ETests() {
     }
 
     const cancelRes = customerCancelOrder(pendingOrder);
-    assert(cancelRes.success && pendingOrder.status === "cancelled", "Customer can cancel order while in pending status");
+    assert(Boolean(cancelRes.success && pendingOrder.status === "cancelled"), "Customer can cancel order while in pending status");
 
     const cancelShippedRes = customerCancelOrder(shippedOrder);
     assert(Boolean(cancelShippedRes.error), "Customer cannot cancel order once shipped");

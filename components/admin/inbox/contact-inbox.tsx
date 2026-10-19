@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   Mail,
   Phone,
@@ -14,6 +14,12 @@ import {
   Loader2,
   X,
   ExternalLink,
+  Search,
+  Sparkles,
+  Inbox,
+  User,
+  Send,
+  Check,
 } from "lucide-react";
 import { AdminDataTable, Column } from "@/components/admin/data-table";
 import {
@@ -37,6 +43,23 @@ export function ContactInbox({ initialSubmissions }: ContactInboxProps) {
     text: string;
     type: "success" | "error";
   } | null>(null);
+
+  // Client hydration from mock store
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("kanhaiya_admin_mock_store_v6");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed.contactSubmissions) && parsed.contactSubmissions.length > 0) {
+          setSubmissions(
+            [...parsed.contactSubmissions].sort(
+              (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+            )
+          );
+        }
+      }
+    } catch {}
+  }, []);
 
   const filteredSubmissions = useMemo(() => {
     if (statusFilter === "all") return submissions;
@@ -62,11 +85,16 @@ export function ContactInbox({ initialSubmissions }: ContactInboxProps) {
       if (res.error) {
         setToastMessage({ text: res.error, type: "error" });
       } else {
+        const updatedTime = new Date().toISOString();
         setSubmissions((prev) =>
-          prev.map((s) => (s.id === submission.id ? { ...s, status: newStatus } : s))
+          prev.map((s) =>
+            s.id === submission.id ? { ...s, status: newStatus, updated_at: updatedTime } : s
+          )
         );
         if (selectedSubmission?.id === submission.id) {
-          setSelectedSubmission((prev) => (prev ? { ...prev, status: newStatus } : null));
+          setSelectedSubmission((prev) =>
+            prev ? { ...prev, status: newStatus, updated_at: updatedTime } : null
+          );
         }
         setToastMessage({
           text: `Inquiry status changed to '${newStatus.replace("_", " ")}'.`,
@@ -106,50 +134,47 @@ export function ContactInbox({ initialSubmissions }: ContactInboxProps) {
 
   const statusBadges = {
     new: {
-      label: "New Inquiry",
-      className: "bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/30",
+      label: "New",
+      className: "bg-blue-500/15 text-blue-700 dark:text-blue-400 border-blue-500/30 font-bold",
     },
     in_progress: {
       label: "In Progress",
-      className: "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30",
+      className: "bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30 font-bold",
     },
     resolved: {
       label: "Resolved",
-      className: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30",
+      className: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 font-bold",
     },
   };
 
   const columns: Column<ContactSubmission>[] = [
     {
-      key: "status",
-      header: "Status",
-      sortable: true,
-      render: (s) => {
-        const badge = statusBadges[s.status] || statusBadges.new;
-        return (
-          <span
-            className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${badge.className}`}
-          >
-            {s.status === "resolved" ? (
-              <CheckCircle2 className="h-3 w-3" />
-            ) : s.status === "in_progress" ? (
-              <Clock className="h-3 w-3" />
-            ) : (
-              <AlertCircle className="h-3 w-3" />
-            )}
-            <span>{badge.label}</span>
-          </span>
-        );
-      },
-    },
-    {
       key: "name",
       header: "Customer",
       sortable: true,
       render: (s) => (
-        <div className="flex flex-col">
-          <span className="font-semibold text-foreground text-xs">{s.name}</span>
-          <span className="text-[11px] text-muted-foreground">{s.email}</span>
+        <div className="flex items-center gap-3">
+          {s.status === "new" ? (
+            <span
+              className="h-2 w-2 rounded-full bg-blue-500 shrink-0 ring-4 ring-blue-500/20 animate-pulse"
+              title="Unread/New Submission"
+            />
+          ) : (
+            <span className="h-2 w-2 rounded-full bg-transparent shrink-0" />
+          )}
+          <div className="flex flex-col">
+            <span
+              className={`text-xs ${
+                s.status === "new" ? "font-bold text-foreground" : "font-medium text-foreground"
+              }`}
+            >
+              {s.name}
+            </span>
+            <span className="text-[11px] text-muted-foreground flex items-center gap-1.5 mt-0.5">
+              <Mail className="h-2.5 w-2.5" />
+              <span>{s.email}</span>
+            </span>
+          </div>
         </div>
       ),
     },
@@ -157,33 +182,51 @@ export function ContactInbox({ initialSubmissions }: ContactInboxProps) {
       key: "phone",
       header: "Phone",
       render: (s) => (
-        <span className="text-xs text-muted-foreground">
+        <span className="text-xs text-muted-foreground font-mono">
           {s.phone || "—"}
         </span>
       ),
     },
     {
       key: "message",
-      header: "Inquiry Message",
+      header: "Message Snippet",
       render: (s) => (
-        <p className="text-xs text-muted-foreground line-clamp-1 max-w-sm">
+        <p className="text-xs text-muted-foreground line-clamp-2 max-w-sm">
           {s.message}
         </p>
       ),
     },
     {
       key: "created_at",
-      header: "Date Received",
+      header: "Submitted",
       sortable: true,
       render: (s) => (
         <span className="text-xs text-muted-foreground whitespace-nowrap">
-          {new Date(s.created_at).toLocaleDateString("en-IN", {
-            day: "numeric",
+          {new Date(s.created_at).toLocaleDateString("en-US", {
             month: "short",
+            day: "numeric",
             year: "numeric",
           })}
         </span>
       ),
+    },
+    {
+      key: "status",
+      header: "Status",
+      sortable: true,
+      render: (s) => {
+        const badge = statusBadges[s.status];
+        return (
+          <span
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] border ${badge.className}`}
+          >
+            {s.status === "new" && <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />}
+            {s.status === "in_progress" && <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />}
+            {s.status === "resolved" && <Check className="h-3 w-3" />}
+            <span>{badge.label}</span>
+          </span>
+        );
+      },
     },
     {
       key: "actions",
@@ -193,10 +236,10 @@ export function ContactInbox({ initialSubmissions }: ContactInboxProps) {
         <div className="flex items-center justify-end gap-1.5">
           <button
             onClick={() => setSelectedSubmission(s)}
-            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-border/70 hover:bg-muted text-xs font-semibold text-foreground transition-colors cursor-pointer"
+            className="p-1.5 rounded-lg border border-border/70 hover:bg-primary/10 hover:text-primary hover:border-primary/30 text-muted-foreground transition-colors cursor-pointer"
+            title="Inspect Message"
           >
-            <Eye className="h-3.5 w-3.5 text-primary" />
-            <span>Inspect</span>
+            <Eye className="h-3.5 w-3.5" />
           </button>
           <button
             onClick={() => {
@@ -204,7 +247,7 @@ export function ContactInbox({ initialSubmissions }: ContactInboxProps) {
               setDeleteModalOpen(true);
             }}
             className="p-1.5 rounded-lg border border-border/70 hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30 text-muted-foreground transition-colors cursor-pointer"
-            title="Delete Inquiry"
+            title="Delete Record"
           >
             <Trash2 className="h-3.5 w-3.5" />
           </button>
@@ -232,69 +275,116 @@ export function ContactInbox({ initialSubmissions }: ContactInboxProps) {
         </div>
       )}
 
-      {/* Filter Tabs */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-1">
+      {/* Status Filter Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <button
           onClick={() => setStatusFilter("all")}
-          className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+          className={`flex flex-col text-left p-4 rounded-2xl border transition-all cursor-pointer ${
             statusFilter === "all"
-              ? "bg-primary text-primary-foreground border-primary"
-              : "bg-card text-muted-foreground border-border hover:bg-muted"
+              ? "bg-primary/5 border-primary shadow-xs ring-1 ring-primary/40"
+              : "bg-card border-border/70 hover:bg-muted/40"
           }`}
         >
-          All Inquiries ({counts.all})
+          <div className="flex items-center justify-between w-full mb-1">
+            <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
+              All Inquiries
+            </span>
+            <Inbox className="h-4 w-4 text-muted-foreground" />
+          </div>
+          <span className="text-2xl font-extrabold text-foreground">{counts.all}</span>
         </button>
+
         <button
           onClick={() => setStatusFilter("new")}
-          className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+          className={`flex flex-col text-left p-4 rounded-2xl border transition-all cursor-pointer ${
             statusFilter === "new"
-              ? "bg-blue-600 text-white border-blue-600"
-              : "bg-card text-muted-foreground border-border hover:bg-muted"
+              ? "bg-blue-500/10 border-blue-500 shadow-xs ring-1 ring-blue-500/40"
+              : "bg-card border-border/70 hover:bg-muted/40"
           }`}
         >
-          New ({counts.new})
+          <div className="flex items-center justify-between w-full mb-1">
+            <span className="text-[11px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
+              <span>New</span>
+            </span>
+            <MessageSquare className="h-4 w-4 text-blue-500" />
+          </div>
+          <span className="text-2xl font-extrabold text-blue-700 dark:text-blue-400">
+            {counts.new}
+          </span>
         </button>
+
         <button
           onClick={() => setStatusFilter("in_progress")}
-          className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+          className={`flex flex-col text-left p-4 rounded-2xl border transition-all cursor-pointer ${
             statusFilter === "in_progress"
-              ? "bg-amber-600 text-white border-amber-600"
-              : "bg-card text-muted-foreground border-border hover:bg-muted"
+              ? "bg-amber-500/10 border-amber-500 shadow-xs ring-1 ring-amber-500/40"
+              : "bg-card border-border/70 hover:bg-muted/40"
           }`}
         >
-          In Progress ({counts.in_progress})
+          <div className="flex items-center justify-between w-full mb-1">
+            <span className="text-[11px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider">
+              In Progress
+            </span>
+            <Clock className="h-4 w-4 text-amber-500" />
+          </div>
+          <span className="text-2xl font-extrabold text-amber-700 dark:text-amber-400">
+            {counts.in_progress}
+          </span>
         </button>
+
         <button
           onClick={() => setStatusFilter("resolved")}
-          className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+          className={`flex flex-col text-left p-4 rounded-2xl border transition-all cursor-pointer ${
             statusFilter === "resolved"
-              ? "bg-emerald-600 text-white border-emerald-600"
-              : "bg-card text-muted-foreground border-border hover:bg-muted"
+              ? "bg-emerald-500/10 border-emerald-500 shadow-xs ring-1 ring-emerald-500/40"
+              : "bg-card border-border/70 hover:bg-muted/40"
           }`}
         >
-          Resolved ({counts.resolved})
+          <div className="flex items-center justify-between w-full mb-1">
+            <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
+              Resolved
+            </span>
+            <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+          </div>
+          <span className="text-2xl font-extrabold text-emerald-700 dark:text-emerald-400">
+            {counts.resolved}
+          </span>
         </button>
       </div>
 
       <AdminDataTable
         columns={columns}
         data={filteredSubmissions}
-        searchPlaceholder="Search inquiries by customer name, email, phone, or message text..."
+        searchPlaceholder="Search by customer name, email, phone, or message keywords..."
         searchKeys={["name", "email", "phone", "message"]}
         initialSortKey="created_at"
         initialSortDirection="desc"
       />
 
-      {/* Inspection Modal */}
+      {/* Slide-over Inspection Drawer / Modal */}
       {selectedSubmission && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto">
-          <div className="relative w-full max-w-xl rounded-2xl bg-card border border-border shadow-2xl p-6 overflow-hidden space-y-6">
+          <div className="relative w-full max-w-lg rounded-3xl bg-card border border-border shadow-2xl p-6 sm:p-8 overflow-hidden space-y-6">
             <div className="flex items-center justify-between pb-4 border-b border-border/60">
-              <div className="flex items-center gap-2">
-                <MessageSquare className="h-4.5 w-4.5 text-primary" />
-                <h3 className="text-base font-bold text-foreground">
-                  Inquiry from {selectedSubmission.name}
-                </h3>
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <User className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-foreground">
+                    {selectedSubmission.name}
+                  </h3>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Calendar className="h-3 w-3" />
+                    <span>
+                      {new Date(selectedSubmission.created_at).toLocaleString("en-US", {
+                        dateStyle: "medium",
+                        timeStyle: "short",
+                      })}
+                    </span>
+                  </div>
+                </div>
               </div>
               <button
                 onClick={() => setSelectedSubmission(null)}
@@ -304,29 +394,28 @@ export function ContactInbox({ initialSubmissions }: ContactInboxProps) {
               </button>
             </div>
 
-            {/* Customer Details Box */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 rounded-xl bg-muted/40 border border-border/60 text-xs">
-              <div className="flex flex-col gap-1">
-                <span className="text-muted-foreground text-[11px] font-semibold">
-                  Customer Email
+            {/* Contact Details */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 rounded-2xl bg-muted/30 border border-border/70 text-xs">
+              <div className="space-y-1">
+                <span className="text-muted-foreground text-[10px] font-bold uppercase tracking-wider">
+                  Email Address
                 </span>
                 <a
                   href={`mailto:${selectedSubmission.email}`}
-                  className="font-bold text-primary hover:underline flex items-center gap-1.5"
+                  className="font-semibold text-primary hover:underline flex items-center gap-1.5"
                 >
                   <Mail className="h-3.5 w-3.5" />
                   <span>{selectedSubmission.email}</span>
                 </a>
               </div>
-
-              <div className="flex flex-col gap-1">
-                <span className="text-muted-foreground text-[11px] font-semibold">
+              <div className="space-y-1">
+                <span className="text-muted-foreground text-[10px] font-bold uppercase tracking-wider">
                   Contact Phone
                 </span>
                 {selectedSubmission.phone ? (
                   <a
                     href={`tel:${selectedSubmission.phone}`}
-                    className="font-bold text-foreground hover:underline flex items-center gap-1.5"
+                    className="font-semibold text-foreground hover:text-primary flex items-center gap-1.5"
                   >
                     <Phone className="h-3.5 w-3.5" />
                     <span>{selectedSubmission.phone}</span>
@@ -335,103 +424,62 @@ export function ContactInbox({ initialSubmissions }: ContactInboxProps) {
                   <span className="text-muted-foreground">Not provided</span>
                 )}
               </div>
-
-              <div className="flex flex-col gap-1">
-                <span className="text-muted-foreground text-[11px] font-semibold">
-                  Received Timestamp
-                </span>
-                <span className="text-foreground flex items-center gap-1.5">
-                  <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
-                  <span>
-                    {new Date(selectedSubmission.created_at).toLocaleString("en-IN")}
-                  </span>
-                </span>
-              </div>
-
-              <div className="flex flex-col gap-1">
-                <span className="text-muted-foreground text-[11px] font-semibold">
-                  Current Status
-                </span>
-                <span className="font-bold uppercase tracking-wide text-primary">
-                  {selectedSubmission.status.replace("_", " ")}
-                </span>
-              </div>
             </div>
 
-            {/* Full Message */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-foreground">
-                Inquiry Message / Note
-              </label>
-              <div className="p-4 rounded-xl border border-border bg-background text-xs text-foreground leading-relaxed whitespace-pre-wrap">
+            {/* Inquiry Message Body */}
+            <div className="space-y-2">
+              <span className="text-xs font-bold text-foreground">Customer Message / Note:</span>
+              <div className="p-4 rounded-2xl bg-muted/20 border border-border text-xs sm:text-sm text-foreground leading-relaxed whitespace-pre-line">
                 {selectedSubmission.message}
               </div>
             </div>
 
-            {/* Status Transition Buttons */}
-            <div className="space-y-2 pt-2 border-t border-border/60">
-              <span className="text-xs font-semibold text-muted-foreground">
-                Update Status:
+            {/* Status Transition Control (Schema strictly: new | in_progress | resolved) */}
+            <div className="space-y-2 pt-2">
+              <span className="text-xs font-bold text-foreground">
+                Inquiry Resolution Status:
               </span>
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  disabled={isUpdating || selectedSubmission.status === "new"}
-                  onClick={() => handleStatusChange(selectedSubmission, "new")}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
-                    selectedSubmission.status === "new"
-                      ? "bg-blue-600 text-white border-blue-600"
-                      : "border-border text-foreground hover:bg-muted"
-                  }`}
-                >
-                  Mark as New
-                </button>
-                <button
-                  type="button"
-                  disabled={isUpdating || selectedSubmission.status === "in_progress"}
-                  onClick={() => handleStatusChange(selectedSubmission, "in_progress")}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
-                    selectedSubmission.status === "in_progress"
-                      ? "bg-amber-600 text-white border-amber-600"
-                      : "border-border text-foreground hover:bg-muted"
-                  }`}
-                >
-                  Mark In Progress
-                </button>
-                <button
-                  type="button"
-                  disabled={isUpdating || selectedSubmission.status === "resolved"}
-                  onClick={() => handleStatusChange(selectedSubmission, "resolved")}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
-                    selectedSubmission.status === "resolved"
-                      ? "bg-emerald-600 text-white border-emerald-600"
-                      : "border-border text-foreground hover:bg-muted"
-                  }`}
-                >
-                  Mark Resolved
-                </button>
+              <div className="grid grid-cols-3 gap-2">
+                {(["new", "in_progress", "resolved"] as const).map((st) => {
+                  const isCurrent = selectedSubmission.status === st;
+                  return (
+                    <button
+                      key={st}
+                      type="button"
+                      disabled={isUpdating}
+                      onClick={() => handleStatusChange(selectedSubmission, st)}
+                      className={`py-2 px-3 rounded-xl text-xs font-semibold border transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                        isCurrent
+                          ? "bg-primary text-primary-foreground border-primary shadow-xs"
+                          : "bg-muted/40 text-muted-foreground border-border hover:bg-muted"
+                      }`}
+                    >
+                      {isCurrent && <Check className="h-3.5 w-3.5" />}
+                      <span>{st === "in_progress" ? "In Progress" : st.charAt(0).toUpperCase() + st.slice(1)}</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
-            <div className="flex items-center justify-between pt-2">
+            {/* Drawer Actions */}
+            <div className="flex items-center justify-between pt-4 border-t border-border/60">
               <button
-                type="button"
                 onClick={() => {
                   setSubmissionToDelete(selectedSubmission);
                   setDeleteModalOpen(true);
                 }}
-                className="text-xs font-semibold text-destructive hover:underline flex items-center gap-1 cursor-pointer"
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-destructive hover:underline cursor-pointer"
               >
                 <Trash2 className="h-3.5 w-3.5" />
-                <span>Delete submission</span>
+                <span>Delete Submission</span>
               </button>
 
               <button
-                type="button"
                 onClick={() => setSelectedSubmission(null)}
-                className="px-4 py-2 rounded-xl border border-border text-xs font-semibold text-foreground hover:bg-muted cursor-pointer"
+                className="px-4 py-2 text-xs font-semibold rounded-xl bg-muted text-foreground hover:bg-muted/80 cursor-pointer"
               >
-                Close
+                Close View
               </button>
             </div>
           </div>
@@ -447,8 +495,8 @@ export function ContactInbox({ initialSubmissions }: ContactInboxProps) {
               <span>Confirm Inquiry Deletion</span>
             </h3>
             <p className="text-xs text-muted-foreground">
-              Are you sure you want to remove the message from{" "}
-              <strong>&ldquo;{submissionToDelete.name}&rdquo;</strong>?
+              Are you sure you want to delete the submission from{" "}
+              <strong>&ldquo;{submissionToDelete.name}&rdquo;</strong>? This record will be permanently removed.
             </p>
 
             <div className="flex items-center justify-end gap-2 pt-2">
@@ -466,7 +514,7 @@ export function ContactInbox({ initialSubmissions }: ContactInboxProps) {
                 className="px-4 py-2 text-xs font-semibold rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90 cursor-pointer disabled:opacity-50"
                 disabled={isUpdating}
               >
-                {isUpdating ? "Deleting..." : "Delete Inquiry"}
+                {isUpdating ? "Deleting..." : "Delete Record"}
               </button>
             </div>
           </div>

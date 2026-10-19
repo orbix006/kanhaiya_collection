@@ -95,7 +95,7 @@ export function HorizontalProductRow({
           >
             <ProductCard
               product={product}
-              categoryName={categoryMap.get(product.category_id)}
+              categoryName={product.category_id ? categoryMap.get(product.category_id) : undefined}
               onView={onViewProduct}
             />
           </div>

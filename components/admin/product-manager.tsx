@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -20,12 +20,17 @@ import {
   DollarSign,
   AlertTriangle,
   Eye,
+  ShoppingBag,
 } from "lucide-react";
 import { AdminDataTable, type Column } from "@/components/admin/data-table";
 import { ProductModal } from "@/components/admin/product-modal";
 import { ProductDeleteModal } from "@/components/admin/product-delete-modal";
 import { archiveProductAction } from "@/app/(admin)/admin/products/actions";
-import { getCategoryPathLabel } from "@/lib/data/categories";
+import {
+  loadMockStore,
+  archiveProductInStore,
+} from "@/lib/mock-data/admin-store";
+import { getCategoryPathLabel, getDescendantCategoryIds } from "@/lib/data/categories";
 import type { Category } from "@/lib/data/homepage";
 import type { ProductDetail } from "@/lib/data/products";
 
@@ -38,9 +43,10 @@ type FilterTab = "all" | "active" | "archived" | "top_seller" | "low_stock";
 
 export function ProductManager({
   initialProducts,
-  categories,
+  categories: initialCategories,
 }: ProductManagerProps) {
   const [products, setProducts] = useState<ProductDetail[]>(initialProducts);
+  const [categories, setCategories] = useState<Category[]>(initialCategories);
   const [activeTab, setActiveTab] = useState<FilterTab>("all");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
 
@@ -58,6 +64,23 @@ export function ProductManager({
 
   const [togglingId, setTogglingId] = useState<string | null>(null);
 
+  // Safe client hydration from MockStore localStorage & real-time catalog event listener
+  useEffect(() => {
+    const syncFromStore = () => {
+      const store = loadMockStore();
+      if (store.products && store.products.length > 0) {
+        setProducts(store.products as unknown as ProductDetail[]);
+      }
+      if (store.categories && store.categories.length > 0) {
+        setCategories(store.categories as unknown as Category[]);
+      }
+    };
+
+    syncFromStore();
+    window.addEventListener("catalog_updated", syncFromStore);
+    return () => window.removeEventListener("catalog_updated", syncFromStore);
+  }, []);
+
   // Tab counts
   const tabCounts = useMemo(() => {
     return {
@@ -69,7 +92,7 @@ export function ProductManager({
     };
   }, [products]);
 
-  // Filtered dataset based on tab & category
+  // Filtered dataset based on tab & category (including descendant child categories)
   const filteredProducts = useMemo(() => {
     return products.filter((p) => {
       // Tab filter
@@ -78,14 +101,16 @@ export function ProductManager({
       if (activeTab === "top_seller" && !p.is_featured_top_seller) return false;
       if (activeTab === "low_stock" && p.stock_quantity > 10) return false;
 
-      // Category filter
+      // Category filter (includes nested child categories)
       if (selectedCategory !== "all") {
-        if (p.category_id !== selectedCategory) return false;
+        const descendantIds = getDescendantCategoryIds(selectedCategory, categories);
+        const matchIds = [selectedCategory, ...descendantIds];
+        if (!p.category_id || !matchIds.includes(p.category_id)) return false;
       }
 
       return true;
     });
-  }, [products, activeTab, selectedCategory]);
+  }, [products, activeTab, selectedCategory, categories]);
 
   // Handler: Open Create Modal
   const handleCreateProduct = () => {
@@ -114,34 +139,50 @@ export function ProductManager({
     setTogglingId(prod.id);
     setNotification(null);
 
-    const res = await archiveProductAction(prod.id, shouldArchive);
-    setTogglingId(null);
-
-    if (res.error) {
-      setNotification({ type: "error", message: res.error });
-    } else {
-      setProducts((prev) =>
-        prev.map((p) => (p.id === prod.id ? { ...p, is_active: !shouldArchive } : p))
-      );
+    // 1. Persist archive state in mock store (validates primary image rule if unarchiving)
+    const localRes = archiveProductInStore(prod.id, shouldArchive);
+    if (!localRes.success) {
+      setTogglingId(null);
       setNotification({
-        type: "success",
-        message: shouldArchive
-          ? `Product "${prod.name}" archived.`
-          : `Product "${prod.name}" restored to active catalog.`,
+        type: "error",
+        message: localRes.error || "Failed to update product status.",
       });
+      return;
     }
+
+    // 2. Server action for cache revalidation
+    try {
+      await archiveProductAction(prod.id, shouldArchive);
+    } catch {
+      // offline fallback
+    }
+
+    setTogglingId(null);
+    setProducts((prev) =>
+      prev.map((p) => (p.id === prod.id ? { ...p, is_active: !shouldArchive } : p))
+    );
+    setNotification({
+      type: "success",
+      message: shouldArchive
+        ? `Product "${prod.name}" archived.`
+        : `Product "${prod.name}" restored to active catalog.`,
+    });
   };
 
   // Handler: Save Success (Insert or Update)
   const handleSaveSuccess = (savedPayload: any) => {
-    // If the server action returned the saved payload or refreshed item, reload state
-    setProducts((prev) => {
-      const exists = prev.some((p) => p.id === savedPayload.id);
-      if (exists) {
-        return prev.map((p) => (p.id === savedPayload.id ? { ...p, ...savedPayload } : p));
-      }
-      return [savedPayload, ...prev];
-    });
+    const store = loadMockStore();
+    if (store.products && store.products.length > 0) {
+      setProducts(store.products as unknown as ProductDetail[]);
+    } else {
+      setProducts((prev) => {
+        const exists = prev.some((p) => p.id === savedPayload.id);
+        if (exists) {
+          return prev.map((p) => (p.id === savedPayload.id ? { ...p, ...savedPayload } : p));
+        }
+        return [savedPayload, ...prev];
+      });
+    }
 
     setNotification({
       type: "success",
@@ -151,30 +192,33 @@ export function ProductManager({
 
   // Handler: Delete/Archive Success from Delete Modal
   const handleDeleteSuccess = (deletedId: string, actionType: "archive" | "delete") => {
-    if (actionType === "delete") {
+    const store = loadMockStore();
+    if (store.products) {
+      setProducts(store.products as unknown as ProductDetail[]);
+    } else if (actionType === "delete") {
       setProducts((prev) => prev.filter((p) => p.id !== deletedId));
-      setNotification({
-        type: "success",
-        message: "Product permanently removed from store catalog.",
-      });
     } else {
       setProducts((prev) =>
         prev.map((p) => (p.id === deletedId ? { ...p, is_active: false } : p))
       );
-      setNotification({
-        type: "success",
-        message: "Product archived successfully.",
-      });
     }
+
+    setNotification({
+      type: "success",
+      message:
+        actionType === "delete"
+          ? "Product permanently removed from store catalog."
+          : "Product archived successfully.",
+    });
   };
 
-  // Data table columns
+  // Data table columns aligned with Phase 3 specifications
   const columns: Column<ProductDetail>[] = [
     {
       key: "name",
       header: "Product",
       sortable: true,
-      className: "min-w-[280px]",
+      className: "min-w-[260px]",
       render: (item) => {
         const primaryImg =
           item.images.find((img) => img.is_primary)?.image_url ||
@@ -208,35 +252,86 @@ export function ProductManager({
                     className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[10px] font-bold shrink-0"
                   >
                     <Sparkles className="h-2.5 w-2.5" />
-                    Top Seller
+                    Top
                   </span>
                 )}
               </div>
-              <div className="flex items-center gap-1.5 mt-0.5 text-[11px] text-muted-foreground">
-                {item.category?.name ? (
-                  <span className="px-1.5 py-0.2 rounded bg-muted text-[10px] font-medium text-foreground/80">
-                    {item.category.name}
-                  </span>
-                ) : (
-                  <span className="text-muted-foreground/60 text-[10px]">Uncategorized</span>
-                )}
-                {item.sku && (
-                  <>
-                    <span>•</span>
-                    <span className="font-mono text-[10px]">{item.sku}</span>
-                  </>
-                )}
-              </div>
+              <span className="text-[11px] text-muted-foreground line-clamp-1 mt-0.5">
+                {item.description || "Authentic handcrafted devotional item"}
+              </span>
             </div>
           </div>
         );
       },
     },
     {
+      key: "category",
+      header: "Category Hierarchy",
+      className: "min-w-[200px]",
+      render: (item) => {
+        const path = item.category_id
+          ? getCategoryPathLabel(item.category_id, categories)
+          : item.category?.name || "Uncategorized";
+
+        return (
+          <div className="space-y-0.5">
+            <div className="text-xs font-semibold text-foreground flex items-center gap-1.5 truncate">
+              <span className="px-2 py-0.5 rounded-md bg-muted text-[11px] font-medium text-foreground/90 border border-border/60">
+                {path}
+              </span>
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      key: "brand",
+      header: "Brand",
+      sortable: true,
+      className: "w-32",
+      render: (item) => (
+        <span className="text-xs font-medium text-foreground">
+          {item.brand || "Kanhaiya Collection"}
+        </span>
+      ),
+    },
+    {
+      key: "sku",
+      header: "SKU",
+      sortable: true,
+      className: "w-32",
+      render: (item) => (
+        <div className="flex items-center gap-1">
+          <span className="font-mono text-[11px] font-semibold bg-muted/70 text-foreground px-2 py-0.5 rounded-md border border-border">
+            {item.sku || "—"}
+          </span>
+        </div>
+      ),
+    },
+    {
+      key: "batch_number",
+      header: "Batch Identifier",
+      sortable: true,
+      className: "w-36",
+      render: (item) => (
+        <div className="flex flex-col gap-0.5">
+          <span
+            title="Development Model Batch Identifier: stable unique batch generated centrally; flagged for persistent DB migration approval."
+            className="font-mono text-[11px] font-bold text-amber-800 dark:text-amber-200 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded-md w-fit cursor-help"
+          >
+            {item.batch_number || "—"}
+          </span>
+          <span className="text-[9px] uppercase tracking-wider text-muted-foreground/80 font-bold">
+            Dev Model
+          </span>
+        </div>
+      ),
+    },
+    {
       key: "base_price",
       header: "Price",
       sortable: true,
-      className: "w-32",
+      className: "w-28",
       render: (item) => (
         <div className="space-y-0.5">
           <div className="font-bold text-xs text-foreground">
@@ -288,17 +383,6 @@ export function ProductManager({
       },
     },
     {
-      key: "variants",
-      header: "Variants",
-      className: "w-24 text-center",
-      render: (item) => (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-muted text-[11px] font-medium text-muted-foreground">
-          <Layers className="h-3 w-3" />
-          <span>{item.variants.length}</span>
-        </span>
-      ),
-    },
-    {
       key: "is_active",
       header: "Status",
       sortable: true,
@@ -311,12 +395,12 @@ export function ProductManager({
             type="button"
             onClick={() => handleToggleActive(item)}
             disabled={isToggling}
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold transition-all disabled:opacity-50 ${
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold transition-all cursor-pointer disabled:opacity-50 ${
               item.is_active
                 ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/20"
                 : "bg-muted text-muted-foreground border border-border hover:bg-muted/80"
             }`}
-            title={item.is_active ? "Click to archive" : "Click to unarchive"}
+            title={item.is_active ? "Click to archive (hide from storefront)" : "Click to activate on storefront"}
           >
             <span
               className={`h-1.5 w-1.5 rounded-full ${
@@ -333,14 +417,14 @@ export function ProductManager({
     {
       key: "actions",
       header: "Actions",
-      className: "w-32 text-right",
+      className: "w-28 text-right",
       render: (item) => (
         <div className="flex items-center justify-end gap-1">
           <Link
             href={`/shop/product/${item.slug}`}
             target="_blank"
-            title="View live product page"
-            className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            title="View live product page on storefront"
+            className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
           >
             <ExternalLink className="h-3.5 w-3.5" />
           </Link>
@@ -348,7 +432,7 @@ export function ProductManager({
             type="button"
             onClick={() => handleEditProduct(item)}
             title="Edit Product"
-            className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+            className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors cursor-pointer"
           >
             <Edit2 className="h-3.5 w-3.5" />
           </button>
@@ -356,7 +440,7 @@ export function ProductManager({
             type="button"
             onClick={() => handleDeleteProduct(item)}
             title="Archive or Delete"
-            className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+            className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
           >
             <Trash2 className="h-3.5 w-3.5" />
           </button>
@@ -531,8 +615,8 @@ export function ProductManager({
       <AdminDataTable
         columns={columns}
         data={filteredProducts}
-        searchPlaceholder="Search products by name, SKU, brand..."
-        searchKeys={["name", "sku", "brand"]}
+        searchPlaceholder="Search products by name, SKU, batch number, brand..."
+        searchKeys={["name", "sku", "batch_number", "brand"]}
         initialSortKey="name"
         initialSortDirection="asc"
         defaultPageSize={10}

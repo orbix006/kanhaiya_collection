@@ -1,16 +1,14 @@
-import { ComingSoon } from "@/components/ui/coming-soon";
+import { getPublicPolicy } from "@/lib/data/cms";
+import { PolicyView } from "@/components/public/policy-view";
+
+export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "Privacy Policy | Kanhaiya Collection",
   description: "Privacy policy and data protection principles for Kanhaiya Collection.",
 };
 
-export default function PrivacyPolicyPage() {
-  return (
-    <ComingSoon
-      pageTitle="Privacy Policy"
-      categoryName="Trust & Security"
-      customDescription="Our transparent privacy policy and customer trust commitment will be published prior to public launch."
-    />
-  );
+export default async function PrivacyPolicyPage() {
+  const policy = await getPublicPolicy("privacy");
+  return <PolicyView policy={policy} />;
 }

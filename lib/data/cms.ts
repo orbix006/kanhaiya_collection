@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 
 export interface HomepageSection {
   key: string;
@@ -14,6 +14,29 @@ export interface Banner {
   link_url: string | null;
   display_order: number;
   is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface Announcement {
+  id: string;
+  text: string;
+  is_active: boolean;
+  display_order: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface FestiveCampaign {
+  id: string;
+  name: string;
+  description: string;
+  image_url: string | null;
+  product_ids: string[];
+  discount_tag?: string | null;
+  discount_percent?: number | null;
+  is_active: boolean;
+  display_order: number;
   created_at?: string;
   updated_at?: string;
 }
@@ -54,7 +77,7 @@ export interface Faq {
   updated_at?: string;
 }
 
-export type PolicyType = "privacy" | "terms" | "shipping" | "return";
+export type PolicyType = "terms" | "privacy" | "cancellation" | "refund" | "shipping" | "return";
 
 export interface SitePolicy {
   id: string;
@@ -334,6 +357,43 @@ Kanhaiya Collection shall not be liable for any indirect, consequential, or inci
 A tracking number and SMS notification from our premium logistics partners (Blue Dart, Delhivery) will be sent upon dispatch.`,
     display_order: 3,
   },
+  cancellation: {
+    id: "policy-cancellation",
+    type: "cancellation",
+    title: "Cancellation Policy",
+    content: `### 1. Order Cancellation Window
+You may cancel your order free of charge at any time before the consignment is dispatched from our fulfillment center (typically within **24 hours** of order placement).
+
+### 2. How to Request Cancellation
+- Navigate to your account order history and click **Cancel Order**, or
+- Email **care@kanhaiyacollection.com** or call **+91 98290 12345** with your order number.
+
+### 3. Post-Dispatch Cancellations
+Once an order has been handed over to our courier partner and a tracking AWB has been issued, it cannot be canceled in transit. You may instead refuse delivery upon arrival or initiate a return within 7 days.
+
+### 4. Refund on Cancellation
+For prepaid orders canceled prior to dispatch, an immediate 100% refund is initiated back to your original payment mode (UPI, card, or net banking) and typically reflects within 24–48 banking hours.`,
+    display_order: 3,
+  },
+  refund: {
+    id: "policy-refund",
+    type: "refund",
+    title: "Refund Policy",
+    content: `### 1. 7-Day Refund Commitment
+We want you to have complete peace of mind when acquiring sacred brass idols, thalis, and temple textiles from Kanhaiya Collection. If you are not entirely satisfied, you may request a full refund within **7 days of delivery**.
+
+### 2. Refund Verification & Quality Inspection
+- All returned sacred items undergo inspection at our artisan center within 48 business hours of receipt.
+- Returned goods must be unblemished, in original brass tag seals, pooja boxes, and protective packaging.
+
+### 3. Refund Timelines & Payment Channels
+- **Prepaid Orders (UPI, Net Banking, Credit/Debit Cards)**: Credited to the original payment source within **3 to 5 business days**.
+- **Cash on Delivery (COD) Orders**: Refunded securely via instant UPI transfer or direct NEFT bank transfer upon receiving your verified bank details.
+
+### 4. Damaged or In-Transit Defect Protection
+In the rare event of transit damage to brass idols or glass chimneys, report within 48 hours of delivery with photos to **care@kanhaiyacollection.com** for an instant priority replacement or full refund.`,
+    display_order: 4,
+  },
   return: {
     id: "policy-return",
     type: "return",
@@ -353,7 +413,7 @@ We want you to be completely delighted with your heirloom pieces. If for any rea
 - Once your return is received and inspected at our Jaipur warehouse (typically 2 business days), your refund will be processed.
 - Prepaid orders: Credited back to the original source payment method within 5–7 working days.
 - COD orders: Refunded via direct bank transfer (NEFT/UPI) to the account provided by the customer.`,
-    display_order: 4,
+    display_order: 5,
   },
 };
 
@@ -442,6 +502,10 @@ export const FALLBACK_LEADS: Lead[] = [
 
 export async function getHomepageSectionsAdmin(): Promise<HomepageSection[]> {
   try {
+    if (!isSupabaseConfigured()) {
+      const { loadMockHomepageSections } = await import("@/lib/mock-data/admin-store");
+      return loadMockHomepageSections();
+    }
     const supabase = await createClient();
     const { data, error } = await supabase
       .from("homepage_sections")
@@ -449,16 +513,22 @@ export async function getHomepageSectionsAdmin(): Promise<HomepageSection[]> {
       .order("display_order", { ascending: true });
 
     if (error || !data || data.length === 0) {
-      return FALLBACK_HOMEPAGE_SECTIONS;
+      const { loadMockHomepageSections } = await import("@/lib/mock-data/admin-store");
+      return loadMockHomepageSections();
     }
     return data as HomepageSection[];
   } catch {
-    return FALLBACK_HOMEPAGE_SECTIONS;
+    const { loadMockHomepageSections } = await import("@/lib/mock-data/admin-store");
+    return loadMockHomepageSections();
   }
 }
 
 export async function getBannersAdmin(): Promise<Banner[]> {
   try {
+    if (!isSupabaseConfigured()) {
+      const { loadMockBanners } = await import("@/lib/mock-data/admin-store");
+      return loadMockBanners();
+    }
     const supabase = await createClient();
     const { data, error } = await supabase
       .from("banners")
@@ -466,16 +536,22 @@ export async function getBannersAdmin(): Promise<Banner[]> {
       .order("display_order", { ascending: true });
 
     if (error || !data || data.length === 0) {
-      return FALLBACK_BANNERS;
+      const { loadMockBanners } = await import("@/lib/mock-data/admin-store");
+      return loadMockBanners();
     }
     return data as Banner[];
   } catch {
-    return FALLBACK_BANNERS;
+    const { loadMockBanners } = await import("@/lib/mock-data/admin-store");
+    return loadMockBanners();
   }
 }
 
 export async function getTestimonialsAdmin(): Promise<Testimonial[]> {
   try {
+    if (!isSupabaseConfigured()) {
+      const { loadMockTestimonials } = await import("@/lib/mock-data/admin-store");
+      return loadMockTestimonials();
+    }
     const supabase = await createClient();
     const { data, error } = await supabase
       .from("testimonials")
@@ -483,16 +559,22 @@ export async function getTestimonialsAdmin(): Promise<Testimonial[]> {
       .order("display_order", { ascending: true });
 
     if (error || !data || data.length === 0) {
-      return FALLBACK_TESTIMONIALS;
+      const { loadMockTestimonials } = await import("@/lib/mock-data/admin-store");
+      return loadMockTestimonials();
     }
     return data as Testimonial[];
   } catch {
-    return FALLBACK_TESTIMONIALS;
+    const { loadMockTestimonials } = await import("@/lib/mock-data/admin-store");
+    return loadMockTestimonials();
   }
 }
 
 export async function getAboutSectionsAdmin(): Promise<AboutSection[]> {
   try {
+    if (!isSupabaseConfigured()) {
+      const { loadMockAboutSections } = await import("@/lib/mock-data/admin-store");
+      return loadMockAboutSections() as AboutSection[];
+    }
     const supabase = await createClient();
     const { data, error } = await supabase
       .from("about_us_sections")
@@ -500,24 +582,22 @@ export async function getAboutSectionsAdmin(): Promise<AboutSection[]> {
       .order("display_order", { ascending: true });
 
     if (error || !data || data.length === 0) {
-      return FALLBACK_ABOUT_SECTIONS;
+      const { loadMockAboutSections } = await import("@/lib/mock-data/admin-store");
+      return loadMockAboutSections() as AboutSection[];
     }
     return data as AboutSection[];
   } catch {
-    return FALLBACK_ABOUT_SECTIONS;
+    const { loadMockAboutSections } = await import("@/lib/mock-data/admin-store");
+    return loadMockAboutSections() as AboutSection[];
   }
 }
 
-function isSupabaseConfigured(): boolean {
-  return Boolean(
-    process.env.NEXT_PUBLIC_SUPABASE_URL &&
-    process.env.NEXT_PUBLIC_SUPABASE_URL !== "https://placeholder-project.supabase.co"
-  );
-}
+
 
 export async function getPublicAboutSections(): Promise<AboutSection[]> {
   if (!isSupabaseConfigured()) {
-    return FALLBACK_ABOUT_SECTIONS.filter((s) => s.is_active);
+    const { loadMockAboutSections } = await import("@/lib/mock-data/admin-store");
+    return loadMockAboutSections().filter((s) => s.is_active) as AboutSection[];
   }
 
   try {
@@ -530,17 +610,20 @@ export async function getPublicAboutSections(): Promise<AboutSection[]> {
 
     if (error || !data) {
       console.warn("Supabase about_us_sections fetch error:", error);
-      return FALLBACK_ABOUT_SECTIONS.filter((s) => s.is_active);
+      const { loadMockAboutSections } = await import("@/lib/mock-data/admin-store");
+      return loadMockAboutSections().filter((s) => s.is_active) as AboutSection[];
     }
     return data as AboutSection[];
   } catch {
-    return FALLBACK_ABOUT_SECTIONS.filter((s) => s.is_active);
+    const { loadMockAboutSections } = await import("@/lib/mock-data/admin-store");
+    return loadMockAboutSections().filter((s) => s.is_active) as AboutSection[];
   }
 }
 
 export async function getFaqsAdmin(): Promise<Faq[]> {
   if (!isSupabaseConfigured()) {
-    return FALLBACK_FAQS;
+    const { loadMockFaqs } = await import("@/lib/mock-data/admin-store");
+    return loadMockFaqs() as Faq[];
   }
 
   try {
@@ -551,17 +634,20 @@ export async function getFaqsAdmin(): Promise<Faq[]> {
       .order("display_order", { ascending: true });
 
     if (error || !data) {
-      return FALLBACK_FAQS;
+      const { loadMockFaqs } = await import("@/lib/mock-data/admin-store");
+      return loadMockFaqs() as Faq[];
     }
     return data as Faq[];
   } catch {
-    return FALLBACK_FAQS;
+    const { loadMockFaqs } = await import("@/lib/mock-data/admin-store");
+    return loadMockFaqs() as Faq[];
   }
 }
 
 export async function getPublicFaqs(): Promise<Faq[]> {
   if (!isSupabaseConfigured()) {
-    return FALLBACK_FAQS.filter((f) => f.is_active);
+    const { loadMockFaqs } = await import("@/lib/mock-data/admin-store");
+    return loadMockFaqs().filter((f) => f.is_active) as Faq[];
   }
 
   try {
@@ -574,17 +660,23 @@ export async function getPublicFaqs(): Promise<Faq[]> {
 
     if (error || !data) {
       console.warn("Supabase faqs fetch error:", error);
-      return FALLBACK_FAQS.filter((f) => f.is_active);
+      const { loadMockFaqs } = await import("@/lib/mock-data/admin-store");
+      return loadMockFaqs().filter((f) => f.is_active) as Faq[];
     }
     return data as Faq[];
   } catch {
-    return FALLBACK_FAQS.filter((f) => f.is_active);
+    const { loadMockFaqs } = await import("@/lib/mock-data/admin-store");
+    return loadMockFaqs().filter((f) => f.is_active) as Faq[];
   }
 }
 
 export async function getSitePoliciesAdmin(): Promise<SitePolicy[]> {
   if (!isSupabaseConfigured()) {
-    return Object.values(FALLBACK_POLICIES).sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
+    const { loadMockPolicies } = await import("@/lib/mock-data/admin-store");
+    return loadMockPolicies().map((p, idx) => ({
+      ...p,
+      display_order: idx + 1,
+    })) as SitePolicy[];
   }
 
   try {
@@ -594,7 +686,11 @@ export async function getSitePoliciesAdmin(): Promise<SitePolicy[]> {
       .select("*");
 
     if (error || !data || data.length === 0) {
-      return Object.values(FALLBACK_POLICIES).sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
+      const { loadMockPolicies } = await import("@/lib/mock-data/admin-store");
+      return loadMockPolicies().map((p, idx) => ({
+        ...p,
+        display_order: idx + 1,
+      })) as SitePolicy[];
     }
     const policies = (data as any[]).map((p) => ({
       ...p,
@@ -603,7 +699,11 @@ export async function getSitePoliciesAdmin(): Promise<SitePolicy[]> {
 
     return policies.sort((a, b) => a.display_order - b.display_order);
   } catch {
-    return Object.values(FALLBACK_POLICIES).sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
+    const { loadMockPolicies } = await import("@/lib/mock-data/admin-store");
+    return loadMockPolicies().map((p, idx) => ({
+      ...p,
+      display_order: idx + 1,
+    })) as SitePolicy[];
   }
 }
 
@@ -613,6 +713,11 @@ export async function getPublicPolicies(): Promise<SitePolicy[]> {
 
 export async function getPublicPolicy(type: PolicyType): Promise<SitePolicy> {
   if (!isSupabaseConfigured()) {
+    const { getMockPolicyByType } = await import("@/lib/mock-data/admin-store");
+    const found = getMockPolicyByType(type);
+    if (found) {
+      return { ...found, display_order: 1 } as SitePolicy;
+    }
     return FALLBACK_POLICIES[type];
   }
 
@@ -621,19 +726,31 @@ export async function getPublicPolicy(type: PolicyType): Promise<SitePolicy> {
     const { data, error } = await supabase
       .from("site_policies")
       .select("*")
-      .eq("type", type)
+      .eq("type", type as any)
       .maybeSingle();
 
     if (error || !data) {
+      const { getMockPolicyByType } = await import("@/lib/mock-data/admin-store");
+      const found = getMockPolicyByType(type);
+      if (found) return { ...found, display_order: 1 } as SitePolicy;
       return FALLBACK_POLICIES[type];
     }
     return data as SitePolicy;
   } catch {
+    const { getMockPolicyByType } = await import("@/lib/mock-data/admin-store");
+    const found = getMockPolicyByType(type);
+    if (found) return { ...found, display_order: 1 } as SitePolicy;
     return FALLBACK_POLICIES[type];
   }
 }
 
 export async function getSiteSettings(key = "footer"): Promise<FooterSettings> {
+  if (!isSupabaseConfigured()) {
+    const { loadMockSettings } = await import("@/lib/mock-data/admin-store");
+    const settings = loadMockSettings(key);
+    return { ...FALLBACK_FOOTER_SETTINGS, ...(settings as object) };
+  }
+
   try {
     const supabase = await createClient();
     const { data, error } = await supabase
@@ -643,15 +760,22 @@ export async function getSiteSettings(key = "footer"): Promise<FooterSettings> {
       .maybeSingle();
 
     if (error || !data || !data.value) {
-      return FALLBACK_FOOTER_SETTINGS;
+      const { loadMockSettings } = await import("@/lib/mock-data/admin-store");
+      return { ...FALLBACK_FOOTER_SETTINGS, ...(loadMockSettings(key) as object) };
     }
     return { ...FALLBACK_FOOTER_SETTINGS, ...(data.value as object) };
   } catch {
-    return FALLBACK_FOOTER_SETTINGS;
+    const { loadMockSettings } = await import("@/lib/mock-data/admin-store");
+    return { ...FALLBACK_FOOTER_SETTINGS, ...(loadMockSettings(key) as object) };
   }
 }
 
 export async function getContactSubmissionsAdmin(): Promise<ContactSubmission[]> {
+  if (!isSupabaseConfigured()) {
+    const { loadMockContactSubmissions } = await import("@/lib/mock-data/admin-store");
+    return loadMockContactSubmissions() as ContactSubmission[];
+  }
+
   try {
     const supabase = await createClient();
     const { data, error } = await supabase
@@ -660,15 +784,22 @@ export async function getContactSubmissionsAdmin(): Promise<ContactSubmission[]>
       .order("created_at", { ascending: false });
 
     if (error || !data || data.length === 0) {
-      return FALLBACK_CONTACT_SUBMISSIONS;
+      const { loadMockContactSubmissions } = await import("@/lib/mock-data/admin-store");
+      return loadMockContactSubmissions() as ContactSubmission[];
     }
     return data as ContactSubmission[];
   } catch {
-    return FALLBACK_CONTACT_SUBMISSIONS;
+    const { loadMockContactSubmissions } = await import("@/lib/mock-data/admin-store");
+    return loadMockContactSubmissions() as ContactSubmission[];
   }
 }
 
 export async function getLeadsAdmin(): Promise<Lead[]> {
+  if (!isSupabaseConfigured()) {
+    const { loadMockLeads } = await import("@/lib/mock-data/admin-store");
+    return loadMockLeads() as Lead[];
+  }
+
   try {
     const supabase = await createClient();
     const { data, error } = await supabase
@@ -677,10 +808,41 @@ export async function getLeadsAdmin(): Promise<Lead[]> {
       .order("created_at", { ascending: false });
 
     if (error || !data || data.length === 0) {
-      return FALLBACK_LEADS;
+      const { loadMockLeads } = await import("@/lib/mock-data/admin-store");
+      return loadMockLeads() as Lead[];
     }
     return data as Lead[];
   } catch {
-    return FALLBACK_LEADS;
+    const { loadMockLeads } = await import("@/lib/mock-data/admin-store");
+    return loadMockLeads() as Lead[];
   }
+}
+
+export async function getResponseNotesAdmin() {
+  const { loadMockResponseNotes } = await import("@/lib/mock-data/admin-store");
+  return loadMockResponseNotes();
+}
+
+// -----------------------------------------------------------------------------
+// ANNOUNCEMENTS AND FESTIVE CAMPAIGNS HELPERS
+// -----------------------------------------------------------------------------
+
+export async function getAnnouncementsAdmin(): Promise<Announcement[]> {
+  const { loadMockAnnouncements } = await import("@/lib/mock-data/admin-store");
+  return loadMockAnnouncements() as Announcement[];
+}
+
+export async function getActiveAnnouncements(): Promise<Announcement[]> {
+  const { loadMockAnnouncements } = await import("@/lib/mock-data/admin-store");
+  return loadMockAnnouncements().filter((a) => a.is_active) as Announcement[];
+}
+
+export async function getFestiveCampaignsAdmin(): Promise<FestiveCampaign[]> {
+  const { loadMockFestiveCampaigns } = await import("@/lib/mock-data/admin-store");
+  return loadMockFestiveCampaigns() as FestiveCampaign[];
+}
+
+export async function getActiveFestiveCampaigns(): Promise<FestiveCampaign[]> {
+  const { loadMockFestiveCampaigns } = await import("@/lib/mock-data/admin-store");
+  return loadMockFestiveCampaigns().filter((c) => c.is_active) as FestiveCampaign[];
 }

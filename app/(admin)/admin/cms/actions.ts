@@ -25,9 +25,14 @@ export async function updateHomepageSectionsAction(
   }
 
   if (auth.isDemo) {
+    const { updateMockHomepageSections } = await import("@/lib/mock-data/admin-store");
+    const res = updateMockHomepageSections(sections);
+    if (!res.success) {
+      return { error: res.error || "Failed to update homepage sections." };
+    }
     revalidatePath("/");
     revalidatePath("/admin/cms/homepage");
-    return { success: true, message: "[Demo Mode] Homepage sections layout updated successfully." };
+    return { success: true, message: "Homepage section order & enablement saved successfully." };
   }
 
   const { supabase } = auth;
@@ -79,12 +84,17 @@ export async function saveBannerAction(payload: BannerPayload) {
   }
 
   if (auth.isDemo) {
+    const { saveMockBanner } = await import("@/lib/mock-data/admin-store");
+    const res = saveMockBanner(payload);
+    if (!res.success) {
+      return { error: res.error || "Failed to save banner." };
+    }
     revalidatePath("/");
     revalidatePath("/admin/cms/banners");
     return {
       success: true,
-      message: `[Demo Mode] Banner '${payload.title || "Hero Banner"}' saved.`,
-      banner: { ...payload, id: payload.id || `demo-banner-${Date.now()}` },
+      message: `Banner '${payload.title || "Hero Banner"}' saved successfully.`,
+      banner: res.banner,
     };
   }
 
@@ -128,7 +138,10 @@ export async function toggleBannerStatusAction(id: string, is_active: boolean) {
   const auth = await verifyAdminCaller();
   if (!auth.authorized) return { error: auth.error };
 
-  if (!auth.isDemo) {
+  if (auth.isDemo) {
+    const { toggleMockBannerStatus } = await import("@/lib/mock-data/admin-store");
+    toggleMockBannerStatus(id);
+  } else {
     const { error } = await auth.supabase
       .from("banners")
       .update({ is_active, updated_at: new Date().toISOString() })
@@ -146,7 +159,10 @@ export async function deleteBannerAction(id: string) {
   const auth = await verifyAdminCaller();
   if (!auth.authorized) return { error: auth.error };
 
-  if (!auth.isDemo) {
+  if (auth.isDemo) {
+    const { deleteMockBanner } = await import("@/lib/mock-data/admin-store");
+    deleteMockBanner(id);
+  } else {
     const { error } = await auth.supabase.from("banners").delete().eq("id", id);
     if (error) return { error: `Failed to delete banner: ${error.message}` };
   }
@@ -182,12 +198,17 @@ export async function saveTestimonialAction(payload: TestimonialPayload) {
   if (!content) return { error: "Testimonial content is required." };
 
   if (auth.isDemo) {
+    const { saveMockTestimonial } = await import("@/lib/mock-data/admin-store");
+    const res = saveMockTestimonial(payload as any);
+    if (!res.success) {
+      return { error: res.error || "Failed to save testimonial." };
+    }
     revalidatePath("/");
     revalidatePath("/admin/cms/testimonials");
     return {
       success: true,
-      message: `[Demo Mode] Testimonial from '${name}' saved.`,
-      testimonial: { ...payload, id: payload.id || `demo-test-${Date.now()}` },
+      message: `Testimonial from '${name}' saved successfully.`,
+      testimonial: res.testimonial,
     };
   }
 
@@ -233,7 +254,10 @@ export async function toggleTestimonialStatusAction(id: string, is_active: boole
   const auth = await verifyAdminCaller();
   if (!auth.authorized) return { error: auth.error };
 
-  if (!auth.isDemo) {
+  if (auth.isDemo) {
+    const { toggleMockTestimonialStatus } = await import("@/lib/mock-data/admin-store");
+    toggleMockTestimonialStatus(id);
+  } else {
     const { error } = await auth.supabase
       .from("testimonials")
       .update({ is_active, updated_at: new Date().toISOString() })
@@ -251,7 +275,10 @@ export async function deleteTestimonialAction(id: string) {
   const auth = await verifyAdminCaller();
   if (!auth.authorized) return { error: auth.error };
 
-  if (!auth.isDemo) {
+  if (auth.isDemo) {
+    const { deleteMockTestimonial } = await import("@/lib/mock-data/admin-store");
+    deleteMockTestimonial(id);
+  } else {
     const { error } = await auth.supabase.from("testimonials").delete().eq("id", id);
     if (error) return { error: `Failed to delete testimonial: ${error.message}` };
   }
@@ -284,12 +311,17 @@ export async function saveAboutSectionAction(payload: AboutSectionPayload) {
   }
 
   if (auth.isDemo) {
+    const { saveMockAboutSection } = await import("@/lib/mock-data/admin-store");
+    const res = saveMockAboutSection(payload);
+    if (!res.success) {
+      return { error: res.error || "Failed to save About section." };
+    }
     revalidatePath("/about");
     revalidatePath("/admin/cms/about");
     return {
       success: true,
-      message: `[Demo Mode] About section '${payload.heading || "Section"}' saved.`,
-      section: { ...payload, id: payload.id || `demo-about-${Date.now()}` },
+      message: `About section '${payload.heading || "Story Section"}' saved successfully.`,
+      section: res.section,
     };
   }
 
@@ -334,14 +366,21 @@ export async function toggleAboutSectionStatusAction(id: string, is_active: bool
   const auth = await verifyAdminCaller();
   if (!auth.authorized) return { error: auth.error };
 
-  if (!auth.isDemo) {
-    const { error } = await auth.supabase
-      .from("about_us_sections")
-      .update({ is_active, updated_at: new Date().toISOString() })
-      .eq("id", id);
-
-    if (error) return { error: `Failed to toggle section: ${error.message}` };
+  if (auth.isDemo) {
+    const { toggleMockAboutSectionStatus } = await import("@/lib/mock-data/admin-store");
+    const res = toggleMockAboutSectionStatus(id, is_active);
+    if (!res.success) return { error: res.error };
+    revalidatePath("/about");
+    revalidatePath("/admin/cms/about");
+    return { success: true, message: `About section ${is_active ? "published" : "hidden"} successfully.` };
   }
+
+  const { error } = await auth.supabase
+    .from("about_us_sections")
+    .update({ is_active, updated_at: new Date().toISOString() })
+    .eq("id", id);
+
+  if (error) return { error: `Failed to toggle section: ${error.message}` };
 
   revalidatePath("/about");
   revalidatePath("/admin/cms/about");
@@ -352,14 +391,46 @@ export async function deleteAboutSectionAction(id: string) {
   const auth = await verifyAdminCaller();
   if (!auth.authorized) return { error: auth.error };
 
-  if (!auth.isDemo) {
-    const { error } = await auth.supabase.from("about_us_sections").delete().eq("id", id);
-    if (error) return { error: `Failed to delete section: ${error.message}` };
+  if (auth.isDemo) {
+    const { deleteMockAboutSection } = await import("@/lib/mock-data/admin-store");
+    const res = deleteMockAboutSection(id);
+    if (!res.success) return { error: res.error };
+    revalidatePath("/about");
+    revalidatePath("/admin/cms/about");
+    return { success: true, message: "About section deleted successfully." };
   }
+
+  const { error } = await auth.supabase.from("about_us_sections").delete().eq("id", id);
+  if (error) return { error: `Failed to delete section: ${error.message}` };
 
   revalidatePath("/about");
   revalidatePath("/admin/cms/about");
   return { success: true, message: "About section deleted successfully." };
+}
+
+export async function reorderAboutSectionsAction(orderedIds: string[]) {
+  const auth = await verifyAdminCaller();
+  if (!auth.authorized) return { error: auth.error };
+
+  if (auth.isDemo) {
+    const { reorderMockAboutSections } = await import("@/lib/mock-data/admin-store");
+    const res = reorderMockAboutSections(orderedIds);
+    if (!res.success) return { error: res.error };
+    revalidatePath("/about");
+    revalidatePath("/admin/cms/about");
+    return { success: true, message: "About sections reordered successfully.", sections: res.sections };
+  }
+
+  const { supabase } = auth;
+  for (let i = 0; i < orderedIds.length; i++) {
+    await supabase
+      .from("about_us_sections")
+      .update({ display_order: i + 1, updated_at: new Date().toISOString() })
+      .eq("id", orderedIds[i]);
+  }
+  revalidatePath("/about");
+  revalidatePath("/admin/cms/about");
+  return { success: true, message: "About sections reordered successfully." };
 }
 
 // -----------------------------------------------------------------------------
@@ -386,13 +457,16 @@ export async function saveFaqAction(payload: FaqPayload) {
   if (!answer) return { error: "FAQ answer is required." };
 
   if (auth.isDemo) {
+    const { saveMockFaq } = await import("@/lib/mock-data/admin-store");
+    const res = saveMockFaq(payload);
+    if (!res.success) return { error: res.error || "Failed to save FAQ." };
     revalidatePath("/faqs");
     revalidatePath("/faq");
     revalidatePath("/admin/cms/faqs");
     return {
       success: true,
-      message: `[Demo Mode] FAQ saved successfully.`,
-      faq: { ...payload, id: payload.id || `demo-faq-${Date.now()}` },
+      message: "FAQ saved successfully.",
+      faq: res.faq,
     };
   }
 
@@ -438,14 +512,22 @@ export async function toggleFaqStatusAction(id: string, is_active: boolean) {
   const auth = await verifyAdminCaller();
   if (!auth.authorized) return { error: auth.error };
 
-  if (!auth.isDemo) {
-    const { error } = await auth.supabase
-      .from("faqs")
-      .update({ is_active, updated_at: new Date().toISOString() })
-      .eq("id", id);
-
-    if (error) return { error: `Failed to toggle FAQ: ${error.message}` };
+  if (auth.isDemo) {
+    const { toggleMockFaqStatus } = await import("@/lib/mock-data/admin-store");
+    const res = toggleMockFaqStatus(id, is_active);
+    if (!res.success) return { error: res.error };
+    revalidatePath("/faqs");
+    revalidatePath("/faq");
+    revalidatePath("/admin/cms/faqs");
+    return { success: true, message: `FAQ ${is_active ? "published" : "hidden"} successfully.` };
   }
+
+  const { error } = await auth.supabase
+    .from("faqs")
+    .update({ is_active, updated_at: new Date().toISOString() })
+    .eq("id", id);
+
+  if (error) return { error: `Failed to toggle FAQ: ${error.message}` };
 
   revalidatePath("/faqs");
   revalidatePath("/faq");
@@ -457,15 +539,50 @@ export async function deleteFaqAction(id: string) {
   const auth = await verifyAdminCaller();
   if (!auth.authorized) return { error: auth.error };
 
-  if (!auth.isDemo) {
-    const { error } = await auth.supabase.from("faqs").delete().eq("id", id);
-    if (error) return { error: `Failed to delete FAQ: ${error.message}` };
+  if (auth.isDemo) {
+    const { deleteMockFaq } = await import("@/lib/mock-data/admin-store");
+    const res = deleteMockFaq(id);
+    if (!res.success) return { error: res.error };
+    revalidatePath("/faqs");
+    revalidatePath("/faq");
+    revalidatePath("/admin/cms/faqs");
+    return { success: true, message: "FAQ deleted successfully." };
   }
+
+  const { error } = await auth.supabase.from("faqs").delete().eq("id", id);
+  if (error) return { error: `Failed to delete FAQ: ${error.message}` };
 
   revalidatePath("/faqs");
   revalidatePath("/faq");
   revalidatePath("/admin/cms/faqs");
   return { success: true, message: "FAQ deleted successfully." };
+}
+
+export async function reorderFaqsAction(orderedIds: string[]) {
+  const auth = await verifyAdminCaller();
+  if (!auth.authorized) return { error: auth.error };
+
+  if (auth.isDemo) {
+    const { reorderMockFaqs } = await import("@/lib/mock-data/admin-store");
+    const res = reorderMockFaqs(orderedIds);
+    if (!res.success) return { error: res.error };
+    revalidatePath("/faqs");
+    revalidatePath("/faq");
+    revalidatePath("/admin/cms/faqs");
+    return { success: true, message: "FAQs reordered successfully.", faqs: res.faqs };
+  }
+
+  const { supabase } = auth;
+  for (let i = 0; i < orderedIds.length; i++) {
+    await supabase
+      .from("faqs")
+      .update({ display_order: i + 1, updated_at: new Date().toISOString() })
+      .eq("id", orderedIds[i]);
+  }
+  revalidatePath("/faqs");
+  revalidatePath("/faq");
+  revalidatePath("/admin/cms/faqs");
+  return { success: true, message: "FAQs reordered successfully." };
 }
 
 // -----------------------------------------------------------------------------
@@ -476,7 +593,8 @@ export async function savePolicyAction(
   type: PolicyType,
   title: string,
   content: string,
-  display_order?: number
+  display_order?: number,
+  isDraft = false
 ) {
   const auth = await verifyAdminCaller();
   if (!auth.authorized) return { error: auth.error };
@@ -488,12 +606,20 @@ export async function savePolicyAction(
   if (!validContent) return { error: "Policy content is required." };
 
   if (auth.isDemo) {
+    const { saveMockPolicy } = await import("@/lib/mock-data/admin-store");
+    const res = saveMockPolicy(type, validTitle, validContent, isDraft);
+    if (!res.success) return { error: res.error || "Failed to save policy." };
     revalidatePath(`/${type}`);
+    if (type === "refund") revalidatePath("/return");
+    if (type === "privacy") revalidatePath("/privacy-policy");
     revalidatePath("/admin/cms/policies");
     revalidatePath("/", "layout");
     return {
       success: true,
-      message: `[Demo Mode] ${validTitle} updated successfully.`,
+      message: isDraft
+        ? `Draft for ${validTitle} saved successfully.`
+        : `${validTitle} updated and published successfully.`,
+      policy: res.policy,
     };
   }
 
@@ -559,9 +685,12 @@ export async function saveSiteSettingsAction(key: string, value: Record<string, 
   if (!key) return { error: "Settings key is required." };
 
   if (auth.isDemo) {
+    const { saveMockSettings } = await import("@/lib/mock-data/admin-store");
+    const res = saveMockSettings(key, value);
+    if (!res.success) return { error: res.error || "Failed to update site settings." };
     revalidatePath("/", "layout");
     revalidatePath("/admin/cms/settings");
-    return { success: true, message: "[Demo Mode] Site settings updated successfully." };
+    return { success: true, message: "Site settings updated successfully.", settings: res.settings };
   }
 
   const { supabase } = auth;
@@ -583,4 +712,159 @@ export async function saveSiteSettingsAction(key: string, value: Record<string, 
   revalidatePath("/", "layout");
   revalidatePath("/admin/cms/settings");
   return { success: true, message: "Site settings updated successfully.", settings: data };
+}
+
+// -----------------------------------------------------------------------------
+// 8. Offer & Discount Announcements Actions (Text-Only Top Ribbon)
+// -----------------------------------------------------------------------------
+
+export interface AnnouncementPayload {
+  id?: string;
+  text: string;
+  is_active?: boolean;
+  display_order?: number;
+}
+
+export async function saveAnnouncementAction(payload: AnnouncementPayload) {
+  const auth = await verifyAdminCaller();
+  if (!auth.authorized) {
+    return { error: auth.error || "Forbidden: Administrator privileges required." };
+  }
+
+  const { saveMockAnnouncement } = await import("@/lib/mock-data/admin-store");
+  const res = saveMockAnnouncement(payload);
+  if (!res.success) {
+    return { error: res.error || "Failed to save announcement." };
+  }
+
+  revalidatePath("/", "layout");
+  revalidatePath("/admin/cms/homepage");
+  return {
+    success: true,
+    message: "Announcement ribbon saved successfully.",
+    announcement: res.announcement,
+  };
+}
+
+export async function toggleAnnouncementStatusAction(id: string, is_active: boolean) {
+  const auth = await verifyAdminCaller();
+  if (!auth.authorized) return { error: auth.error };
+
+  const { toggleMockAnnouncementStatus } = await import("@/lib/mock-data/admin-store");
+  const res = toggleMockAnnouncementStatus(id);
+  if (!res.success) return { error: res.error || "Failed to toggle announcement." };
+
+  revalidatePath("/", "layout");
+  revalidatePath("/admin/cms/homepage");
+  return {
+    success: true,
+    message: `Announcement ${is_active ? "activated" : "deactivated"} successfully.`,
+    announcement: res.announcement,
+  };
+}
+
+export async function deleteAnnouncementAction(id: string) {
+  const auth = await verifyAdminCaller();
+  if (!auth.authorized) return { error: auth.error };
+
+  const { deleteMockAnnouncement } = await import("@/lib/mock-data/admin-store");
+  const res = deleteMockAnnouncement(id);
+  if (!res.success) return { error: res.error || "Failed to delete announcement." };
+
+  revalidatePath("/", "layout");
+  revalidatePath("/admin/cms/homepage");
+  return { success: true, message: "Announcement removed successfully." };
+}
+
+export async function reorderAnnouncementsAction(orderedIds: string[]) {
+  const auth = await verifyAdminCaller();
+  if (!auth.authorized) return { error: auth.error };
+
+  const { reorderMockAnnouncements } = await import("@/lib/mock-data/admin-store");
+  const res = reorderMockAnnouncements(orderedIds);
+  if (!res.success) return { error: res.error || "Failed to reorder announcements." };
+
+  revalidatePath("/", "layout");
+  revalidatePath("/admin/cms/homepage");
+  return { success: true, message: "Announcement sequence updated.", announcements: res.announcements };
+}
+
+// -----------------------------------------------------------------------------
+// 9. Festive Discount Campaigns Actions
+// -----------------------------------------------------------------------------
+
+export interface FestiveCampaignPayload {
+  id?: string;
+  name: string;
+  description: string;
+  image_url?: string | null;
+  product_ids: string[];
+  discount_tag?: string | null;
+  discount_percent?: number | null;
+  is_active?: boolean;
+  display_order?: number;
+}
+
+export async function saveFestiveCampaignAction(payload: FestiveCampaignPayload) {
+  const auth = await verifyAdminCaller();
+  if (!auth.authorized) {
+    return { error: auth.error || "Forbidden: Administrator privileges required." };
+  }
+
+  const { saveMockFestiveCampaign } = await import("@/lib/mock-data/admin-store");
+  const res = saveMockFestiveCampaign(payload);
+  if (!res.success) {
+    return { error: res.error || "Failed to save festive campaign." };
+  }
+
+  revalidatePath("/");
+  revalidatePath("/admin/cms/homepage");
+  return {
+    success: true,
+    message: `Festive campaign '${payload.name}' saved successfully.`,
+    campaign: res.campaign,
+  };
+}
+
+export async function toggleFestiveCampaignStatusAction(id: string, is_active: boolean) {
+  const auth = await verifyAdminCaller();
+  if (!auth.authorized) return { error: auth.error };
+
+  const { toggleMockFestiveCampaignStatus } = await import("@/lib/mock-data/admin-store");
+  const res = toggleMockFestiveCampaignStatus(id);
+  if (!res.success) return { error: res.error || "Failed to toggle campaign." };
+
+  revalidatePath("/");
+  revalidatePath("/admin/cms/homepage");
+  return {
+    success: true,
+    message: `Festive campaign ${is_active ? "activated" : "deactivated"} successfully.`,
+    campaign: res.campaign,
+  };
+}
+
+export async function deleteFestiveCampaignAction(id: string) {
+  const auth = await verifyAdminCaller();
+  if (!auth.authorized) return { error: auth.error };
+
+  const { deleteMockFestiveCampaign } = await import("@/lib/mock-data/admin-store");
+  const res = deleteMockFestiveCampaign(id);
+  if (!res.success) return { error: res.error || "Failed to delete campaign." };
+
+  revalidatePath("/");
+  revalidatePath("/admin/cms/homepage");
+  return { success: true, message: "Festive campaign deleted successfully." };
+}
+
+export async function reorderFestiveCampaignsAction(orderedIds: string[]) {
+  const auth = await verifyAdminCaller();
+  if (!auth.authorized) return { error: auth.error };
+
+  const { reorderMockFestiveCampaigns } = await import("@/lib/mock-data/admin-store");
+  const res = reorderMockFestiveCampaigns(orderedIds);
+  if (!res.success) return { error: res.error || "Failed to reorder campaigns." };
+
+  revalidatePath("/");
+  revalidatePath("/admin/cms/homepage");
+  return { success: true, message: "Festive campaign sequence updated.", campaigns: res.campaigns };
 }

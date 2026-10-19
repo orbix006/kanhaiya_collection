@@ -1,7 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
+import { getLocalSession } from "@/lib/auth/local-auth";
 import {
   getLocalStoreData,
   saveLocalStoreData,
@@ -13,33 +14,34 @@ import {
 /**
  * Server-side admin authorization guard.
  * Checks Supabase authentication and verifies `profiles.role === 'admin'`.
+ * In local mode, verifies authoritative session has role 'admin'.
  */
 async function verifyAdminAuth(): Promise<boolean> {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (isSupabaseConfigured()) {
+    try {
+      const supabase = await createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
-  // If Supabase is active, enforce database profile role check
-  if (supabaseUrl) {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+      if (!user) {
+        return false;
+      }
 
-    if (!user) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .single();
+
+      return profile?.role === "admin";
+    } catch {
       return false;
     }
-
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-
-    return profile?.role === "admin";
   }
 
-  // In local/dev environment without remote Supabase project,
-  // we check for admin authorization cookie or allow local administrative management
-  return true;
+  const session = await getLocalSession();
+  return session?.role === "admin";
 }
 
 // -----------------------------------------------------------------------------
@@ -442,3 +444,23 @@ export async function deleteProductAction(id: string) {
   revalidatePath("/admin");
   return { success: true };
 }
+
+export async function updateProductStockAction(id: string, newStock: number) {
+  const isAdmin = await verifyAdminAuth();
+  if (!isAdmin) return { error: "Unauthorized" };
+
+  const store = getLocalStoreData();
+  const idx = store.products.findIndex((p) => p.id === id);
+  if (idx === -1) return { error: "Product not found" };
+
+  store.products[idx].stock_quantity = Math.max(0, newStock);
+  store.products[idx].updated_at = new Date().toISOString();
+
+  saveLocalStoreData(store);
+  revalidatePath("/", "layout");
+  revalidatePath("/admin");
+  revalidatePath("/admin/inventory");
+  revalidatePath("/admin/products");
+  return { success: true, updatedStock: store.products[idx].stock_quantity };
+}
+

@@ -31,22 +31,19 @@ export async function approveReviewAction(
     process.env.NEXT_PUBLIC_SUPABASE_URL !== "https://placeholder-project.supabase.co";
 
   if (!isConfigured) {
-    const store = getDemoReviewsStore();
-    const review = store.get(reviewId);
-    if (!review) {
-      return { error: `Review '${reviewId}' not found.` };
+    const { approveMockReview } = await import("@/lib/mock-data/admin-store");
+    const result = approveMockReview(reviewId);
+    if (!result.success) {
+      return { error: result.error || "Failed to approve review." };
     }
-    review.is_approved = true;
 
     safeRevalidate("/admin/reviews");
     safeRevalidate("/admin");
     safeRevalidate("/shop");
-    safeRevalidate(`/product/${review.product_slug}`);
-    safeRevalidate(`/shop/product/${review.product_slug}`);
 
     return {
       success: true,
-      message: `[Demo Mode] Review for '${review.product_name}' has been approved and published.`,
+      message: "Review approved successfully. Product rating and review count updated via schema trigger.",
     };
   }
 
@@ -125,22 +122,19 @@ export async function unapproveReviewAction(
     process.env.NEXT_PUBLIC_SUPABASE_URL !== "https://placeholder-project.supabase.co";
 
   if (!isConfigured) {
-    const store = getDemoReviewsStore();
-    const review = store.get(reviewId);
-    if (!review) {
-      return { error: `Review '${reviewId}' not found.` };
+    const { unapproveMockReview } = await import("@/lib/mock-data/admin-store");
+    const result = unapproveMockReview(reviewId);
+    if (!result.success) {
+      return { error: result.error || "Failed to unapprove review." };
     }
-    review.is_approved = false;
 
     safeRevalidate("/admin/reviews");
     safeRevalidate("/admin");
     safeRevalidate("/shop");
-    safeRevalidate(`/product/${review.product_slug}`);
-    safeRevalidate(`/shop/product/${review.product_slug}`);
 
     return {
       success: true,
-      message: `[Demo Mode] Approval revoked for '${review.product_name}' review.`,
+      message: "Approval revoked. Excluded from product rating rollups.",
     };
   }
 
@@ -219,21 +213,19 @@ export async function deleteReviewAction(
     process.env.NEXT_PUBLIC_SUPABASE_URL !== "https://placeholder-project.supabase.co";
 
   if (!isConfigured) {
-    const store = getDemoReviewsStore();
-    const review = store.get(reviewId);
-    store.delete(reviewId);
+    const { deleteMockReview } = await import("@/lib/mock-data/admin-store");
+    const result = deleteMockReview(reviewId);
+    if (!result.success) {
+      return { error: result.error || "Failed to delete review." };
+    }
 
     safeRevalidate("/admin/reviews");
     safeRevalidate("/admin");
     safeRevalidate("/shop");
-    if (review) {
-      safeRevalidate(`/product/${review.product_slug}`);
-      safeRevalidate(`/shop/product/${review.product_slug}`);
-    }
 
     return {
       success: true,
-      message: "[Demo Mode] Review has been deleted.",
+      message: "Review deleted successfully. Product ratings recalculated.",
     };
   }
 

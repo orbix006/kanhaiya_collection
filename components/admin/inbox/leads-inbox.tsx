@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   Users,
   Mail,
@@ -14,6 +14,11 @@ import {
   X,
   Share2,
   Check,
+  Tag,
+  Sparkles,
+  UserCheck,
+  XCircle,
+  TrendingUp,
 } from "lucide-react";
 import { AdminDataTable, Column } from "@/components/admin/data-table";
 import {
@@ -29,6 +34,7 @@ interface LeadsInboxProps {
 export function LeadsInbox({ initialLeads }: LeadsInboxProps) {
   const [leads, setLeads] = useState<Lead[]>(initialLeads);
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [sourceFilter, setSourceFilter] = useState<string>("all");
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [leadToDelete, setLeadToDelete] = useState<Lead | null>(null);
@@ -38,10 +44,40 @@ export function LeadsInbox({ initialLeads }: LeadsInboxProps) {
     type: "success" | "error";
   } | null>(null);
 
+  // Client hydration from mock store
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("kanhaiya_admin_mock_store_v6");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed.leads) && parsed.leads.length > 0) {
+          setLeads(
+            [...parsed.leads].sort(
+              (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+            )
+          );
+        }
+      }
+    } catch {}
+  }, []);
+
+  const sources = useMemo(() => {
+    const set = new Set<string>();
+    leads.forEach((l) => {
+      if (l.source) set.add(l.source);
+    });
+    return Array.from(set);
+  }, [leads]);
+
   const filteredLeads = useMemo(() => {
-    if (statusFilter === "all") return leads;
-    return leads.filter((l) => l.status === statusFilter);
-  }, [leads, statusFilter]);
+    return leads.filter((l) => {
+      const matchesStatus = statusFilter === "all" || l.status === statusFilter;
+      const matchesSource =
+        sourceFilter === "all" ||
+        (l.source && l.source.toLowerCase() === sourceFilter.toLowerCase());
+      return matchesStatus && matchesSource;
+    });
+  }, [leads, statusFilter, sourceFilter]);
 
   const counts = useMemo(() => {
     return {
@@ -63,11 +99,16 @@ export function LeadsInbox({ initialLeads }: LeadsInboxProps) {
       if (res.error) {
         setToastMessage({ text: res.error, type: "error" });
       } else {
+        const updatedTime = new Date().toISOString();
         setLeads((prev) =>
-          prev.map((l) => (l.id === lead.id ? { ...l, status: newStatus } : l))
+          prev.map((l) =>
+            l.id === lead.id ? { ...l, status: newStatus, updated_at: updatedTime } : l
+          )
         );
         if (selectedLead?.id === lead.id) {
-          setSelectedLead((prev) => (prev ? { ...prev, status: newStatus } : null));
+          setSelectedLead((prev) =>
+            prev ? { ...prev, status: newStatus, updated_at: updatedTime } : null
+          );
         }
         setToastMessage({
           text: `Lead status updated to '${newStatus}'.`,
@@ -107,92 +148,115 @@ export function LeadsInbox({ initialLeads }: LeadsInboxProps) {
 
   const statusBadges = {
     new: {
-      label: "New Lead",
-      className: "bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/30",
+      label: "New",
+      className: "bg-blue-500/15 text-blue-700 dark:text-blue-400 border-blue-500/30 font-bold",
     },
     contacted: {
       label: "Contacted",
-      className: "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30",
+      className: "bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30 font-bold",
     },
     converted: {
       label: "Converted",
-      className: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30",
+      className: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 font-bold",
     },
     closed: {
       label: "Closed",
-      className: "bg-muted text-muted-foreground border-border",
+      className: "bg-muted text-muted-foreground border-border font-medium",
     },
   };
 
   const columns: Column<Lead>[] = [
     {
-      key: "status",
-      header: "Status",
-      sortable: true,
-      render: (l) => {
-        const badge = statusBadges[l.status] || statusBadges.new;
-        return (
-          <span
-            className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${badge.className}`}
-          >
-            {l.status === "converted" ? (
-              <Check className="h-3 w-3" />
-            ) : l.status === "contacted" ? (
-              <Clock className="h-3 w-3" />
-            ) : (
-              <AlertCircle className="h-3 w-3" />
-            )}
-            <span>{badge.label}</span>
-          </span>
-        );
-      },
-    },
-    {
-      key: "email",
-      header: "Lead Contact",
+      key: "name",
+      header: "Lead / Contact",
       sortable: true,
       render: (l) => (
-        <div className="flex flex-col">
-          <span className="font-semibold text-foreground text-xs">{l.email}</span>
-          {l.name && (
-            <span className="text-[11px] text-muted-foreground">{l.name}</span>
+        <div className="flex items-center gap-2.5">
+          {l.status === "new" ? (
+            <span
+              className="h-2 w-2 rounded-full bg-blue-500 shrink-0 ring-4 ring-blue-500/20 animate-pulse"
+              title="New Inbound Lead"
+            />
+          ) : (
+            <span className="h-2 w-2 rounded-full bg-transparent shrink-0" />
           )}
+          <div className="flex flex-col">
+            <span
+              className={`text-xs ${
+                l.status === "new" ? "font-bold text-foreground" : "font-medium text-foreground"
+              }`}
+            >
+              {l.name || "Anonymous Subscriber"}
+            </span>
+            <span className="text-[11px] text-muted-foreground flex items-center gap-1.5 mt-0.5">
+              <Mail className="h-2.5 w-2.5" />
+              <span>{l.email}</span>
+            </span>
+          </div>
         </div>
-      ),
-    },
-    {
-      key: "source",
-      header: "Capture Source",
-      sortable: true,
-      render: (l) => (
-        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-muted text-[11px] font-bold text-foreground border border-border/60 uppercase tracking-wider font-mono">
-          <Share2 className="h-3 w-3 text-primary" />
-          <span>{l.source || "newsletter"}</span>
-        </span>
       ),
     },
     {
       key: "phone",
       header: "Phone",
       render: (l) => (
-        <span className="text-xs text-muted-foreground">
+        <span className="text-xs text-muted-foreground font-mono">
           {l.phone || "—"}
         </span>
       ),
     },
     {
+      key: "source",
+      header: "Channel Source",
+      sortable: true,
+      render: (l) => (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-muted text-[10px] font-semibold text-foreground border border-border/70 capitalize">
+          <Tag className="h-2.5 w-2.5 text-primary" />
+          <span>{l.source || "Direct Form"}</span>
+        </span>
+      ),
+    },
+    {
+      key: "message",
+      header: "Inquiry / Notes",
+      render: (l) => (
+        <p className="text-xs text-muted-foreground line-clamp-2 max-w-sm">
+          {l.message || "Newsletter subscription / interest alert."}
+        </p>
+      ),
+    },
+    {
       key: "created_at",
-      header: "Subscribed Date",
+      header: "Captured",
       sortable: true,
       render: (l) => (
         <span className="text-xs text-muted-foreground whitespace-nowrap">
-          {new Date(l.created_at).toLocaleDateString("en-IN", {
-            day: "numeric",
+          {new Date(l.created_at).toLocaleDateString("en-US", {
             month: "short",
+            day: "numeric",
             year: "numeric",
           })}
         </span>
       ),
+    },
+    {
+      key: "status",
+      header: "Status",
+      sortable: true,
+      render: (l) => {
+        const badge = statusBadges[l.status];
+        return (
+          <span
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] border ${badge.className}`}
+          >
+            {l.status === "new" && <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />}
+            {l.status === "contacted" && <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />}
+            {l.status === "converted" && <Check className="h-3 w-3" />}
+            {l.status === "closed" && <XCircle className="h-3 w-3" />}
+            <span>{badge.label}</span>
+          </span>
+        );
+      },
     },
     {
       key: "actions",
@@ -202,10 +266,10 @@ export function LeadsInbox({ initialLeads }: LeadsInboxProps) {
         <div className="flex items-center justify-end gap-1.5">
           <button
             onClick={() => setSelectedLead(l)}
-            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-border/70 hover:bg-muted text-xs font-semibold text-foreground transition-colors cursor-pointer"
+            className="p-1.5 rounded-lg border border-border/70 hover:bg-primary/10 hover:text-primary hover:border-primary/30 text-muted-foreground transition-colors cursor-pointer"
+            title="Inspect Lead"
           >
-            <Eye className="h-3.5 w-3.5 text-primary" />
-            <span>Inspect</span>
+            <Eye className="h-3.5 w-3.5" />
           </button>
           <button
             onClick={() => {
@@ -241,79 +305,149 @@ export function LeadsInbox({ initialLeads }: LeadsInboxProps) {
         </div>
       )}
 
-      {/* Filter Tabs */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-1">
+      {/* Status Filter Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         <button
           onClick={() => setStatusFilter("all")}
-          className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+          className={`flex flex-col text-left p-4 rounded-2xl border transition-all cursor-pointer ${
             statusFilter === "all"
-              ? "bg-primary text-primary-foreground border-primary"
-              : "bg-card text-muted-foreground border-border hover:bg-muted"
+              ? "bg-primary/5 border-primary shadow-xs ring-1 ring-primary/40"
+              : "bg-card border-border/70 hover:bg-muted/40"
           }`}
         >
-          All Leads ({counts.all})
+          <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">
+            All Leads
+          </span>
+          <span className="text-2xl font-extrabold text-foreground">{counts.all}</span>
         </button>
+
         <button
           onClick={() => setStatusFilter("new")}
-          className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+          className={`flex flex-col text-left p-4 rounded-2xl border transition-all cursor-pointer ${
             statusFilter === "new"
-              ? "bg-blue-600 text-white border-blue-600"
-              : "bg-card text-muted-foreground border-border hover:bg-muted"
+              ? "bg-blue-500/10 border-blue-500 shadow-xs ring-1 ring-blue-500/40"
+              : "bg-card border-border/70 hover:bg-muted/40"
           }`}
         >
-          New ({counts.new})
+          <span className="text-[11px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider flex items-center gap-1.5 mb-1">
+            <span className="h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
+            <span>New</span>
+          </span>
+          <span className="text-2xl font-extrabold text-blue-700 dark:text-blue-400">
+            {counts.new}
+          </span>
         </button>
+
         <button
           onClick={() => setStatusFilter("contacted")}
-          className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+          className={`flex flex-col text-left p-4 rounded-2xl border transition-all cursor-pointer ${
             statusFilter === "contacted"
-              ? "bg-amber-600 text-white border-amber-600"
-              : "bg-card text-muted-foreground border-border hover:bg-muted"
+              ? "bg-amber-500/10 border-amber-500 shadow-xs ring-1 ring-amber-500/40"
+              : "bg-card border-border/70 hover:bg-muted/40"
           }`}
         >
-          Contacted ({counts.contacted})
+          <span className="text-[11px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider mb-1">
+            Contacted
+          </span>
+          <span className="text-2xl font-extrabold text-amber-700 dark:text-amber-400">
+            {counts.contacted}
+          </span>
         </button>
+
         <button
           onClick={() => setStatusFilter("converted")}
-          className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+          className={`flex flex-col text-left p-4 rounded-2xl border transition-all cursor-pointer ${
             statusFilter === "converted"
-              ? "bg-emerald-600 text-white border-emerald-600"
-              : "bg-card text-muted-foreground border-border hover:bg-muted"
+              ? "bg-emerald-500/10 border-emerald-500 shadow-xs ring-1 ring-emerald-500/40"
+              : "bg-card border-border/70 hover:bg-muted/40"
           }`}
         >
-          Converted ({counts.converted})
+          <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider mb-1 flex items-center gap-1">
+            <TrendingUp className="h-3 w-3" />
+            <span>Converted</span>
+          </span>
+          <span className="text-2xl font-extrabold text-emerald-700 dark:text-emerald-400">
+            {counts.converted}
+          </span>
         </button>
+
         <button
           onClick={() => setStatusFilter("closed")}
-          className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+          className={`flex flex-col text-left p-4 rounded-2xl border transition-all cursor-pointer ${
             statusFilter === "closed"
-              ? "bg-muted text-foreground border-border"
-              : "bg-card text-muted-foreground border-border hover:bg-muted"
+              ? "bg-muted border-foreground/30 shadow-xs ring-1 ring-foreground/20"
+              : "bg-card border-border/70 hover:bg-muted/40"
           }`}
         >
-          Closed ({counts.closed})
+          <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">
+            Closed
+          </span>
+          <span className="text-2xl font-extrabold text-foreground">{counts.closed}</span>
         </button>
       </div>
+
+      {/* Filter by Source Pill Strip */}
+      {sources.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5 p-3 rounded-2xl bg-muted/30 border border-border/70">
+          <span className="text-xs font-bold text-muted-foreground mr-1">Source:</span>
+          <button
+            onClick={() => setSourceFilter("all")}
+            className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              sourceFilter === "all"
+                ? "bg-primary text-primary-foreground shadow-xs"
+                : "bg-card border border-border/70 text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            All Sources
+          </button>
+          {sources.map((src) => (
+            <button
+              key={src}
+              onClick={() => setSourceFilter(src)}
+              className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer capitalize ${
+                sourceFilter === src
+                  ? "bg-primary text-primary-foreground shadow-xs"
+                  : "bg-card border border-border/70 text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {src}
+            </button>
+          ))}
+        </div>
+      )}
 
       <AdminDataTable
         columns={columns}
         data={filteredLeads}
-        searchPlaceholder="Search leads by email, name, phone, or capture source..."
-        searchKeys={["email", "name", "phone", "source", "message"]}
+        searchPlaceholder="Search leads by customer name, email, phone, or source..."
+        searchKeys={["name", "email", "phone", "source", "message"]}
         initialSortKey="created_at"
         initialSortDirection="desc"
       />
 
-      {/* Inspection Modal */}
+      {/* Slide-over Inspection Drawer / Modal */}
       {selectedLead && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto">
-          <div className="relative w-full max-w-xl rounded-2xl bg-card border border-border shadow-2xl p-6 overflow-hidden space-y-6">
+          <div className="relative w-full max-w-lg rounded-3xl bg-card border border-border shadow-2xl p-6 sm:p-8 overflow-hidden space-y-6">
             <div className="flex items-center justify-between pb-4 border-b border-border/60">
-              <div className="flex items-center gap-2">
-                <Users className="h-4.5 w-4.5 text-primary" />
-                <h3 className="text-base font-bold text-foreground">
-                  Lead: {selectedLead.email}
-                </h3>
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <Users className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-foreground">
+                    {selectedLead.name || "Anonymous Subscriber"}
+                  </h3>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Calendar className="h-3 w-3" />
+                    <span>
+                      {new Date(selectedLead.created_at).toLocaleString("en-US", {
+                        dateStyle: "medium",
+                        timeStyle: "short",
+                      })}
+                    </span>
+                  </div>
+                </div>
               </div>
               <button
                 onClick={() => setSelectedLead(null)}
@@ -323,47 +457,28 @@ export function LeadsInbox({ initialLeads }: LeadsInboxProps) {
               </button>
             </div>
 
-            {/* Lead Details Box */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 rounded-xl bg-muted/40 border border-border/60 text-xs">
-              <div className="flex flex-col gap-1">
-                <span className="text-muted-foreground text-[11px] font-semibold">
+            {/* Contact Information & Capture Source */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 rounded-2xl bg-muted/30 border border-border/70 text-xs">
+              <div className="space-y-1">
+                <span className="text-muted-foreground text-[10px] font-bold uppercase tracking-wider">
                   Email Address
                 </span>
                 <a
                   href={`mailto:${selectedLead.email}`}
-                  className="font-bold text-primary hover:underline flex items-center gap-1.5"
+                  className="font-semibold text-primary hover:underline flex items-center gap-1.5"
                 >
                   <Mail className="h-3.5 w-3.5" />
                   <span>{selectedLead.email}</span>
                 </a>
               </div>
-
-              <div className="flex flex-col gap-1">
-                <span className="text-muted-foreground text-[11px] font-semibold">
-                  Full Name
-                </span>
-                <span className="font-semibold text-foreground">
-                  {selectedLead.name || "Not provided"}
-                </span>
-              </div>
-
-              <div className="flex flex-col gap-1">
-                <span className="text-muted-foreground text-[11px] font-semibold">
-                  Capture Source
-                </span>
-                <span className="font-mono uppercase font-bold text-foreground">
-                  {selectedLead.source || "newsletter"}
-                </span>
-              </div>
-
-              <div className="flex flex-col gap-1">
-                <span className="text-muted-foreground text-[11px] font-semibold">
-                  Phone Number
+              <div className="space-y-1">
+                <span className="text-muted-foreground text-[10px] font-bold uppercase tracking-wider">
+                  Contact Phone
                 </span>
                 {selectedLead.phone ? (
                   <a
                     href={`tel:${selectedLead.phone}`}
-                    className="font-bold text-foreground hover:underline flex items-center gap-1.5"
+                    className="font-semibold text-foreground hover:text-primary flex items-center gap-1.5"
                   >
                     <Phone className="h-3.5 w-3.5" />
                     <span>{selectedLead.phone}</span>
@@ -372,116 +487,71 @@ export function LeadsInbox({ initialLeads }: LeadsInboxProps) {
                   <span className="text-muted-foreground">Not provided</span>
                 )}
               </div>
-
-              <div className="flex flex-col gap-1">
-                <span className="text-muted-foreground text-[11px] font-semibold">
-                  Subscription Timestamp
+              <div className="space-y-1 sm:col-span-2 pt-1 border-t border-border/40">
+                <span className="text-muted-foreground text-[10px] font-bold uppercase tracking-wider">
+                  Marketing Acquisition Channel
                 </span>
-                <span className="text-foreground flex items-center gap-1.5">
-                  <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
-                  <span>
-                    {new Date(selectedLead.created_at).toLocaleString("en-IN")}
-                  </span>
-                </span>
-              </div>
-
-              <div className="flex flex-col gap-1">
-                <span className="text-muted-foreground text-[11px] font-semibold">
-                  Current Status
-                </span>
-                <span className="font-bold uppercase tracking-wide text-primary">
-                  {selectedLead.status}
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-muted text-xs font-semibold text-foreground capitalize">
+                  <Tag className="h-3 w-3 text-primary" />
+                  <span>{selectedLead.source || "Website Inbound"}</span>
                 </span>
               </div>
             </div>
 
-            {selectedLead.message && (
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-foreground">
-                  Attached Note / Request
-                </label>
-                <div className="p-3 rounded-xl border border-border bg-background text-xs text-foreground leading-relaxed">
-                  {selectedLead.message}
-                </div>
+            {/* Inquiry Details / Message */}
+            <div className="space-y-2">
+              <span className="text-xs font-bold text-foreground">Submission Note / Interest:</span>
+              <div className="p-4 rounded-2xl bg-muted/20 border border-border text-xs sm:text-sm text-foreground leading-relaxed whitespace-pre-line">
+                {selectedLead.message || "Newsletter subscription initiated via storefront footer."}
               </div>
-            )}
+            </div>
 
-            {/* Status Transition Buttons */}
-            <div className="space-y-2 pt-2 border-t border-border/60">
-              <span className="text-xs font-semibold text-muted-foreground">
-                Update Lead Status:
+            {/* Status Transition Control (Schema strictly: new | contacted | converted | closed) */}
+            <div className="space-y-2 pt-2">
+              <span className="text-xs font-bold text-foreground">
+                Lead Pipeline Status:
               </span>
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  disabled={isUpdating || selectedLead.status === "new"}
-                  onClick={() => handleStatusChange(selectedLead, "new")}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
-                    selectedLead.status === "new"
-                      ? "bg-blue-600 text-white border-blue-600"
-                      : "border-border text-foreground hover:bg-muted"
-                  }`}
-                >
-                  New
-                </button>
-                <button
-                  type="button"
-                  disabled={isUpdating || selectedLead.status === "contacted"}
-                  onClick={() => handleStatusChange(selectedLead, "contacted")}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
-                    selectedLead.status === "contacted"
-                      ? "bg-amber-600 text-white border-amber-600"
-                      : "border-border text-foreground hover:bg-muted"
-                  }`}
-                >
-                  Contacted
-                </button>
-                <button
-                  type="button"
-                  disabled={isUpdating || selectedLead.status === "converted"}
-                  onClick={() => handleStatusChange(selectedLead, "converted")}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
-                    selectedLead.status === "converted"
-                      ? "bg-emerald-600 text-white border-emerald-600"
-                      : "border-border text-foreground hover:bg-muted"
-                  }`}
-                >
-                  Converted
-                </button>
-                <button
-                  type="button"
-                  disabled={isUpdating || selectedLead.status === "closed"}
-                  onClick={() => handleStatusChange(selectedLead, "closed")}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
-                    selectedLead.status === "closed"
-                      ? "bg-muted text-foreground border-border"
-                      : "border-border text-foreground hover:bg-muted"
-                  }`}
-                >
-                  Closed
-                </button>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {(["new", "contacted", "converted", "closed"] as const).map((st) => {
+                  const isCurrent = selectedLead.status === st;
+                  return (
+                    <button
+                      key={st}
+                      type="button"
+                      disabled={isUpdating}
+                      onClick={() => handleStatusChange(selectedLead, st)}
+                      className={`py-2 px-2.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer flex items-center justify-center gap-1 capitalize ${
+                        isCurrent
+                          ? "bg-primary text-primary-foreground border-primary shadow-xs"
+                          : "bg-muted/40 text-muted-foreground border-border hover:bg-muted"
+                      }`}
+                    >
+                      {isCurrent && <Check className="h-3.5 w-3.5" />}
+                      <span>{st}</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
-            <div className="flex items-center justify-between pt-2">
+            {/* Drawer Actions */}
+            <div className="flex items-center justify-between pt-4 border-t border-border/60">
               <button
-                type="button"
                 onClick={() => {
                   setLeadToDelete(selectedLead);
                   setDeleteModalOpen(true);
                 }}
-                className="text-xs font-semibold text-destructive hover:underline flex items-center gap-1 cursor-pointer"
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-destructive hover:underline cursor-pointer"
               >
                 <Trash2 className="h-3.5 w-3.5" />
-                <span>Delete lead record</span>
+                <span>Delete Lead</span>
               </button>
 
               <button
-                type="button"
                 onClick={() => setSelectedLead(null)}
-                className="px-4 py-2 rounded-xl border border-border text-xs font-semibold text-foreground hover:bg-muted cursor-pointer"
+                className="px-4 py-2 text-xs font-semibold rounded-xl bg-muted text-foreground hover:bg-muted/80 cursor-pointer"
               >
-                Close
+                Close View
               </button>
             </div>
           </div>
@@ -497,8 +567,8 @@ export function LeadsInbox({ initialLeads }: LeadsInboxProps) {
               <span>Confirm Lead Deletion</span>
             </h3>
             <p className="text-xs text-muted-foreground">
-              Are you sure you want to remove lead{" "}
-              <strong>&ldquo;{leadToDelete.email}&rdquo;</strong>?
+              Are you sure you want to delete lead{" "}
+              <strong>&ldquo;{leadToDelete.name || leadToDelete.email}&rdquo;</strong>? This record will be removed from your audience records.
             </p>
 
             <div className="flex items-center justify-end gap-2 pt-2">

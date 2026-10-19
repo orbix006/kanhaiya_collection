@@ -8,6 +8,7 @@ export interface Banner {
   subtitle: string;
   cta_text: string;
   cta_link: string;
+  link_url?: string | null;
   image_url: string;
   mobile_image_url?: string | null;
   is_active: boolean;
@@ -20,6 +21,7 @@ export interface Banner {
 
 export interface Category {
   id: string;
+  parent_id?: string | null;
   name: string;
   slug: string;
   description: string;
@@ -33,11 +35,11 @@ export interface Category {
 
 export interface Product {
   id: string;
-  category_id: string;
+  category_id: string | null;
   name: string;
   slug: string;
-  description: string;
-  brand: string;
+  description: string | null;
+  brand: string | null;
   base_price: number;
   compare_at_price?: number | null;
   stock_quantity: number;
@@ -48,6 +50,19 @@ export interface Product {
   image_url: string;
   created_at: string;
   updated_at: string;
+  sku?: string | null;
+  batch_number?: string;
+  avg_rating?: number;
+  review_count?: number;
+  images?: Array<{
+    id?: string;
+    image_url: string;
+    alt_text?: string | null;
+    display_order: number;
+    is_primary: boolean;
+  }>;
+  variants?: Array<any>;
+  category?: any;
 }
 
 export interface FestiveOffer {
@@ -499,12 +514,30 @@ export async function getAllCategories(): Promise<Category[]> {
 
 export async function getAllProducts(): Promise<Product[]> {
   const store = getLocalStoreData();
-  return store.products;
+  return store.products.map((p) => {
+    const primaryImg =
+      p.images?.find((img) => img.is_primary)?.image_url ||
+      p.images?.[0]?.image_url ||
+      p.image_url;
+    return {
+      ...p,
+      image_url: primaryImg || "/images/preview-murti.jpg",
+    };
+  });
 }
 
 export async function getProductBySlug(slug: string): Promise<Product | null> {
   const store = getLocalStoreData();
-  return store.products.find((p) => p.slug === slug) || null;
+  const p = store.products.find((p) => p.slug === slug && p.is_active);
+  if (!p) return null;
+  const primaryImg =
+    p.images?.find((img) => img.is_primary)?.image_url ||
+    p.images?.[0]?.image_url ||
+    p.image_url;
+  return {
+    ...p,
+    image_url: primaryImg || "/images/preview-murti.jpg",
+  };
 }
 
 export async function getProductsByIds(ids: string[]): Promise<Product[]> {

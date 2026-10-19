@@ -7,10 +7,11 @@ interface PolicyViewProps {
 }
 
 const POLICY_NAV: { type: PolicyType; title: string; href: string }[] = [
-  { type: "privacy", title: "Privacy Policy", href: "/privacy" },
   { type: "terms", title: "Terms of Service", href: "/terms" },
+  { type: "privacy", title: "Privacy Policy", href: "/privacy" },
+  { type: "cancellation", title: "Cancellation Policy", href: "/cancellation" },
+  { type: "refund", title: "Refund Policy", href: "/refund" },
   { type: "shipping", title: "Shipping & Delivery", href: "/shipping" },
-  { type: "return", title: "Returns & Refunds", href: "/return" },
 ];
 
 /**
@@ -155,7 +156,7 @@ export function PolicyView({ policy }: PolicyViewProps) {
             <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
               Other Store Policies & Customer Guidelines
             </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
               {POLICY_NAV.map((item) => {
                 const isCurrent = item.type === policy?.type;
                 return (

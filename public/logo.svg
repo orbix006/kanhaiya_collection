@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 80" width="320" height="80" fill="none">
+  <!-- Diya Emblem Background -->
+  <circle cx="40" cy="40" r="32" fill="#FFFDF7" stroke="#C8891A" stroke-width="2" stroke-opacity="0.35"/>
+  <circle cx="40" cy="40" r="28" fill="#FFF8EC" fill-opacity="0.6"/>
+  
+  <!-- Sacred Diya Icon -->
+  <g transform="translate(24, 24)" stroke="#C8891A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <!-- Diya Flame -->
+    <path d="M16 2c.67 2.67 3.33 4.67 3.33 7.33A3.33 3.33 0 0 1 16 12.67a3.33 3.33 0 0 1-3.33-3.34C12.67 6.67 15.33 4.67 16 2z" fill="#C8891A" fill-opacity="0.25"/>
+    <!-- Diya Base -->
+    <path d="M5.33 18c0 5.15 4.78 9.33 10.67 9.33s10.67-4.18 10.67-9.33H5.33z" fill="#C8891A" fill-opacity="0.15"/>
+    <path d="M5.33 18h21.34"/>
+  </g>
+
+  <!-- Typography: Kanhaiya Collection -->
+  <text x="88" y="44" font-family="'Cinzel', 'Playfair Display', Georgia, serif" font-size="24" font-weight="600" fill="#3B2416" letter-spacing="-0.02em">
+    Kanhaiya Collection
+  </text>
+  <text x="89" y="60" font-family="system-ui, -apple-system, sans-serif" font-size="9.5" font-weight="500" fill="#8C7355" letter-spacing="0.18em">
+    SACRED DEVOTION &amp; CRAFTSMANSHIP
+  </text>
+</svg>

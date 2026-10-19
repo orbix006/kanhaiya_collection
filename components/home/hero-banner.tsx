@@ -11,11 +11,29 @@ interface HeroBannerProps {
 }
 
 export function HeroBanner({ banners }: HeroBannerProps) {
+  const [activeBanners, setActiveBanners] = useState<Banner[]>(() => {
+    return banners && banners.length > 0 ? banners : [];
+  });
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  const activeBanners = banners && banners.length > 0 ? banners : [];
+  // Sync real-time updates when admin saves or reorders banners
+  useEffect(() => {
+    const handleSync = async () => {
+      try {
+        const { loadMockBanners } = await import("@/lib/mock-data/admin-store");
+        const stored = loadMockBanners();
+        if (stored && stored.length > 0) {
+          setActiveBanners(stored.filter((b) => b.is_active) as any);
+        }
+      } catch {}
+    };
+
+    handleSync();
+    window.addEventListener("catalog_updated", handleSync);
+    return () => window.removeEventListener("catalog_updated", handleSync);
+  }, []);
 
   // Autoplay carousel (6s interval, pauses on hover)
   useEffect(() => {
@@ -68,9 +86,9 @@ export function HeroBanner({ banners }: HeroBannerProps) {
                 isActive ? "opacity-100 z-10" : "opacity-0 z-0 pointer-events-none"
               }`}
             >
-              {/* Optional Clickable Full-Banner Destination */}
+              {/* Clickable Full-Banner Destination */}
               <Link
-                href={banner.cta_link || "/shop"}
+                href={banner.link_url || banner.cta_link || "/shop"}
                 className="absolute inset-0 block cursor-pointer z-10"
                 tabIndex={isActive ? 0 : -1}
                 aria-label={banner.title || "Promotional Banner"}

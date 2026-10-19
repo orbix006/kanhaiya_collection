@@ -1,4 +1,5 @@
-import { createClient } from "@/lib/supabase/server";
+import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
+import { getLocalSession } from "@/lib/auth/local-auth";
 import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
 import { BrandStatement } from "@/components/layout/brand-statement";
@@ -10,19 +11,39 @@ export default async function PublicLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  let user: { email?: string; id?: string } | null = null;
+  let profile: { full_name: string | null; avatar_url: string | null; role?: string } | null = null;
 
-  let profile: { full_name: string | null; avatar_url: string | null } | null = null;
-  if (user) {
-    const { data } = await supabase
-      .from("profiles")
-      .select("full_name, avatar_url")
-      .eq("id", user.id)
-      .single();
-    profile = data;
+  if (isSupabaseConfigured()) {
+    try {
+      const supabase = await createClient();
+      const {
+        data: { user: supabaseUser },
+      } = await supabase.auth.getUser();
+
+      if (supabaseUser) {
+        user = { id: supabaseUser.id, email: supabaseUser.email };
+        const { data: profileData } = await supabase
+          .from("profiles")
+          .select("full_name, avatar_url, role")
+          .eq("id", supabaseUser.id)
+          .single();
+        profile = profileData;
+      }
+    } catch {
+      user = null;
+      profile = null;
+    }
+  } else {
+    const session = await getLocalSession();
+    if (session) {
+      user = { id: session.id, email: session.email };
+      profile = {
+        full_name: session.full_name,
+        avatar_url: null,
+        role: session.role,
+      };
+    }
   }
 
   return (

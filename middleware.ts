@@ -6,45 +6,54 @@ export async function middleware(request: NextRequest) {
     request,
   });
 
-  const supabaseUrl =
-    process.env.NEXT_PUBLIC_SUPABASE_URL ||
-    "https://placeholder-project.supabase.co";
-  const supabaseAnonKey =
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder-anon-key";
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  const isConfigured =
-    Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL) &&
-    process.env.NEXT_PUBLIC_SUPABASE_URL !== "https://placeholder-project.supabase.co";
+  const isConfigured = Boolean(
+    supabaseUrl &&
+    supabaseAnonKey &&
+    supabaseUrl.trim() !== "" &&
+    supabaseAnonKey.trim() !== "" &&
+    supabaseUrl !== "https://placeholder-project.supabase.co" &&
+    supabaseAnonKey !== "placeholder-anon-key" &&
+    supabaseUrl.startsWith("http")
+  );
 
   const pathname = request.nextUrl.pathname;
 
+  // 1. Local Development Mode Authorization Guard
   if (!isConfigured) {
-    const demoCookie = request.cookies.get("demo_user")?.value;
+    const protectedRoutes = ["/admin", "/account", "/cart", "/checkout"];
+    const demoCookieRaw = request.cookies.get("demo_user")?.value;
     let demoUser: { email?: string; role?: string } | null = null;
-    if (demoCookie) {
+    if (demoCookieRaw) {
       try {
-        demoUser = JSON.parse(demoCookie);
+        const decoded = decodeURIComponent(demoCookieRaw);
+        demoUser = JSON.parse(decoded);
       } catch {
-        demoUser = null;
+        try {
+          demoUser = JSON.parse(demoCookieRaw);
+        } catch {
+          demoUser = null;
+        }
       }
     }
 
-    const protectedRoutes = ["/admin", "/account", "/cart", "/checkout"];
     if (protectedRoutes.some((route) => pathname.startsWith(route))) {
       if (!demoUser) {
         const loginUrl = new URL("/login", request.url);
         loginUrl.searchParams.set("redirect", pathname);
         return NextResponse.redirect(loginUrl);
       }
-
-      if (pathname.startsWith("/admin") && demoUser.role !== "admin") {
-        return NextResponse.redirect(new URL("/403", request.url));
-      }
+      // Note: Role authorization for /admin is authoritatively enforced server-side
+      // by AdminLayout (app/(admin)/layout.tsx) against the database record so that
+      // newly promoted administrators are not falsely blocked by stale browser cookies.
     }
     return supabaseResponse;
   }
 
-  const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+  // 2. Production / Cloud Supabase Mode Authorization Guard
+  const supabase = createServerClient(supabaseUrl!, supabaseAnonKey!, {
     cookies: {
       getAll() {
         return request.cookies.getAll();
@@ -80,16 +89,7 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(loginUrl);
     }
 
-    // Verify role server-side in database
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-
-    if (!profile || profile.role !== "admin") {
-      return NextResponse.redirect(new URL("/403", request.url));
-    }
+    // Role check is performed authoritatively in AdminLayout and server actions
   }
 
   // Authenticated user routes protection (/account, /cart, /checkout)

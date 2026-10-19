@@ -24,6 +24,8 @@ export interface AdminReviewItem {
   variant_name?: string | null;
   unit_price?: number | null;
   quantity?: number | null;
+  product_avg_rating?: number;
+  product_review_count?: number;
 }
 
 export interface AdminReviewFilterParams {

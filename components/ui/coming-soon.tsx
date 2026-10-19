@@ -36,13 +36,7 @@ export function ComingSoon({
         <div className="absolute bottom-10 -left-20 w-80 h-80 rounded-full bg-[#8B4513]/5 blur-3xl" />
 
         {/* Subtle Traditional Geometric/Mandala Motif Pattern */}
-        <div
-          className="absolute inset-0 opacity-[0.035]"
-          style={{
-            backgroundImage: `radial-gradient(circle at 12px 12px, #3B2416 1px, transparent 0)`,
-            backgroundSize: "28px 28px",
-          }}
-        />
+        <div className="absolute inset-0 opacity-[0.035] coming-soon-pattern" />
       </div>
 
       <div className="relative z-10 mx-auto max-w-2xl text-center flex flex-col items-center">
@@ -59,13 +53,11 @@ export function ComingSoon({
           >
             <path
               d="M12 2c.5 2 2.5 3.5 2.5 5.5A2.5 2.5 0 0 1 12 10a2.5 2.5 0 0 1-2.5-2.5C9.5 5.5 11.5 4 12 2z"
-              fill="#C8891A"
-              fillOpacity="0.85"
+              className="diya-flame"
             />
             <path
               d="M4 14c0 3.866 3.582 7 8 7s8-3.134 8-7H4z"
-              fill="#8B4513"
-              fillOpacity="0.2"
+              className="diya-base"
             />
             <path d="M4 14h16" />
           </svg>

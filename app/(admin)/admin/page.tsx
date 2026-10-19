@@ -1,33 +1,24 @@
 import React from "react";
-import {
-  getAllBanners,
-  getAllCategories,
-  getAllProducts,
-  getFestiveOffer,
-} from "@/lib/store";
-import { AdminPanel } from "@/components/admin/admin-panel";
+import { getFestiveOffer } from "@/lib/store";
+import { loadMockStore } from "@/lib/mock-data/admin-store";
+import { DashboardView } from "@/components/admin/dashboard-view";
 
-export const revalidate = 0; // Dynamic server rendering for admin portal
+export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Admin Panel | Kanhaiya Collection",
-  description: "Administrative Management Portal for Banners, Categories, and Festive Offers",
+  title: "Executive Admin Dashboard | Kanhaiya Collection",
+  description: "Executive Management & Operations Portal for Kanhaiya Collection",
 };
 
 export default async function AdminDashboardPage() {
-  const [banners, categories, products, festiveData] = await Promise.all([
-    getAllBanners(),
-    getAllCategories(),
-    getAllProducts(),
-    getFestiveOffer(),
-  ]);
+  const festiveData = await getFestiveOffer();
+  const initialStore = loadMockStore();
 
   return (
-    <AdminPanel
-      initialBanners={banners}
-      initialCategories={categories}
-      initialProducts={products}
-      initialFestiveOffer={festiveData.offer}
+    <DashboardView
+      initialStore={initialStore}
+      festiveOffer={festiveData.offer}
     />
   );
 }
+

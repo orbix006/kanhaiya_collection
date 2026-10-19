@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 
 export interface HomepageSection {
   key: string;
@@ -96,7 +96,7 @@ const FALLBACK_BANNERS: Banner[] = [
   },
 ];
 
-const FALLBACK_CATEGORIES: Category[] = [
+export const FALLBACK_CATEGORIES: Category[] = [
   {
     id: "cat-1",
     parent_id: null,
@@ -199,7 +199,7 @@ const FALLBACK_CATEGORIES: Category[] = [
   },
 ];
 
-const FALLBACK_PRODUCTS: ProductItem[] = [
+export const FALLBACK_PRODUCTS: ProductItem[] = [
   {
     id: "prod-1",
     name: "Royal Linen Formal Shirt",
@@ -426,6 +426,9 @@ const FALLBACK_TESTIMONIALS: Testimonial[] = [
 ];
 
 export async function getHomepageSections(): Promise<HomepageSection[]> {
+  if (!isSupabaseConfigured()) {
+    return FALLBACK_SECTIONS.filter((s) => s.is_enabled);
+  }
   try {
     const supabase = await createClient();
     const { data, error } = await supabase
@@ -444,6 +447,9 @@ export async function getHomepageSections(): Promise<HomepageSection[]> {
 }
 
 export async function getActiveBanners(): Promise<Banner[]> {
+  if (!isSupabaseConfigured()) {
+    return FALLBACK_BANNERS.filter((b) => b.is_active);
+  }
   try {
     const supabase = await createClient();
     const { data, error } = await supabase
@@ -462,6 +468,20 @@ export async function getActiveBanners(): Promise<Banner[]> {
 }
 
 export async function getHomepageCategories(): Promise<Category[]> {
+  if (!isSupabaseConfigured()) {
+    try {
+      const { loadMockCategories } = await import("@/lib/mock-data/admin-store");
+      const loaded = loadMockCategories();
+      if (loaded && loaded.length > 0) {
+        return (loaded as unknown as Category[])
+          .filter((c) => c.is_active && c.show_on_homepage && c.parent_id === null)
+          .sort((a, b) => a.display_order - b.display_order);
+      }
+    } catch {
+      // Fallback below
+    }
+    return FALLBACK_CATEGORIES.filter((c) => c.is_active && c.show_on_homepage && c.parent_id === null);
+  }
   try {
     const supabase = await createClient();
     const { data, error } = await supabase
@@ -472,15 +492,29 @@ export async function getHomepageCategories(): Promise<Category[]> {
       .order("display_order", { ascending: true });
 
     if (error || !data || data.length === 0) {
-      return FALLBACK_CATEGORIES.filter((c) => c.show_on_homepage && c.parent_id === null);
+      return FALLBACK_CATEGORIES.filter((c) => c.is_active && c.show_on_homepage && c.parent_id === null);
     }
     return data as Category[];
   } catch {
-    return FALLBACK_CATEGORIES.filter((c) => c.show_on_homepage && c.parent_id === null);
+    return FALLBACK_CATEGORIES.filter((c) => c.is_active && c.show_on_homepage && c.parent_id === null);
   }
 }
 
 export async function getAllActiveCategories(): Promise<Category[]> {
+  if (!isSupabaseConfigured()) {
+    try {
+      const { loadMockCategories } = await import("@/lib/mock-data/admin-store");
+      const loaded = loadMockCategories();
+      if (loaded && loaded.length > 0) {
+        return (loaded as unknown as Category[])
+          .filter((c) => c.is_active)
+          .sort((a, b) => a.display_order - b.display_order);
+      }
+    } catch {
+      // Fallback below
+    }
+    return FALLBACK_CATEGORIES.filter((c) => c.is_active);
+  }
   try {
     const supabase = await createClient();
     const { data, error } = await supabase
@@ -490,16 +524,16 @@ export async function getAllActiveCategories(): Promise<Category[]> {
       .order("display_order", { ascending: true });
 
     if (error || !data || data.length === 0) {
-      return FALLBACK_CATEGORIES;
+      return FALLBACK_CATEGORIES.filter((c) => c.is_active);
     }
     return data as Category[];
   } catch {
-    return FALLBACK_CATEGORIES;
+    return FALLBACK_CATEGORIES.filter((c) => c.is_active);
   }
 }
 
 export async function getContinueBrowsingProducts(userId?: string | null): Promise<ProductItem[]> {
-  if (!userId) return [];
+  if (!isSupabaseConfigured() || !userId) return [];
 
   try {
     const supabase = await createClient();
@@ -562,6 +596,11 @@ export async function getContinueBrowsingProducts(userId?: string | null): Promi
 }
 
 export async function getTopSellers(): Promise<ProductItem[]> {
+  if (!isSupabaseConfigured()) {
+    return FALLBACK_PRODUCTS.filter((p) => p.is_featured_top_seller).concat(
+      FALLBACK_PRODUCTS.filter((p) => !p.is_featured_top_seller)
+    ).slice(0, 8);
+  }
   try {
     const supabase = await createClient();
     const { data: topSellers, error } = await supabase
@@ -610,6 +649,13 @@ export async function getTopSellers(): Promise<ProductItem[]> {
 }
 
 export async function getCategoryProductSections(): Promise<CategoryProductSection[]> {
+  if (!isSupabaseConfigured()) {
+    const topCats = FALLBACK_CATEGORIES.filter((c) => c.parent_id === null);
+    return topCats.map((cat) => ({
+      category: cat,
+      products: FALLBACK_PRODUCTS.filter((p) => p.category_slug === cat.slug).slice(0, 4),
+    }));
+  }
   try {
     const supabase = await createClient();
     // Get all categories to establish hierarchy
@@ -716,6 +762,9 @@ export async function getCategoryProductSections(): Promise<CategoryProductSecti
 }
 
 export async function getActiveTestimonials(): Promise<Testimonial[]> {
+  if (!isSupabaseConfigured()) {
+    return FALLBACK_TESTIMONIALS.filter((t) => t.is_active);
+  }
   try {
     const supabase = await createClient();
     const { data, error } = await supabase

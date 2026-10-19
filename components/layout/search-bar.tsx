@@ -1,25 +1,28 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { Search, X, Package, Layers } from "lucide-react";
-import { SEARCH_CATALOG, type SearchProduct, type SearchCategory } from "@/lib/constants";
+import { loadMockStore, type MockProductDetail, type MockCategory } from "@/lib/mock-data/admin-store";
 
 interface SearchBarProps {
   isMobile?: boolean;
   onNavigate?: () => void;
 }
 
-const PLACEHOLDERS = ["Search by product", "Search by category"];
+const PLACEHOLDERS = ["Search sacred idols & diyas", "Search by category or SKU"];
 
 export function SearchBar({ isMobile = false, onNavigate }: SearchBarProps) {
   const [query, setQuery] = useState("");
   const [isFocused, setIsFocused] = useState(false);
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
   const [isFading, setIsFading] = useState(false);
+  const [products, setProducts] = useState<MockProductDetail[]>([]);
+  const [categories, setCategories] = useState<MockCategory[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Dynamic rotating placeholder between "Search by product" and "Search by category"
+  // Dynamic rotating placeholder
   useEffect(() => {
     if (isFocused || query) return;
 
@@ -34,6 +37,24 @@ export function SearchBar({ isMobile = false, onNavigate }: SearchBarProps) {
     return () => clearInterval(interval);
   }, [isFocused, query]);
 
+  // Sync with shared mock store and listen for real-time updates
+  useEffect(() => {
+    const syncCatalog = () => {
+      const store = loadMockStore();
+      if (store.products) {
+        // Public storefront search only returns ACTIVE products
+        setProducts(store.products.filter((p) => p.is_active));
+      }
+      if (store.categories) {
+        setCategories(store.categories.filter((c) => c.is_active));
+      }
+    };
+
+    syncCatalog();
+    window.addEventListener("catalog_updated", syncCatalog);
+    return () => window.removeEventListener("catalog_updated", syncCatalog);
+  }, []);
+
   // Click outside listener to close search dropdown
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -47,18 +68,31 @@ export function SearchBar({ isMobile = false, onNavigate }: SearchBarProps) {
 
   const trimmed = query.trim().toLowerCase();
 
-  // Filter matching products and categories
-  const matchedProducts: SearchProduct[] = trimmed
-    ? SEARCH_CATALOG.products.filter(
-        (p) =>
-          p.name.toLowerCase().includes(trimmed) ||
-          p.description.toLowerCase().includes(trimmed) ||
-          p.category.toLowerCase().includes(trimmed)
-      )
+  // Category map for fast lookup
+  const categoryMap = new Map<string, string>();
+  for (const cat of categories) {
+    categoryMap.set(cat.id, cat.name);
+  }
+
+  // Filter matching active products and categories
+  const matchedProducts = trimmed
+    ? products
+        .filter((p) => {
+          const nameMatch = p.name?.toLowerCase().includes(trimmed);
+          const descMatch = p.description?.toLowerCase().includes(trimmed);
+          const skuMatch = p.sku?.toLowerCase().includes(trimmed);
+          const brandMatch = p.brand?.toLowerCase().includes(trimmed);
+          const catName = p.category_id ? categoryMap.get(p.category_id)?.toLowerCase() : "";
+          const catMatch = catName?.includes(trimmed);
+          return nameMatch || descMatch || skuMatch || brandMatch || catMatch;
+        })
+        .slice(0, 6)
     : [];
 
-  const matchedCategories: SearchCategory[] = trimmed
-    ? SEARCH_CATALOG.categories.filter((c) => c.name.toLowerCase().includes(trimmed))
+  const matchedCategories = trimmed
+    ? categories
+        .filter((c) => c.name?.toLowerCase().includes(trimmed) || c.slug?.toLowerCase().includes(trimmed))
+        .slice(0, 4)
     : [];
 
   const hasResults = matchedProducts.length > 0 || matchedCategories.length > 0;
@@ -111,7 +145,7 @@ export function SearchBar({ isMobile = false, onNavigate }: SearchBarProps) {
             type="button"
             onClick={() => setQuery("")}
             aria-label="Clear search query"
-            className="p-1 rounded-full text-[#806B57] hover:text-[#3B2416] hover:bg-[#E8DCC8]/50 transition-colors"
+            className="p-1 rounded-full text-[#806B57] hover:text-[#3B2416] hover:bg-[#E8DCC8]/50 transition-colors cursor-pointer"
           >
             <X className="h-3.5 w-3.5" />
           </button>
@@ -134,7 +168,7 @@ export function SearchBar({ isMobile = false, onNavigate }: SearchBarProps) {
                     {matchedCategories.map((cat) => (
                       <Link
                         key={cat.id}
-                        href="/categories"
+                        href={`/shop?category=${cat.slug}`}
                         onClick={handleItemClick}
                         className="group flex items-center justify-between p-2 rounded-xl text-xs text-[#3B2416] hover:bg-[#F8F1E3] transition-colors"
                       >
@@ -144,11 +178,9 @@ export function SearchBar({ isMobile = false, onNavigate }: SearchBarProps) {
                             {cat.name}
                           </span>
                         </div>
-                        {cat.itemCount && (
-                          <span className="text-[10px] text-[#806B57] bg-[#E8DCC8]/40 px-2 py-0.5 rounded-full font-normal">
-                            {cat.itemCount}
-                          </span>
-                        )}
+                        <span className="text-[10px] text-[#806B57] bg-[#E8DCC8]/40 px-2 py-0.5 rounded-full font-normal">
+                          Browse Collection
+                        </span>
                       </Link>
                     ))}
                   </div>
@@ -160,43 +192,76 @@ export function SearchBar({ isMobile = false, onNavigate }: SearchBarProps) {
                 <div>
                   <div className="flex items-center gap-1.5 px-2 py-1 text-[11px] font-medium tracking-wider uppercase text-[#C8891A]">
                     <Package className="h-3.5 w-3.5" />
-                    <span>Products</span>
+                    <span>Products ({matchedProducts.length})</span>
                   </div>
                   <div className="mt-1 space-y-1">
-                    {matchedProducts.map((prod) => (
-                      <Link
-                        key={prod.id}
-                        href="/shop"
-                        onClick={handleItemClick}
-                        className="group flex items-center justify-between p-2 rounded-xl text-xs text-[#3B2416] hover:bg-[#F8F1E3] transition-colors"
-                      >
-                        <div className="flex flex-col">
-                          <div className="flex items-center gap-2">
-                            <span className="text-[#C8891A]">→</span>
-                            <span className="font-medium text-sm group-hover:text-[#C8891A] transition-colors">
-                              {prod.name}
-                            </span>
+                    {matchedProducts.map((prod) => {
+                      const primaryImg =
+                        prod.images?.find((img) => img.is_primary)?.image_url ||
+                        prod.images?.[0]?.image_url ||
+                        "/images/preview-murti.jpg";
+
+                      const catName = prod.category_id ? categoryMap.get(prod.category_id) : null;
+
+                      return (
+                        <Link
+                          key={prod.id}
+                          href={`/shop/product/${prod.slug}`}
+                          onClick={handleItemClick}
+                          className="group flex items-center justify-between p-2 rounded-xl text-xs text-[#3B2416] hover:bg-[#F8F1E3] transition-colors gap-3"
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="relative h-10 w-10 rounded-lg overflow-hidden shrink-0 bg-[#F8F1E3] border border-[#E8DCC8]/60">
+                              <Image
+                                src={primaryImg}
+                                alt={prod.name}
+                                fill
+                                className="object-cover"
+                                sizes="40px"
+                              />
+                            </div>
+                            <div className="flex flex-col min-w-0">
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-medium text-sm text-[#3B2416] group-hover:text-[#C8891A] transition-colors truncate">
+                                  {prod.name}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2 text-[11px] text-[#806B57]">
+                                {catName && (
+                                  <span className="text-[#C8891A] font-medium">{catName}</span>
+                                )}
+                                {prod.sku && (
+                                  <>
+                                    <span>•</span>
+                                    <span className="font-mono text-[10px]">{prod.sku}</span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
                           </div>
-                          <span className="text-[11px] text-[#806B57] pl-4 truncate max-w-[280px] font-normal">
-                            {prod.description}
-                          </span>
-                        </div>
-                        {prod.price && (
-                          <span className="font-medium text-xs text-[#8B4513] shrink-0">
-                            {prod.price}
-                          </span>
-                        )}
-                      </Link>
-                    ))}
+
+                          <div className="flex flex-col items-end shrink-0">
+                            <span className="font-semibold text-xs text-[#8B4513]">
+                              ₹{prod.base_price.toLocaleString("en-IN")}
+                            </span>
+                            {prod.compare_at_price && prod.compare_at_price > prod.base_price && (
+                              <span className="text-[10px] text-muted-foreground line-through">
+                                ₹{prod.compare_at_price.toLocaleString("en-IN")}
+                              </span>
+                            )}
+                          </div>
+                        </Link>
+                      );
+                    })}
                   </div>
                 </div>
               )}
             </div>
           ) : (
             <div className="py-6 px-4 text-center">
-              <p className="text-sm font-medium text-[#3B2416]">No results found</p>
+              <p className="text-sm font-medium text-[#3B2416]">No active products found</p>
               <p className="text-xs text-[#806B57] mt-1 font-normal">
-                No products or categories matching &ldquo;{query}&rdquo;
+                No items or categories matching &ldquo;{query}&rdquo;
               </p>
             </div>
           )}

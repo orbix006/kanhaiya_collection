@@ -14,7 +14,7 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
   const { slug } = await params;
   const product = await getProductBySlug(slug);
 
-  if (!product) {
+  if (!product || !product.is_active) {
     notFound();
   }
 

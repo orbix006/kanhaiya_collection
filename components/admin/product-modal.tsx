@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Image from "next/image";
 import {
   X,
@@ -18,7 +18,11 @@ import {
   Loader2,
   RotateCw,
   Sliders,
+  Lock,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
+
 import {
   FormField,
   FormInput,
@@ -27,7 +31,16 @@ import {
   FormSwitch,
 } from "@/components/admin/form";
 import { ImageUploader } from "@/components/ui/image-uploader";
-import { generateSlug, getCategoryPathLabel } from "@/lib/data/categories";
+import {
+  generateSlug,
+  getCategoryPathLabel,
+  getDescendantCategoryIds,
+} from "@/lib/data/categories";
+import {
+  upsertProductInStore,
+  generateProductSku,
+  generateProductBatchNumber,
+} from "@/lib/mock-data/admin-store";
 import type { Category } from "@/lib/data/homepage";
 import type {
   ProductDetail,
@@ -66,14 +79,16 @@ export function ProductModal({
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [isSlugManuallyEdited, setIsSlugManuallyEdited] = useState(false);
-  const [categoryId, setCategoryId] = useState<string>("");
-  const [brand, setBrand] = useState("");
+  const [rootCategoryId, setRootCategoryId] = useState<string>("");
+  const [subcategoryId, setSubcategoryId] = useState<string>("");
+  const [brand, setBrand] = useState("Kanhaiya Collection");
   const [sku, setSku] = useState("");
+  const [batchNumber, setBatchNumber] = useState("");
   const [description, setDescription] = useState("");
 
-  const [basePrice, setBasePrice] = useState<string>("");
+  const [basePrice, setBasePrice] = useState<string>("0");
   const [compareAtPrice, setCompareAtPrice] = useState<string>("");
-  const [stockQuantity, setStockQuantity] = useState<string>("0");
+  const [stockQuantity, setStockQuantity] = useState<string>("10");
   const [isActive, setIsActive] = useState<boolean>(true);
   const [isFeaturedTopSeller, setIsFeaturedTopSeller] = useState<boolean>(false);
   const [topSellerDisplayOrder, setTopSellerDisplayOrder] = useState<string>("");
@@ -83,9 +98,35 @@ export function ProductModal({
 
   // Images state
   const [images, setImages] = useState<ProductImageInput[]>([]);
+  const [manualImageUrl, setManualImageUrl] = useState("");
 
   // Variants state
   const [variants, setVariants] = useState<ProductVariantInput[]>([]);
+
+  // Category hierarchy calculation
+  const effectiveCategoryId = subcategoryId || rootCategoryId;
+  const availableSubcategories = useMemo(() => {
+    if (!rootCategoryId) return [];
+    const descendantIds = new Set(getDescendantCategoryIds(rootCategoryId, categories));
+    return categories
+      .filter((c) => descendantIds.has(c.id))
+      .map((c) => {
+        const full = getCategoryPathLabel(c.id, categories);
+        const rootCat = categories.find((cat) => cat.id === rootCategoryId);
+        const relLabel = rootCat && full.startsWith(rootCat.name)
+          ? full.replace(rootCat.name + " > ", "")
+          : full;
+        return {
+          ...c,
+          displayLabel: relLabel,
+        };
+      });
+  }, [categories, rootCategoryId]);
+
+  const fullCategoryPath = useMemo(() => {
+    if (!effectiveCategoryId) return "None selected";
+    return getCategoryPathLabel(effectiveCategoryId, categories);
+  }, [effectiveCategoryId, categories]);
 
   // Populate data when editing an existing product or reset when creating
   useEffect(() => {
@@ -93,9 +134,31 @@ export function ProductModal({
       setName(product.name || "");
       setSlug(product.slug || "");
       setIsSlugManuallyEdited(true);
-      setCategoryId(product.category_id || "");
-      setBrand(product.brand || "");
+
+      // Resolve category & subcategory from product.category_id (supports any hierarchy depth)
+      const assignedCat = categories.find((c) => c.id === product.category_id);
+      if (assignedCat && assignedCat.parent_id) {
+        let root = assignedCat;
+        while (root.parent_id) {
+          const parent = categories.find((c) => c.id === root.parent_id);
+          if (!parent) break;
+          root = parent;
+        }
+        setRootCategoryId(root.id);
+        setSubcategoryId(assignedCat.id);
+      } else if (assignedCat) {
+        setRootCategoryId(assignedCat.id);
+        setSubcategoryId("");
+      } else {
+        const firstRoot = categories.find((c) => !c.parent_id)?.id || categories[0]?.id || "";
+        setRootCategoryId(product.category_id || firstRoot);
+        setSubcategoryId("");
+      }
+
+      setBrand(product.brand || "Kanhaiya Collection");
+      // Preserve existing SKU and Batch Number on edit (do NOT regenerate)
       setSku(product.sku || "");
+      setBatchNumber((product as any).batch_number || "");
       setDescription(product.description || "");
 
       setBasePrice(String(product.base_price || 0));
@@ -140,13 +203,21 @@ export function ProductModal({
           : []
       );
     } else {
-      // Reset for new product
+      // Reset for new product: automatically generate SKU and Batch Number
       setName("");
       setSlug("");
       setIsSlugManuallyEdited(false);
-      setCategoryId(categories.length > 0 ? categories[0].id : "");
-      setBrand("Kanhaiya Heritage");
-      setSku("");
+
+      const rootCats = categories.filter((c) => !c.parent_id);
+      const defaultRoot = rootCats[0]?.id || categories[0]?.id || "";
+      setRootCategoryId(defaultRoot);
+      setSubcategoryId("");
+
+      const rootCatObj = categories.find((c) => c.id === defaultRoot);
+      setSku(generateProductSku(rootCatObj?.name || rootCatObj?.slug));
+      setBatchNumber(generateProductBatchNumber());
+
+      setBrand("Kanhaiya Collection");
       setDescription("");
 
       setBasePrice("");
@@ -164,6 +235,24 @@ export function ProductModal({
     setActiveTab("general");
     setErrorMessage(null);
   }, [product, categories, isOpen]);
+
+  const handleRootCategoryChange = (newRootId: string) => {
+    setRootCategoryId(newRootId);
+    setSubcategoryId("");
+    // If creating a new product, automatically update the SKU candidate to match category convention
+    if (!product) {
+      const catObj = categories.find((c) => c.id === newRootId);
+      setSku(generateProductSku(catObj?.name || catObj?.slug));
+    }
+  };
+
+  const handleSubcategoryChange = (newSubId: string) => {
+    setSubcategoryId(newSubId);
+    if (!product && newSubId) {
+      const catObj = categories.find((c) => c.id === newSubId);
+      setSku(generateProductSku(catObj?.name || catObj?.slug));
+    }
+  };
 
   // Handle auto-slug on name typing unless manually overridden
   const handleNameChange = (val: string) => {
@@ -195,6 +284,36 @@ export function ProductModal({
       ];
     });
   };
+
+  const handleAddManualImage = (url: string) => {
+    if (!url.trim()) return;
+    setImages((prev) => {
+      const isFirst = prev.length === 0;
+      return [
+        ...prev,
+        {
+          image_url: url.trim(),
+          alt_text: `${name || "Product"} view`,
+          display_order: prev.length + 1,
+          is_primary: isFirst,
+        },
+      ];
+    });
+    setManualImageUrl("");
+  };
+
+  const handleMoveImage = (index: number, direction: "left" | "right") => {
+    setImages((prev) => {
+      const targetIdx = direction === "left" ? index - 1 : index + 1;
+      if (targetIdx < 0 || targetIdx >= prev.length) return prev;
+      const copy = [...prev];
+      const temp = copy[index];
+      copy[index] = copy[targetIdx];
+      copy[targetIdx] = temp;
+      return copy.map((img, idx) => ({ ...img, display_order: idx + 1 }));
+    });
+  };
+
 
   const handleSetPrimaryImage = (index: number) => {
     setImages((prev) =>
@@ -274,16 +393,49 @@ export function ProductModal({
     e.preventDefault();
     setErrorMessage(null);
 
-    // Client-side quick checks
+    // Client-side required field checks per specification
     if (!name.trim()) {
       setActiveTab("general");
       setErrorMessage("Product name is required.");
       return;
     }
 
+    if (!description.trim()) {
+      setActiveTab("general");
+      setErrorMessage("Product details / description is required.");
+      return;
+    }
+
+    if (!brand.trim()) {
+      setActiveTab("general");
+      setErrorMessage("Brand label is required.");
+      return;
+    }
+
+    if (!effectiveCategoryId) {
+      setActiveTab("general");
+      setErrorMessage("Please select a category hierarchy for this product.");
+      return;
+    }
+
     if (!basePrice || isNaN(Number(basePrice)) || Number(basePrice) < 0) {
       setActiveTab("pricing");
       setErrorMessage("Please enter a valid base price (greater than or equal to 0).");
+      return;
+    }
+
+    // Sensible compare-at price check
+    if (
+      compareAtPrice &&
+      !isNaN(Number(compareAtPrice)) &&
+      basePrice &&
+      !isNaN(Number(basePrice)) &&
+      Number(compareAtPrice) < Number(basePrice)
+    ) {
+      setActiveTab("pricing");
+      setErrorMessage(
+        `Sensible Pricing Rule: Compare-at price (₹${compareAtPrice}) cannot be lower than the base price (₹${basePrice}).`
+      );
       return;
     }
 
@@ -299,12 +451,13 @@ export function ProductModal({
 
     const payload: ProductSavePayload = {
       id: product?.id,
-      category_id: categoryId || null,
+      category_id: effectiveCategoryId,
       name: name.trim(),
       slug: slug.trim() || generateSlug(name),
-      description: description.trim() || null,
-      brand: brand.trim() || null,
+      description: description.trim(),
+      brand: brand.trim(),
       sku: sku.trim() || null,
+      batch_number: batchNumber.trim() || null,
       base_price: Number(basePrice),
       compare_at_price: compareAtPrice ? Number(compareAtPrice) : null,
       stock_quantity: Number(stockQuantity) || 0,
@@ -319,20 +472,48 @@ export function ProductModal({
       variants,
     };
 
-    try {
-      const res = await saveProductAction(payload);
-      if (res.error) {
-        setErrorMessage(res.error);
-      } else {
-        onSuccess(res.product || payload);
-        onClose();
-      }
-    } catch (err: any) {
-      setErrorMessage(err.message || "An unexpected error occurred while saving product.");
-    } finally {
+    // 1. Validate and save to mock store (persisted in localStorage and data/ecomm_store.json)
+    const localRes = upsertProductInStore({
+      id: product?.id,
+      category_id: effectiveCategoryId,
+      name: name.trim(),
+      slug: slug.trim() || generateSlug(name),
+      description: description.trim(),
+      brand: brand.trim(),
+      sku: sku.trim() || null,
+      batch_number: batchNumber.trim() || undefined,
+      base_price: Number(basePrice),
+      compare_at_price: compareAtPrice ? Number(compareAtPrice) : null,
+      stock_quantity: Number(stockQuantity) || 0,
+      is_active: isActive,
+      is_featured_top_seller: isFeaturedTopSeller,
+      top_seller_display_order: topSellerDisplayOrder
+        ? Number(topSellerDisplayOrder)
+        : null,
+      meta_title: metaTitle.trim() || null,
+      meta_description: metaDescription.trim() || null,
+      images: images as any,
+      variants: variants as any,
+    });
+
+    if (!localRes.success) {
       setIsSubmitting(false);
+      setErrorMessage(localRes.error || "Failed to validate product.");
+      return;
     }
+
+    // 2. Invoke server action for cache revalidation and server persistence
+    try {
+      await saveProductAction(payload);
+    } catch {
+      // Offline fallback
+    }
+
+    setIsSubmitting(false);
+    onSuccess(localRes.product || payload);
+    onClose();
   };
+
 
   if (!isOpen) return null;
 
@@ -495,50 +676,133 @@ export function ProductModal({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <FormField
-                  label="Category"
+                  label="Category (Hierarchy Root)"
                   required
-                  helperText="Assign to parent or child subcategory"
+                  helperText="Select top-level catalog category"
                 >
                   <FormSelect
-                    value={categoryId}
-                    onChange={(e) => setCategoryId(e.target.value)}
+                    value={rootCategoryId}
+                    onChange={(e) => handleRootCategoryChange(e.target.value)}
                     required
                   >
-                    <option value="">Select a Category...</option>
-                    {categories.map((c) => (
+                    <option value="">Select Root Category...</option>
+                    {categories
+                      .filter((c) => !c.parent_id)
+                      .map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                  </FormSelect>
+                </FormField>
+
+                <FormField
+                  label="Subcategory (Optional)"
+                  helperText={
+                    availableSubcategories.length > 0
+                      ? "Assign to a specific child category"
+                      : "No subcategories under selected root"
+                  }
+                >
+                  <FormSelect
+                    value={subcategoryId}
+                    onChange={(e) => handleSubcategoryChange(e.target.value)}
+                    disabled={availableSubcategories.length === 0}
+                  >
+                    <option value="">
+                      -- None (Assign to Root Category) --
+                    </option>
+                    {availableSubcategories.map((c) => (
                       <option key={c.id} value={c.id}>
-                        {getCategoryPathLabel(c.id, categories)}
+                        {c.displayLabel || c.name}
                       </option>
                     ))}
                   </FormSelect>
                 </FormField>
-
-                <FormField label="Brand / Label" helperText="e.g. Kanhaiya Heritage">
-                  <FormInput
-                    placeholder="Enter brand name"
-                    value={brand}
-                    onChange={(e) => setBrand(e.target.value)}
-                  />
-                </FormField>
               </div>
 
-              <FormField label="SKU (Stock Keeping Unit)" helperText="Optional unique stock tracking code">
+              {/* Hierarchy Path Visual Breadcrumb */}
+              <div className="flex items-center justify-between px-3.5 py-2.5 rounded-xl border border-border/80 bg-muted/30 text-xs">
+                <div className="flex items-center gap-2">
+                  <span className="text-muted-foreground font-semibold">
+                    Assigned Hierarchy:
+                  </span>
+                  <span className="font-bold text-foreground">
+                    {fullCategoryPath}
+                  </span>
+                </div>
+                <span className="text-[10px] font-mono text-muted-foreground">
+                  ID: {effectiveCategoryId || "None"}
+                </span>
+              </div>
+
+              <FormField label="Brand / Label" required helperText="e.g. Kanhaiya Collection">
                 <FormInput
-                  placeholder="e.g. SKU-LINEN-ROYAL-01"
-                  value={sku}
-                  onChange={(e) => setSku(e.target.value)}
+                  placeholder="Enter brand name"
+                  value={brand}
+                  onChange={(e) => setBrand(e.target.value)}
+                  required
                 />
               </FormField>
 
+              {/* Automatically Generated SKU & Batch Number (Strictly Read-Only) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-2xl border border-border/80 bg-muted/20">
+                {/* Automatically Generated SKU */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-semibold text-foreground flex items-center gap-1.5">
+                      <Lock className="h-3.5 w-3.5 text-muted-foreground" />
+                      Auto-Generated SKU
+                    </span>
+                    <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded-md">
+                      Read-Only
+                    </span>
+                  </div>
+                  <div className="h-9.5 px-3 rounded-xl border border-border bg-background flex items-center justify-between font-mono text-xs text-foreground font-bold select-all">
+                    <span>{sku || "Generating..."}</span>
+                    <span className="text-[10px] font-normal text-muted-foreground font-sans">
+                      Verified Unique
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">
+                    Standard SKU convention (<code className="font-mono">KC-PREFIX-SEQ</code>). Generated centrally; preserved across edits.
+                  </p>
+                </div>
+
+                {/* Automatically Generated Batch Number */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-semibold text-foreground flex items-center gap-1.5">
+                      <Lock className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                      Auto-Generated Batch
+                    </span>
+                    <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded-md">
+                      Dev Model
+                    </span>
+                  </div>
+                  <div className="h-9.5 px-3 rounded-xl border border-amber-500/30 bg-amber-500/5 flex items-center justify-between font-mono text-xs text-amber-900 dark:text-amber-200 font-bold select-all">
+                    <span>{batchNumber || "Generating..."}</span>
+                    <span className="text-[10px] font-normal text-amber-700 dark:text-amber-400 font-sans">
+                      Stable Batch
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">
+                    Stable unique identifier (<code className="font-mono">BATCH-YYYYMM-XXXX</code>). Development model attribute, separate from uploaded PostgreSQL database schema; flagged for migration approval.
+                  </p>
+                </div>
+              </div>
+
               <FormField
-                label="Product Description"
-                helperText="Detailed description of fabric composition, craftsmanship, and styling"
+                label="Product Details / Description"
+                required
+                helperText="Detailed description of craftsmanship, sacred materials, spiritual significance, and dimensions."
               >
                 <FormTextarea
                   rows={4}
-                  placeholder="Describe the product weave, materials, and occasion fit..."
+                  placeholder="Describe the artisan craft, materials (e.g. pure brass, Ashtadhatu, pure linen), and occasion..."
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
+                  required
                 />
               </FormField>
             </div>
@@ -639,8 +903,40 @@ export function ProductModal({
                   />
                 </FormField>
               )}
+
+              {/* Read-Only System Managed Metrics (Schema Requirement) */}
+              <div className="p-4 rounded-2xl border border-border/80 bg-muted/20 space-y-3 pt-4">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                  <Lock className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span>System-Managed Performance Metrics (Read-only)</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="p-3 rounded-xl border border-border/60 bg-card">
+                    <span className="text-[10px] text-muted-foreground block font-medium">Average Rating</span>
+                    <span className="text-sm font-bold text-foreground font-mono">
+                      ★ {product?.avg_rating !== undefined ? Number(product.avg_rating).toFixed(1) : "0.0"} / 5.0
+                    </span>
+                    <span className="text-[10px] text-muted-foreground block mt-0.5">Rolled up from approved reviews</span>
+                  </div>
+                  <div className="p-3 rounded-xl border border-border/60 bg-card">
+                    <span className="text-[10px] text-muted-foreground block font-medium">Review Count</span>
+                    <span className="text-sm font-bold text-foreground font-mono">
+                      {product?.review_count ?? 0} reviews
+                    </span>
+                    <span className="text-[10px] text-muted-foreground block mt-0.5">Customer feedback submissions</span>
+                  </div>
+                  <div className="p-3 rounded-xl border border-border/60 bg-card">
+                    <span className="text-[10px] text-muted-foreground block font-medium">Lifetime Sales</span>
+                    <span className="text-sm font-bold text-foreground font-mono">
+                      {product?.sold_count ?? 0} units sold
+                    </span>
+                    <span className="text-[10px] text-muted-foreground block mt-0.5">Auto-updated on order confirmation</span>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
+
 
           {/* TAB 3: Images Management */}
           {activeTab === "images" && (
@@ -664,18 +960,85 @@ export function ProductModal({
                 </div>
               </div>
 
+              {/* Dev Storage Persistence Banner */}
+              <div className="p-3.5 rounded-xl border border-blue-500/20 bg-blue-500/5 text-blue-900 dark:text-blue-200 text-xs leading-relaxed flex items-start gap-2.5">
+                <CheckCircle2 className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+                <div>
+                  <span className="font-bold">Development Storage Architecture: </span>
+                  <span>
+                    Uploaded images are streamed to the local development filesystem at <code className="font-mono bg-blue-500/10 px-1 py-0.5 rounded text-[11px]">public/uploads/</code> and referenced via standard URLs. This avoids large base64 strings in localStorage, preventing localStorage quota limits while guaranteeing image persistence across server reloads and browser refreshes.
+                  </span>
+                </div>
+              </div>
+
               {/* Upload to media bucket */}
-              <div className="p-5 rounded-2xl border border-border/80 bg-muted/20">
-                <span className="block text-xs font-bold text-foreground mb-2">
-                  Upload Product Photo to Media Bucket:
-                </span>
-                <ImageUploader
-                  bucket="media"
-                  folderPath="products"
-                  label=""
-                  aspectRatio="auto"
-                  onUploadComplete={handleImageUploaded}
-                />
+              {/* Upload to media bucket OR Add by URL/Preset */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="p-4 rounded-2xl border border-border/80 bg-muted/20">
+                  <span className="block text-xs font-bold text-foreground mb-2">
+                    Upload Local Photo File:
+                  </span>
+                  <ImageUploader
+                    bucket="media"
+                    folderPath="products"
+                    label=""
+                    aspectRatio="auto"
+                    onUploadComplete={handleImageUploaded}
+                  />
+                </div>
+
+                <div className="p-4 rounded-2xl border border-border/80 bg-muted/20 space-y-2">
+                  <span className="block text-xs font-bold text-foreground">
+                    Add Photo by URL or Dev Preset:
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      placeholder="Paste image URL (https://... or /images/...)"
+                      value={manualImageUrl}
+                      onChange={(e) => setManualImageUrl(e.target.value)}
+                      className="h-9 w-full rounded-xl border border-border bg-background px-3 text-xs text-foreground focus:border-primary focus:outline-hidden"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleAddManualImage(manualImageUrl)}
+                      className="px-3.5 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-bold shrink-0 hover:bg-primary/90 transition-all cursor-pointer"
+                    >
+                      Add
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-wrap text-[11px] text-muted-foreground pt-1">
+                    <span className="font-semibold text-[10px]">Sample Presets:</span>
+                    <button
+                      type="button"
+                      onClick={() => handleAddManualImage("https://images.unsplash.com/photo-1599707367072-cd6ada2bc375?auto=format&fit=crop&w=800&q=80")}
+                      className="px-2 py-0.5 rounded bg-muted hover:bg-primary/10 hover:text-primary transition-colors cursor-pointer text-[10px]"
+                    >
+                      + Brass Idol
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleAddManualImage("https://images.unsplash.com/photo-1606293926075-69a00dbfde81?auto=format&fit=crop&w=800&q=80")}
+                      className="px-2 py-0.5 rounded bg-muted hover:bg-primary/10 hover:text-primary transition-colors cursor-pointer text-[10px]"
+                    >
+                      + Akhand Diya
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleAddManualImage("https://images.unsplash.com/photo-1582738411706-bfc8e691d1c2?auto=format&fit=crop&w=800&q=80")}
+                      className="px-2 py-0.5 rounded bg-muted hover:bg-primary/10 hover:text-primary transition-colors cursor-pointer text-[10px]"
+                    >
+                      + Puja Thali
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleAddManualImage("https://images.unsplash.com/photo-1608571423902-eed4a5ad8108?auto=format&fit=crop&w=800&q=80")}
+                      className="px-2 py-0.5 rounded bg-muted hover:bg-primary/10 hover:text-primary transition-colors cursor-pointer text-[10px]"
+                    >
+                      + Dhoop
+                    </button>
+                  </div>
+                </div>
               </div>
 
               {/* Current Images List */}
@@ -710,6 +1073,10 @@ export function ProductModal({
                               <span>Primary Image</span>
                             </span>
                           )}
+
+                          <span className="absolute bottom-2 right-2 rounded-md bg-black/60 text-white font-mono text-[10px] px-1.5 py-0.5 backdrop-blur-xs">
+                            Order #{idx + 1}
+                          </span>
                         </div>
 
                         {/* Alt Text Input */}
@@ -726,7 +1093,7 @@ export function ProductModal({
                           />
                         </div>
 
-                        {/* Image Actions: Set Primary, Delete */}
+                        {/* Image Actions: Set Primary, Reorder, Delete */}
                         <div className="flex items-center justify-between pt-2 border-t border-border/60">
                           <button
                             type="button"
@@ -746,14 +1113,34 @@ export function ProductModal({
                             <span>{img.is_primary ? "Primary Thumbnail" : "Make Primary"}</span>
                           </button>
 
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteImage(idx)}
-                            className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
-                            aria-label="Delete image"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => handleMoveImage(idx, "left")}
+                              disabled={idx === 0}
+                              title="Move left in gallery display order"
+                              className="p-1 rounded-lg text-muted-foreground hover:bg-muted disabled:opacity-30 cursor-pointer"
+                            >
+                              <ChevronLeft className="h-4 w-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleMoveImage(idx, "right")}
+                              disabled={idx === images.length - 1}
+                              title="Move right in gallery display order"
+                              className="p-1 rounded-lg text-muted-foreground hover:bg-muted disabled:opacity-30 cursor-pointer"
+                            >
+                              <ChevronRight className="h-4 w-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteImage(idx)}
+                              className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
+                              aria-label="Delete image"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -766,6 +1153,7 @@ export function ProductModal({
               </div>
             </div>
           )}
+
 
           {/* TAB 4: Variants Management */}
           {activeTab === "variants" && (

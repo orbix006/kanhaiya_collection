@@ -96,6 +96,28 @@ h1, h2, h3, h4, h5, h6 {
   background-size: 24px 24px;
 }
 
+/* Auth layout decorative subtle dot pattern */
+.auth-dot-pattern {
+  background-image: radial-gradient(circle at 12px 12px, #3B2416 1px, transparent 0);
+  background-size: 24px 24px;
+}
+
+.coming-soon-pattern {
+  background-image: radial-gradient(circle at 12px 12px, #3B2416 1px, transparent 0);
+  background-size: 28px 28px;
+}
+
+/* Sacred Diya brand motif fills */
+.diya-flame {
+  fill: #C8891A;
+  fill-opacity: 0.85;
+}
+
+.diya-base {
+  fill: #8B4513;
+  fill-opacity: 0.15;
+}
+
 /* Custom subtle scrollbar */
 ::-webkit-scrollbar {
   width: 8px;

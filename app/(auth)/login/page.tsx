@@ -3,7 +3,7 @@
 import { useActionState, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { loginAction } from "../actions";
+import { loginAction, enterDevAdminPreviewAction } from "../actions";
 import { Loader2, ArrowRight } from "lucide-react";
 
 function LoginForm() {
@@ -29,10 +29,12 @@ function LoginForm() {
             >
               <path
                 d="M12 2c.5 2 2.5 3.5 2.5 5.5A2.5 2.5 0 0 1 12 10a2.5 2.5 0 0 1-2.5-2.5C9.5 5.5 11.5 4 12 2z"
-                fill="#C8891A"
-                fillOpacity="0.85"
+                className="diya-flame"
               />
-              <path d="M4 14c0 3.866 3.582 7 8 7s8-3.134 8-7H4z" fill="#8B4513" fillOpacity="0.15" />
+              <path
+                d="M4 14c0 3.866 3.582 7 8 7s8-3.134 8-7H4z"
+                className="diya-base"
+              />
               <path d="M4 14h16" />
             </svg>
           </div>
@@ -124,6 +126,35 @@ function LoginForm() {
           Sign up
         </Link>
       </div>
+
+      {/* Development-Only Admin Access Mechanism */}
+      {process.env.NODE_ENV !== "production" && (
+        <div className="pt-4 border-t border-[#E8DCC8]/70">
+          <div className="rounded-xl border border-amber-300/80 bg-amber-50/70 p-4 space-y-2.5 text-left">
+            <div className="flex items-center justify-between">
+              <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-amber-900">
+                <span className="h-2 w-2 rounded-full bg-amber-600 animate-pulse" />
+                Dev Admin Preview
+              </span>
+              <span className="text-[10px] text-amber-800 font-medium bg-amber-200/70 px-2 py-0.5 rounded-md">
+                Offline Mode
+              </span>
+            </div>
+            <p className="text-xs text-[#806B57] leading-relaxed">
+              Open and test the complete admin panel frontend with simulated administrator privileges without configuring an external Supabase backend.
+            </p>
+            <form action={enterDevAdminPreviewAction}>
+              <button
+                type="submit"
+                className="w-full h-9 inline-flex items-center justify-center gap-2 rounded-lg bg-amber-800 text-amber-50 text-xs font-semibold hover:bg-amber-900 transition-colors shadow-2xs"
+              >
+                <span>Enter Admin Preview Mode</span>
+                <ArrowRight className="h-3.5 w-3.5" />
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

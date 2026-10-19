@@ -7,6 +7,7 @@ import {
   getNewlyAddedProducts,
   getFestiveOffer,
 } from "@/lib/store";
+import { getActiveFestiveCampaigns } from "@/lib/data/cms";
 import { HeroBanner } from "@/components/home/hero-banner";
 import { RecentlyViewed } from "@/components/home/recently-viewed";
 import { BestsellerSection } from "@/components/home/bestseller-section";
@@ -31,6 +32,7 @@ export default async function HomePage() {
     bestsellers,
     newlyAdded,
     festiveOfferData,
+    festiveCampaigns,
   ] = await Promise.all([
     getActiveBanners(),
     getActiveCategories(),
@@ -38,6 +40,7 @@ export default async function HomePage() {
     getBestsellerProducts(8),
     getNewlyAddedProducts(10),
     getFestiveOffer(),
+    getActiveFestiveCampaigns(),
   ]);
 
   return (
@@ -54,10 +57,11 @@ export default async function HomePage() {
       {/* 4. Newly Added (Latest products sorted by created_at desc) */}
       <NewlyAddedSection products={newlyAdded} categories={categories} />
 
-      {/* 5. Festive Offer (Admin-controlled, hidden if disabled) */}
+      {/* 5. Festive Discount Campaigns (Slideshow of active campaigns, hidden if disabled) */}
       <FestiveOfferSection
         offer={festiveOfferData.offer}
-        products={festiveOfferData.products}
+        campaigns={festiveCampaigns}
+        products={allProducts}
         categories={categories}
       />
 

@@ -1,0 +1,34 @@
+{
+  "users": [
+    {
+      "id": "usr_4104acb962ff4cdaae6cd0136b9cee47",
+      "full_name": "Amber",
+      "email": "you@example.com",
+      "password_hash": "0d3af8270b50cb082173b78f89ba8cefef8e86bee052e39880be4997c38d18c326136b3fd1c6e0b34c8db59dc03cedf938345bd311eb18a9fa472e90ca259cd4",
+      "salt": "2fa6514da4ca8412b2f5bcbabd798def",
+      "role": "admin",
+      "created_at": "2026-10-14T03:30:09.058Z",
+      "updated_at": "2026-10-14T03:35:37.045Z"
+    },
+    {
+      "id": "usr_dev_admin_preview",
+      "full_name": "Local Dev Administrator",
+      "email": "admin@kanhaiya.local",
+      "password_hash": "d42c150464abe0568dfeb456d43a3aafef530697b6095e9c40b40bdeeebcc4be6f27a1aaa910eafe1404385cb3d6ef977f7051c000324445bbd3282ad2652545",
+      "salt": "a14e5cb1ab83f9661d6c94957e0a9756",
+      "role": "admin",
+      "created_at": "2026-10-14T04:06:22.546Z",
+      "updated_at": "2026-10-14T04:06:22.546Z"
+    },
+    {
+      "id": "usr_4d9c77101ddf4057afbdfb27ad1ab494",
+      "full_name": "Test Customer",
+      "email": "testuser-1791952170380@example.com",
+      "password_hash": "3127035a4aecae0e8105be4f64f75ed72721a78ef4fd368d2ede34f7eff96230274784d687e81c60b32f1710bb9f781ce787e159d699a3430fc6d709701fb712",
+      "salt": "f7cd6bd70258355443d137730bd4dd18",
+      "role": "user",
+      "created_at": "2026-10-14T04:29:30.412Z",
+      "updated_at": "2026-10-14T04:29:30.606Z"
+    }
+  ]
+}

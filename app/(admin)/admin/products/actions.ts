@@ -32,6 +32,12 @@ export interface ProductSavePayload {
   description?: string | null;
   brand?: string | null;
   sku?: string | null;
+  /**
+   * Development model batch identifier.
+   * NOTE: Clearly separate from PostgreSQL database schema (which has no batch_number column).
+   * Flagged for persistent database migration approval.
+   */
+  batch_number?: string | null;
   base_price: number;
   compare_at_price?: number | null;
   stock_quantity: number;
@@ -187,23 +193,31 @@ export async function saveProductAction(payload: ProductSavePayload) {
   });
 
   if (isDemo) {
+    const { upsertProductInStore } = await import("@/lib/mock-data/admin-store");
+    const saveRes = upsertProductInStore({
+      ...payload,
+      name,
+      slug,
+      images: sanitizedImages as any,
+      variants: sanitizedVariants as any,
+    });
+
+    if (!saveRes.success) {
+      return { error: saveRes.error || "Failed to save product in development catalog." };
+    }
+
     revalidatePath("/admin/products");
     revalidatePath("/shop");
+    revalidatePath("/categories");
     revalidatePath(`/shop/product/${slug}`);
     revalidatePath(`/product/${slug}`);
+    revalidatePath(`/products/${slug}`);
     revalidatePath("/");
 
     return {
       success: true,
-      message: `[Demo Mode] Product '${name}' saved successfully.`,
-      product: {
-        id: payload.id || `demo-prod-${Date.now()}`,
-        ...payload,
-        name,
-        slug,
-        images: sanitizedImages,
-        variants: sanitizedVariants,
-      },
+      message: `Product '${name}' saved successfully.`,
+      product: saveRes.product,
     };
   }
 
@@ -400,12 +414,21 @@ export async function archiveProductAction(productId: string, shouldArchive: boo
   const { supabase, isDemo } = authCheck;
 
   if (isDemo) {
+    const { archiveProductInStore } = await import("@/lib/mock-data/admin-store");
+    const res = archiveProductInStore(productId, shouldArchive);
+    if (!res.success) {
+      return { error: res.error || "Failed to update product status." };
+    }
+
     revalidatePath("/admin/products");
     revalidatePath("/shop");
+    revalidatePath("/categories");
     revalidatePath("/");
     return {
       success: true,
-      message: `[Demo Mode] Product status changed to ${shouldArchive ? "Archived" : "Active"}.`,
+      message: shouldArchive
+        ? "Product archived. It is now hidden from public store browse and search."
+        : "Product restored to active catalog.",
     };
   }
 
@@ -463,12 +486,19 @@ export async function deleteProductAction(productId: string) {
   const { supabase, isDemo } = authCheck;
 
   if (isDemo) {
+    const { deleteProductFromStore } = await import("@/lib/mock-data/admin-store");
+    const res = deleteProductFromStore(productId);
+    if (!res.success) {
+      return { error: res.error || "Failed to delete product." };
+    }
+
     revalidatePath("/admin/products");
     revalidatePath("/shop");
+    revalidatePath("/categories");
     revalidatePath("/");
     return {
       success: true,
-      message: "[Demo Mode] Product deleted successfully.",
+      message: "Product permanently removed from store catalog.",
     };
   }
 

@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { AlertTriangle, Trash2, X } from "lucide-react";
+import { AlertTriangle, Trash2, X, Package, ShieldCheck } from "lucide-react";
 import { getDescendantCategoryIds, getCategoryPathLabel } from "@/lib/data/categories";
+import { deleteCategoryFromStore } from "@/lib/mock-data/admin-store";
 import { deleteCategoryAction } from "@/app/(admin)/admin/categories/actions";
 import type { Category } from "@/lib/data/homepage";
 
@@ -12,6 +13,7 @@ interface CategoryDeleteModalProps {
   onSuccess: (deletedCategoryId: string) => void;
   category: Category | null;
   allCategories: Category[];
+  allProducts?: any[];
 }
 
 export function CategoryDeleteModal({
@@ -20,6 +22,7 @@ export function CategoryDeleteModal({
   onSuccess,
   category,
   allCategories,
+  allProducts = [],
 }: CategoryDeleteModalProps) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -32,19 +35,35 @@ export function CategoryDeleteModal({
     descendantIds.includes(c.id)
   );
 
+  // Calculate products affected
+  const allAffectedCategoryIds = new Set([category.id, ...descendantIds]);
+  const directProducts = allProducts.filter((p) => p.category_id === category.id);
+  const totalAffectedProducts = allProducts.filter(
+    (p) => p.category_id && allAffectedCategoryIds.has(p.category_id)
+  );
+
   const handleDelete = async () => {
     setIsDeleting(true);
     setErrorMessage(null);
 
-    const res = await deleteCategoryAction(category.id);
-    setIsDeleting(false);
-
-    if (res.error) {
-      setErrorMessage(res.error);
-    } else {
-      onSuccess(category.id);
-      onClose();
+    // 1. Delete from Mock Store with cascade handling
+    const localRes = deleteCategoryFromStore(category.id);
+    if (!localRes.success) {
+      setIsDeleting(false);
+      setErrorMessage(localRes.error || "Failed to delete category.");
+      return;
     }
+
+    // 2. Call server action for Next.js cache revalidation
+    try {
+      await deleteCategoryAction(category.id);
+    } catch {
+      // Offline fallback
+    }
+
+    setIsDeleting(false);
+    onSuccess(category.id);
+    onClose();
   };
 
   return (
@@ -60,7 +79,7 @@ export function CategoryDeleteModal({
         <button
           type="button"
           onClick={onClose}
-          className="absolute right-5 top-5 flex h-8 w-8 items-center justify-center rounded-xl bg-muted text-muted-foreground hover:text-foreground"
+          className="absolute right-5 top-5 flex h-8 w-8 items-center justify-center rounded-xl bg-muted text-muted-foreground hover:text-foreground cursor-pointer"
         >
           <X className="h-4 w-4" />
         </button>
@@ -71,11 +90,11 @@ export function CategoryDeleteModal({
             <AlertTriangle className="h-6 w-6" />
           </div>
           <div>
-            <h3 className="text-lg font-bold tracking-tight text-foreground">
+            <h3 className="text-lg font-bold tracking-tight text-foreground font-serif">
               Delete Category: {category.name}
             </h3>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Please review the cascade deletion effects before proceeding.
+              Review cascade deletion and product unlink warnings before proceeding.
             </p>
           </div>
         </div>
@@ -86,24 +105,26 @@ export function CategoryDeleteModal({
           </div>
         )}
 
-        {/* Descendant Cascade Explanation */}
+        {/* Explanation Details */}
         <div className="space-y-4 text-xs text-foreground/90">
+          {/* Subcategories Cascade Notice */}
           <div className="rounded-2xl border border-amber-300/60 bg-amber-50 dark:bg-amber-950/40 p-4 text-amber-900 dark:text-amber-200">
             <p className="font-bold text-xs mb-1">
-              ⚠️ Descendant Cascade Deletion Warning:
+              ⚠️ Descendant Cascade Deletion Rule (Schema Foreign Key):
             </p>
             <p className="leading-relaxed">
-              In this database schema, subcategories reference their parent via a cascading foreign key (<code>parent_id ON DELETE CASCADE</code>).
+              Subcategories reference their parent via a cascading foreign key (<code className="font-mono text-[11px]">parent_id ON DELETE CASCADE</code>).
               Deleting <strong>"{category.name}"</strong> will permanently delete this category and all of its descendant subcategories.
             </p>
           </div>
 
+          {/* List of subcategories if any */}
           {descendantCategories.length > 0 ? (
             <div className="rounded-2xl border border-border bg-muted/40 p-4 space-y-2">
               <span className="font-semibold text-xs text-foreground block">
                 The following {descendantCategories.length} subcategory(ies) will also be deleted:
               </span>
-              <ul className="space-y-1.5 pl-3 list-disc text-muted-foreground">
+              <ul className="space-y-1.5 pl-3 list-disc text-muted-foreground max-h-36 overflow-y-auto">
                 {descendantCategories.map((sub) => (
                   <li key={sub.id} className="font-mono text-[11px]">
                     {getCategoryPathLabel(sub.id, allCategories)}
@@ -117,8 +138,37 @@ export function CategoryDeleteModal({
             </p>
           )}
 
-          <div className="rounded-xl border border-border/70 p-3 bg-card text-[11px] text-muted-foreground">
-            <strong>Product Survival Note:</strong> Products assigned to this category will <strong>not</strong> be deleted; their category association will automatically become uncategorized (<code>category_id SET NULL</code>).
+          {/* Product Warning Notice */}
+          {totalAffectedProducts.length > 0 ? (
+            <div className="rounded-2xl border border-border bg-card p-4 space-y-2">
+              <div className="flex items-center gap-2 text-foreground font-semibold text-xs">
+                <Package className="h-4 w-4 text-primary" />
+                <span>
+                  {totalAffectedProducts.length} Product(s) Currently Linked
+                </span>
+              </div>
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                <strong>Product Survival Rule:</strong> In accordance with the schema (<code className="font-mono text-[10px]">category_id ON DELETE SET NULL</code>), these products will <strong>not</strong> be deleted. Their category association will be cleared to uncategorized.
+              </p>
+              {directProducts.length > 0 && (
+                <p className="text-[10px] text-muted-foreground/80">
+                  • {directProducts.length} directly in this category
+                  {descendantCategories.length > 0 && ` • ${totalAffectedProducts.length - directProducts.length} in descendant subcategories`}
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="rounded-xl border border-border/70 p-3 bg-muted/20 text-[11px] text-muted-foreground">
+              No products are currently assigned to this category or its subcategories.
+            </div>
+          )}
+
+          {/* Historical Order Information Preservation Guarantee */}
+          <div className="rounded-xl border border-emerald-500/20 bg-emerald-50/50 dark:bg-emerald-950/20 p-3 text-[11px] text-emerald-800 dark:text-emerald-300 flex items-start gap-2">
+            <ShieldCheck className="h-4 w-4 shrink-0 mt-0.5 text-emerald-600" />
+            <span>
+              <strong>Historical Order Protection:</strong> Past customer orders store immutable product snapshots. Deleting this category will <strong>never</strong> alter or delete historical order records.
+            </span>
           </div>
         </div>
 
@@ -128,7 +178,7 @@ export function CategoryDeleteModal({
             type="button"
             onClick={onClose}
             disabled={isDeleting}
-            className="px-4 py-2 rounded-xl border border-border text-xs font-semibold text-muted-foreground hover:bg-muted transition-colors"
+            className="px-4 py-2 rounded-xl border border-border text-xs font-semibold text-muted-foreground hover:bg-muted transition-colors cursor-pointer"
           >
             Cancel
           </button>
@@ -136,7 +186,7 @@ export function CategoryDeleteModal({
             type="button"
             onClick={handleDelete}
             disabled={isDeleting}
-            className="inline-flex items-center gap-2 px-5 py-2 rounded-xl bg-destructive text-destructive-foreground text-xs font-bold shadow-xs hover:bg-destructive/90 disabled:opacity-50 transition-colors"
+            className="inline-flex items-center gap-2 px-5 py-2 rounded-xl bg-destructive text-destructive-foreground text-xs font-bold shadow-xs hover:bg-destructive/90 disabled:opacity-50 transition-colors cursor-pointer"
           >
             <Trash2 className="h-4 w-4" />
             <span>

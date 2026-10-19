@@ -73,6 +73,12 @@ export interface ProductDetail {
   category?: Category | null;
   images: ProductImage[];
   variants: ProductVariant[];
+  /**
+   * Development model batch identifier.
+   * NOTE: Clearly separate from PostgreSQL database schema (which has no batch_number column).
+   * Flagged for persistent database migration approval.
+   */
+  batch_number?: string | null;
 }
 
 export interface ShopFilterParams {
@@ -1043,8 +1049,21 @@ export async function getShopProducts(params: ShopFilterParams): Promise<ShopQue
     // Graceful fallback to offline catalog below
   }
 
-  // Robust Fallback In-Memory Catalog Filtering
-  let filtered = [...FALLBACK_PRODUCT_DETAILS].filter((p) => p.is_active);
+  // Robust shared mock catalog filtering (admin-store synchronization)
+  let sourceProducts: ProductDetail[] = [];
+  try {
+    const { loadMockProducts } = await import("@/lib/mock-data/admin-store");
+    const loaded = loadMockProducts();
+    if (loaded && loaded.length > 0) {
+      sourceProducts = loaded as unknown as ProductDetail[];
+    } else {
+      sourceProducts = FALLBACK_PRODUCT_DETAILS;
+    }
+  } catch {
+    sourceProducts = FALLBACK_PRODUCT_DETAILS;
+  }
+
+  let filtered = [...sourceProducts].filter((p) => p.is_active);
 
   // Category filtering with descendant expansion
   if (activeCategory) {
@@ -1254,8 +1273,21 @@ export async function getProductBySlug(slug: string): Promise<ProductDetail | nu
     // Fallback to local catalog below
   }
 
-  // Offline / fallback lookup
-  const fallback = FALLBACK_PRODUCT_DETAILS.find(
+  // Offline / shared mock store lookup
+  let sourceProducts: ProductDetail[] = [];
+  try {
+    const { loadMockProducts } = await import("@/lib/mock-data/admin-store");
+    const loaded = loadMockProducts();
+    if (loaded && loaded.length > 0) {
+      sourceProducts = loaded as unknown as ProductDetail[];
+    } else {
+      sourceProducts = FALLBACK_PRODUCT_DETAILS;
+    }
+  } catch {
+    sourceProducts = FALLBACK_PRODUCT_DETAILS;
+  }
+
+  const fallback = sourceProducts.find(
     (p) => p.slug === slug && p.is_active
   );
 

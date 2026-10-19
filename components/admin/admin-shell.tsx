@@ -17,13 +17,25 @@ interface AdminShellProps {
 
 export function AdminShell({ children, userEmail, profile }: AdminShellProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   return (
-    <div className="flex min-h-screen bg-background text-foreground">
+    <div className="flex min-h-screen bg-background text-foreground font-sans">
       {/* Desktop Sidebar */}
-      <div className="hidden lg:block lg:w-64 shrink-0">
-        <div className="fixed inset-y-0 left-0 z-40 w-64">
-          <AdminSidebar />
+      <div
+        className={`hidden lg:block shrink-0 transition-all duration-200 ${
+          isCollapsed ? "lg:w-20" : "lg:w-64"
+        }`}
+      >
+        <div
+          className={`fixed inset-y-0 left-0 z-40 transition-all duration-200 ${
+            isCollapsed ? "w-20" : "w-64"
+          }`}
+        >
+          <AdminSidebar
+            isCollapsed={isCollapsed}
+            onToggleCollapse={() => setIsCollapsed(!isCollapsed)}
+          />
         </div>
       </div>
 

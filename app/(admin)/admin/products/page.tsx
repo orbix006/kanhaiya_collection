@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { ProductManager } from "@/components/admin/product-manager";
 import { getAllActiveCategories } from "@/lib/data/homepage";
 import { FALLBACK_PRODUCT_DETAILS, type ProductDetail } from "@/lib/data/products";
+import { SEED_PRODUCTS, SEED_CATEGORIES } from "@/lib/mock-data/admin-store";
 import { Package, Sparkles } from "lucide-react";
 import type { Category } from "@/lib/data/homepage";
 import type { Metadata } from "next";
@@ -15,8 +16,6 @@ export const metadata: Metadata = {
 };
 
 export default async function AdminProductsPage() {
-  const supabase = await createClient();
-
   const isConfigured =
     Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL) &&
     process.env.NEXT_PUBLIC_SUPABASE_URL !== "https://placeholder-project.supabase.co";
@@ -26,6 +25,7 @@ export default async function AdminProductsPage() {
 
   if (isConfigured) {
     try {
+      const supabase = await createClient();
       // 1. Fetch categories
       const { data: dbCats } = await supabase
         .from("categories")
@@ -115,15 +115,15 @@ export default async function AdminProductsPage() {
           };
         });
       } else {
-        products = FALLBACK_PRODUCT_DETAILS;
+        products = SEED_PRODUCTS as unknown as ProductDetail[];
       }
     } catch {
-      categories = await getAllActiveCategories();
-      products = FALLBACK_PRODUCT_DETAILS;
+      categories = SEED_CATEGORIES as unknown as Category[];
+      products = SEED_PRODUCTS as unknown as ProductDetail[];
     }
   } else {
-    categories = await getAllActiveCategories();
-    products = FALLBACK_PRODUCT_DETAILS;
+    categories = SEED_CATEGORIES as unknown as Category[];
+    products = SEED_PRODUCTS as unknown as ProductDetail[];
   }
 
   return (

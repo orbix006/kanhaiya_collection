@@ -2,6 +2,7 @@ import React from "react";
 import Link from "next/link";
 import { getAllProducts, getActiveCategories } from "@/lib/store";
 import { ProductCard } from "@/components/ui/product-card";
+import { getDescendantCategoryIds } from "@/lib/data/categories";
 import { ShoppingBag } from "lucide-react";
 
 export const metadata = {
@@ -29,7 +30,9 @@ export default async function ShopPage({ searchParams }: ShopPageProps) {
   let filtered = allProducts.filter((p) => p.is_active);
 
   if (selectedCategory) {
-    filtered = filtered.filter((p) => p.category_id === selectedCategory.id);
+    const descendantIds = getDescendantCategoryIds(selectedCategory.id, categories as any);
+    const targetIds = [selectedCategory.id, ...descendantIds];
+    filtered = filtered.filter((p) => p.category_id && targetIds.includes(p.category_id));
   }
 
   // Sorting
@@ -75,7 +78,7 @@ export default async function ShopPage({ searchParams }: ShopPageProps) {
                 : "bg-[#FFFDF7] border border-[#E8DCC8] text-[#3B2416] hover:bg-[#F8F1E3]"
             }`}
           >
-            All Products ({allProducts.length})
+            All Products ({allProducts.filter((p) => p.is_active).length})
           </Link>
           {categories.map((cat) => {
             const isSelected = selectedCategorySlug === cat.slug;
@@ -112,7 +115,7 @@ export default async function ShopPage({ searchParams }: ShopPageProps) {
               <ProductCard
                 key={product.id}
                 product={product}
-                categoryName={categoryMap.get(product.category_id)}
+                categoryName={product.category_id ? categoryMap.get(product.category_id) : undefined}
               />
             ))}
           </div>

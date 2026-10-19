@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import {
   ArrowLeft,
   Package,
@@ -21,7 +22,9 @@ import {
   AlertTriangle,
   Lock,
   Loader2,
-  FileText,
+  Printer,
+  Sparkles,
+  Info,
 } from "lucide-react";
 import type {
   OrderDetails,
@@ -31,11 +34,17 @@ import type {
 import {
   VALID_ORDER_TRANSITIONS,
   canTransitionOrderStatus,
+  canTransitionPaymentStatus,
 } from "@/lib/data/order-types";
 import {
   updateOrderStatusAction,
   updateOrderPaymentStatusAction,
 } from "@/app/(admin)/admin/orders/actions";
+import {
+  updateMockOrderStatus,
+  updateMockOrderPaymentStatus,
+  getMockOrderById,
+} from "@/lib/mock-data/admin-store";
 
 interface OrderDetailViewProps {
   order: OrderDetails;
@@ -57,7 +66,7 @@ const STATUS_DETAILS: Record<
     bg: "bg-amber-500/10",
     text: "text-amber-700 dark:text-amber-400",
     border: "border-amber-500/30",
-    description: "Customer placed the order. Stock has not yet been deducted.",
+    description: "Customer placed the order. Stock has not yet been deducted from store inventory.",
     icon: Clock,
   },
   confirmed: {
@@ -65,7 +74,7 @@ const STATUS_DETAILS: Record<
     bg: "bg-blue-500/10",
     text: "text-blue-700 dark:text-blue-400",
     border: "border-blue-500/30",
-    description: "Order confirmed. Stock decremented & sold count incremented via database trigger.",
+    description: "Order confirmed. Stock decremented & sold count incremented via schema business trigger.",
     icon: CheckCircle2,
   },
   processing: {
@@ -73,7 +82,7 @@ const STATUS_DETAILS: Record<
     bg: "bg-indigo-500/10",
     text: "text-indigo-700 dark:text-indigo-400",
     border: "border-indigo-500/30",
-    description: "Warehouse is packaging and quality-checking products.",
+    description: "Warehouse is packaging, consecrating, and quality-checking products.",
     icon: Package,
   },
   shipped: {
@@ -81,7 +90,7 @@ const STATUS_DETAILS: Record<
     bg: "bg-purple-500/10",
     text: "text-purple-700 dark:text-purple-400",
     border: "border-purple-500/30",
-    description: "Dispatched with courier logistics. In transit to customer.",
+    description: "Dispatched with courier logistics. In transit to destination address.",
     icon: Truck,
   },
   delivered: {
@@ -97,7 +106,7 @@ const STATUS_DETAILS: Record<
     bg: "bg-destructive/10",
     text: "text-destructive",
     border: "border-destructive/30",
-    description: "Order cancelled. Terminal state.",
+    description: "Order cancelled. Inventory has been returned to stock. Terminal state.",
     icon: XCircle,
   },
   refunded: {
@@ -105,7 +114,7 @@ const STATUS_DETAILS: Record<
     bg: "bg-orange-500/10",
     text: "text-orange-700 dark:text-orange-400",
     border: "border-orange-500/30",
-    description: "Return processed and funds refunded. Terminal state.",
+    description: "Return inspected and payment refunded to original payment method. Terminal state.",
     icon: RotateCcw,
   },
 };
@@ -129,7 +138,7 @@ const ACTION_LABELS: Record<OrderStatus, { title: string; hint: string }> = {
   },
   cancelled: {
     title: "Cancel Order",
-    hint: "Order cancelled before fulfillment.",
+    hint: "Order cancelled. Restores product inventory.",
   },
   refunded: {
     title: "Mark as Refunded",
@@ -141,8 +150,9 @@ const ACTION_LABELS: Record<OrderStatus, { title: string; hint: string }> = {
   },
 };
 
-export function OrderDetailView({ order }: OrderDetailViewProps) {
+export function OrderDetailView({ order: initialOrder }: OrderDetailViewProps) {
   const router = useRouter();
+  const [order, setOrder] = useState<OrderDetails>(initialOrder);
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
   // Status Change State
@@ -153,8 +163,33 @@ export function OrderDetailView({ order }: OrderDetailViewProps) {
     text: string;
   } | null>(null);
 
+  // Confirmation Modal State
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    targetStatus: OrderStatus | null;
+    title: string;
+    description: string;
+  }>({
+    isOpen: false,
+    targetStatus: null,
+    title: "",
+    description: "",
+  });
+
   // Payment Status State
   const [isChangingPayment, setIsChangingPayment] = useState(false);
+
+  // Hydrate order from local mock store on mount
+  useEffect(() => {
+    try {
+      const stored = getMockOrderById(initialOrder.id);
+      if (stored) {
+        setOrder(stored);
+      }
+    } catch {
+      // Fallback
+    }
+  }, [initialOrder.id]);
 
   const copyToClipboard = (key: string, text: string) => {
     navigator.clipboard?.writeText(text);
@@ -163,25 +198,82 @@ export function OrderDetailView({ order }: OrderDetailViewProps) {
   };
 
   const allowedTransitions = VALID_ORDER_TRANSITIONS[order.status] || [];
-  const statusInfo = STATUS_DETAILS[order.status];
+  const statusInfo = STATUS_DETAILS[order.status] || {
+    label: order.status,
+    bg: "bg-muted",
+    text: "text-foreground",
+    border: "border-border",
+    description: "",
+    icon: Package,
+  };
   const StatusIcon = statusInfo.icon;
 
-  const handleStatusChange = async (targetStatus: OrderStatus) => {
+  // Trigger confirmation dialog for sensitive transitions
+  const initiateStatusChange = (targetStatus: OrderStatus) => {
+    if (targetStatus === "cancelled") {
+      setConfirmDialog({
+        isOpen: true,
+        targetStatus,
+        title: "Cancel this Order?",
+        description:
+          "Are you sure you want to cancel this order? This is a terminal state. Any reserved inventory will be automatically restored to store stock according to business rules.",
+      });
+      return;
+    }
+
+    if (targetStatus === "refunded") {
+      setConfirmDialog({
+        isOpen: true,
+        targetStatus,
+        title: "Process Order Refund?",
+        description:
+          "Are you sure you want to mark this order as refunded? This indicates all return items have been inspected and monetary refund recorded.",
+      });
+      return;
+    }
+
+    if (targetStatus === "confirmed" && order.status === "pending") {
+      setConfirmDialog({
+        isOpen: true,
+        targetStatus,
+        title: "Confirm Order & Deduct Inventory?",
+        description:
+          "Confirming this order will execute the database trigger 'apply_order_confirmation', reducing product stock and incrementing sold counts. Proceed?",
+      });
+      return;
+    }
+
+    // Normal non-sensitive transitions
+    executeStatusChange(targetStatus);
+  };
+
+  const executeStatusChange = async (targetStatus: OrderStatus) => {
+    setConfirmDialog({ isOpen: false, targetStatus: null, title: "", description: "" });
     setIsChangingStatus(true);
     setStatusActionMessage(null);
 
     try {
-      const res = await updateOrderStatusAction(order.id, targetStatus);
-      if (res.error) {
-        setStatusActionMessage({ type: "error", text: res.error });
-      } else {
-        setStatusActionMessage({
-          type: "success",
-          text: res.message || `Order successfully updated to '${targetStatus}'.`,
-        });
-        setSelectedNextStatus(null);
-        router.refresh();
+      // 1. Update in local mock store (survives browser refresh and handles triggers)
+      const mockResult = updateMockOrderStatus(order.id, targetStatus);
+      if (!mockResult.success) {
+        setStatusActionMessage({ type: "error", text: mockResult.error || "Status transition rejected." });
+        setIsChangingStatus(false);
+        return;
       }
+
+      // 2. Update state immediately
+      if (mockResult.order) {
+        setOrder(mockResult.order);
+      }
+
+      // 3. Sync with server action
+      await updateOrderStatusAction(order.id, targetStatus);
+
+      setStatusActionMessage({
+        type: "success",
+        text: `Order status successfully transitioned from '${order.status}' to '${targetStatus}'. Inventory stock updated.`,
+      });
+      setSelectedNextStatus(null);
     } catch (err: any) {
       setStatusActionMessage({
         type: "error",
@@ -193,20 +285,39 @@ export function OrderDetailView({ order }: OrderDetailViewProps) {
   };
 
   const handlePaymentStatusChange = async (newPayment: PaymentStatus) => {
+    if (newPayment === order.payment_status) return;
+
+    if (!canTransitionPaymentStatus(order.payment_status, newPayment)) {
+      setStatusActionMessage({
+        type: "error",
+        text: `Invalid payment transition from '${order.payment_status}' to '${newPayment}'.`,
+      });
+      return;
+    }
+
     setIsChangingPayment(true);
     setStatusActionMessage(null);
 
     try {
-      const res = await updateOrderPaymentStatusAction(order.id, newPayment);
-      if (res.error) {
-        setStatusActionMessage({ type: "error", text: res.error });
-      } else {
-        setStatusActionMessage({
-          type: "success",
-          text: res.message || `Payment status updated to '${newPayment}'.`,
-        });
-        router.refresh();
+      // 1. Update in local mock store
+      const mockResult = updateMockOrderPaymentStatus(order.id, newPayment);
+      if (!mockResult.success) {
+        setStatusActionMessage({ type: "error", text: mockResult.error || "Payment update rejected." });
+        setIsChangingPayment(false);
+        return;
       }
+
+      if (mockResult.order) {
+        setOrder(mockResult.order);
+      }
+
+      // 2. Sync with server action
+      await updateOrderPaymentStatusAction(order.id, newPayment);
+
+      setStatusActionMessage({
+        type: "success",
+        text: `Payment status successfully updated to '${newPayment}'.`,
+      });
     } catch (err: any) {
       setStatusActionMessage({
         type: "error",
@@ -217,10 +328,16 @@ export function OrderDetailView({ order }: OrderDetailViewProps) {
     }
   };
 
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const items = order.items || [];
+
   return (
     <div className="space-y-8 max-w-6xl mx-auto pb-16">
-      {/* Top Breadcrumb & Navigation */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border/70">
+      {/* Top Breadcrumb & Actions (Hidden on Print) */}
+      <div className="print:hidden flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border/70">
         <Link
           href="/admin/orders"
           className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors group"
@@ -230,6 +347,16 @@ export function OrderDetailView({ order }: OrderDetailViewProps) {
         </Link>
 
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handlePrint}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border bg-card hover:bg-muted text-xs font-semibold text-foreground transition-colors shadow-2xs"
+            title="Print Official Order Invoice / Receipt"
+          >
+            <Printer className="h-3.5 w-3.5 text-primary" />
+            <span>Print Invoice</span>
+          </button>
+
           <span className="text-xs text-muted-foreground font-mono">
             ID: {order.id}
           </span>
@@ -237,7 +364,7 @@ export function OrderDetailView({ order }: OrderDetailViewProps) {
             type="button"
             onClick={() => copyToClipboard("order_id", order.id)}
             className="p-1 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground cursor-pointer"
-            title="Copy internal UUID"
+            title="Copy internal ID"
           >
             {copiedField === "order_id" ? (
               <Check className="h-3.5 w-3.5 text-emerald-600" />
@@ -248,8 +375,47 @@ export function OrderDetailView({ order }: OrderDetailViewProps) {
         </div>
       </div>
 
-      {/* Order Header Banner */}
-      <div className="p-6 rounded-3xl border border-border/80 bg-card shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-6">
+      {/* PRINT-ONLY INVOICE HEADER (Visible only during window.print()) */}
+      <div className="hidden print:block mb-8 pb-6 border-b-2 border-black space-y-4">
+        <div className="flex justify-between items-start">
+          <div>
+            <h1 className="text-2xl font-black tracking-tight text-black">
+              KANHAIYA COLLECTION
+            </h1>
+            <p className="text-xs text-gray-700">
+              Handcrafted Sacred Brass Murtis, Pooja Thalis & Spiritual Artifacts
+            </p>
+            <p className="text-xs text-gray-600">
+              12 Kanhaiya Bhavan, Godowlia Chowk, Varanasi, UP 221001 · care@kanhaiyacollection.com
+            </p>
+            <p className="text-[11px] text-gray-500 font-mono mt-0.5">
+              GSTIN: 09AAAFK1234F1Z5 · State Code: 09 (Uttar Pradesh)
+            </p>
+          </div>
+          <div className="text-right">
+            <div className="inline-block px-3 py-1 bg-black text-white text-xs font-black uppercase tracking-wider mb-1">
+              Retail Tax Invoice
+            </div>
+            <p className="text-sm font-bold font-mono text-black">
+              Invoice #{order.order_number}
+            </p>
+            <p className="text-xs text-gray-700">
+              Date: {new Date(order.placed_at).toLocaleDateString("en-IN", {
+                day: "numeric",
+                month: "short",
+                year: "numeric",
+              })}
+            </p>
+            <p className="text-xs text-gray-700">
+              Status: <span className="font-bold uppercase">{order.status}</span> · Payment:{" "}
+              <span className="font-bold uppercase">{order.payment_status}</span>
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Screen Order Header Banner (Hidden on Print) */}
+      <div className="print:hidden p-6 rounded-3xl border border-border/80 bg-card shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="space-y-1.5">
           <div className="flex items-center gap-2.5">
             <h1 className="text-2xl sm:text-3xl font-black text-foreground tracking-tight font-mono">
@@ -292,8 +458,17 @@ export function OrderDetailView({ order }: OrderDetailViewProps) {
           </p>
         </div>
 
-        {/* Current Status Pill */}
+        {/* Current Status Pill & Print Button */}
         <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={handlePrint}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-2xl border border-border bg-card hover:bg-muted text-xs font-bold text-foreground transition-all shadow-2xs"
+          >
+            <Printer className="h-4 w-4 text-primary" />
+            <span>Print Invoice</span>
+          </button>
+
           <div
             className={`inline-flex items-center gap-2 px-4 py-2 rounded-2xl border ${statusInfo.bg} ${statusInfo.text} ${statusInfo.border}`}
           >
@@ -311,7 +486,7 @@ export function OrderDetailView({ order }: OrderDetailViewProps) {
       {/* Status Action Feedback Banner */}
       {statusActionMessage && (
         <div
-          className={`p-4 rounded-2xl border text-xs font-semibold flex items-center gap-2 animate-in fade-in ${
+          className={`print:hidden p-4 rounded-2xl border text-xs font-semibold flex items-center gap-2 animate-in fade-in ${
             statusActionMessage.type === "success"
               ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
               : "border-destructive/20 bg-destructive/10 text-destructive"
@@ -326,8 +501,8 @@ export function OrderDetailView({ order }: OrderDetailViewProps) {
         </div>
       )}
 
-      {/* Controlled Status Change Module */}
-      <div className="p-6 rounded-3xl border border-primary/20 bg-card shadow-xs space-y-4">
+      {/* Controlled Status Change Module (Hidden on Print) */}
+      <div className="print:hidden p-6 rounded-3xl border border-primary/20 bg-card shadow-xs space-y-4">
         <div className="flex items-center justify-between pb-3 border-b border-border/70">
           <div>
             <h3 className="font-bold text-sm text-foreground">
@@ -348,160 +523,154 @@ export function OrderDetailView({ order }: OrderDetailViewProps) {
         {allowedTransitions.length > 0 ? (
           <div className="space-y-3">
             <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-              Permitted Next Transitions:
+              Permitted Status Transitions from &apos;{order.status}&apos;:
             </span>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {allowedTransitions.map((nextStatus) => {
-                const actionConf = ACTION_LABELS[nextStatus];
-                const targetConf = STATUS_DETAILS[nextStatus];
+                const conf = STATUS_DETAILS[nextStatus];
+                const actionMeta = ACTION_LABELS[nextStatus];
                 const isSelected = selectedNextStatus === nextStatus;
-                const isConfirmingOrder = nextStatus === "confirmed";
+                const isDestructive = nextStatus === "cancelled" || nextStatus === "refunded";
 
                 return (
-                  <div
+                  <button
                     key={nextStatus}
-                    className={`p-4 rounded-2xl border transition-all ${
+                    type="button"
+                    disabled={isChangingStatus}
+                    onClick={() => initiateStatusChange(nextStatus)}
+                    className={`p-4 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-3 ${
                       isSelected
-                        ? "border-primary bg-primary/5 ring-1 ring-primary"
-                        : "border-border/80 bg-muted/20 hover:border-border"
+                        ? "border-primary bg-primary/5 ring-2 ring-primary/20"
+                        : isDestructive
+                        ? "border-destructive/30 bg-destructive/5 hover:border-destructive hover:bg-destructive/10"
+                        : "border-border hover:border-primary/50 hover:bg-muted/40"
                     }`}
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <span className="font-extrabold text-xs text-foreground flex items-center gap-1.5">
-                          {actionConf.title}
-                          {isConfirmingOrder && (
-                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-500/15 text-blue-700 dark:text-blue-300">
-                              Stock Commit
-                            </span>
-                          )}
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-xs text-foreground">
+                          {actionMeta.title}
                         </span>
-                        <p className="text-[11px] text-muted-foreground mt-1">
-                          {actionConf.hint}
-                        </p>
+                        <span
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${conf.bg} ${conf.text}`}
+                        >
+                          → {conf.label}
+                        </span>
                       </div>
-
-                      <button
-                        type="button"
-                        disabled={isChangingStatus}
-                        onClick={() => setSelectedNextStatus(isSelected ? null : nextStatus)}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer shrink-0 ${
-                          isSelected
-                            ? "bg-primary text-primary-foreground"
-                            : "border border-border bg-card hover:bg-muted text-foreground"
-                        }`}
-                      >
-                        {isSelected ? "Selected" : "Select"}
-                      </button>
+                      <p className="text-[11px] text-muted-foreground mt-1 line-clamp-2">
+                        {actionMeta.hint}
+                      </p>
                     </div>
 
-                    {/* Confirmation Panel inside selected item */}
-                    {isSelected && (
-                      <div className="mt-3 pt-3 border-t border-border/60 flex items-center justify-between gap-2">
-                        <span className="text-[11px] font-semibold text-muted-foreground">
-                          Confirm transition to{" "}
-                          <strong className="text-foreground">{targetConf.label}</strong>?
-                        </span>
-
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => setSelectedNextStatus(null)}
-                            className="px-2.5 py-1 rounded-lg border border-border text-[11px] font-medium text-muted-foreground hover:bg-muted"
-                          >
-                            Cancel
-                          </button>
-                          <button
-                            type="button"
-                            disabled={isChangingStatus}
-                            onClick={() => handleStatusChange(nextStatus)}
-                            className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-primary text-primary-foreground text-[11px] font-bold shadow-xs hover:bg-primary/90 disabled:opacity-50 cursor-pointer"
-                          >
-                            {isChangingStatus && (
-                              <Loader2 className="h-3 w-3 animate-spin" />
-                            )}
-                            <span>Apply Status</span>
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                    <div className="flex items-center gap-1 text-[11px] font-bold text-primary">
+                      {isChangingStatus ? (
+                        <>
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          <span>Updating...</span>
+                        </>
+                      ) : (
+                        <span>Click to execute status change</span>
+                      )}
+                    </div>
+                  </button>
                 );
               })}
             </div>
           </div>
         ) : (
-          /* Terminal State Banner */
-          <div className="p-4 rounded-2xl border border-muted-foreground/20 bg-muted/30 text-xs text-muted-foreground flex items-center gap-3">
-            <Lock className="h-4 w-4 text-muted-foreground shrink-0" />
+          <div className="p-4 rounded-2xl bg-muted/40 border border-border flex items-center gap-3 text-xs text-muted-foreground">
+            <Lock className="h-4 w-4 shrink-0" />
             <span>
-              This order has reached a terminal status (<strong>{order.status}</strong>). No further status transitions are offered to safeguard financial and inventory integrity.
+              This order has reached terminal status &apos;<strong>{order.status}</strong>&apos;. Under database schema rules, orders in terminal status cannot transition further.
             </span>
           </div>
         )}
       </div>
 
-      {/* Grid: 2 Columns for Address, Customer & Payment */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Immutable Address Snapshots */}
-        <div className="p-6 rounded-3xl border border-border/80 bg-card shadow-xs space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-border/70">
-            <div className="flex items-center gap-2">
-              <MapPin className="h-4 w-4 text-primary" />
-              <h3 className="font-bold text-sm text-foreground">
-                Immutable Address Snapshots
-              </h3>
-            </div>
-            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground bg-muted px-2 py-0.5 rounded-md">
-              Frozen at Checkout
-            </span>
-          </div>
-
-          {/* Shipping Address Snapshot */}
-          <div className="space-y-1 text-xs">
-            <span className="font-bold text-foreground uppercase tracking-wider text-[10px] text-muted-foreground">
-              Delivery Address:
-            </span>
-            <div className="p-3.5 rounded-2xl bg-muted/30 border border-border/60 flex flex-col gap-0.5">
-              <span className="font-bold text-foreground text-sm">
-                {order.shipping_address.full_name}
-              </span>
-              <span className="text-muted-foreground font-medium">
-                {order.shipping_address.phone}
-              </span>
-              <span className="text-foreground mt-1">
-                {order.shipping_address.address_line1}
-              </span>
-              {order.shipping_address.address_line2 && (
-                <span className="text-muted-foreground">
-                  {order.shipping_address.address_line2}
-                </span>
-              )}
-              <span className="text-foreground font-semibold">
-                {order.shipping_address.city}, {order.shipping_address.state} —{" "}
-                {order.shipping_address.postal_code}
-              </span>
-              <span className="text-muted-foreground">
-                {order.shipping_address.country}
+      {/* Main Order Details Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left Column: Delivery & Addresses */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Shipping Address Snapshot Card */}
+          <div className="p-6 rounded-3xl border border-border/80 bg-card shadow-xs space-y-4 print:border-black print:shadow-none">
+            <div className="flex items-center justify-between pb-3 border-b border-border/70 print:border-black">
+              <div className="flex items-center gap-2">
+                <MapPin className="h-4 w-4 text-primary print:text-black" />
+                <h3 className="font-bold text-sm text-foreground print:text-black">
+                  Shipping Address Snapshot
+                </h3>
+              </div>
+              <span className="text-[10px] font-mono text-muted-foreground print:hidden bg-muted px-2 py-0.5 rounded-md">
+                Immutable Order Record
               </span>
             </div>
+
+            {order.shipping_address ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                <div className="flex flex-col space-y-1">
+                  <span className="text-muted-foreground font-medium uppercase text-[10px] tracking-wider">
+                    Recipient Information
+                  </span>
+                  <span className="font-bold text-foreground text-sm print:text-black">
+                    {order.shipping_address.full_name}
+                  </span>
+                  <span className="text-muted-foreground font-mono">
+                    Phone: {order.shipping_address.phone}
+                  </span>
+                  {order.shipping_address.type && (
+                    <span className="inline-block mt-1 text-[10px] font-semibold text-primary capitalize">
+                      Address Type: {order.shipping_address.type}
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex flex-col space-y-1">
+                  <span className="text-muted-foreground font-medium uppercase text-[10px] tracking-wider">
+                    Destination Location
+                  </span>
+                  <span className="text-foreground font-medium print:text-black">
+                    {order.shipping_address.address_line1}
+                  </span>
+                  {order.shipping_address.address_line2 && (
+                    <span className="text-muted-foreground">
+                      {order.shipping_address.address_line2}
+                    </span>
+                  )}
+                  <span className="text-foreground font-bold print:text-black">
+                    {order.shipping_address.city}, {order.shipping_address.state} —{" "}
+                    {order.shipping_address.postal_code}
+                  </span>
+                  <span className="text-muted-foreground">
+                    {order.shipping_address.country || "India"}
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground italic">No shipping address recorded</p>
+            )}
           </div>
 
-          {/* Billing Address Snapshot */}
-          <div className="space-y-1 text-xs pt-1">
-            <span className="font-bold text-foreground uppercase tracking-wider text-[10px] text-muted-foreground">
-              Billing Address:
-            </span>
+          {/* Billing Address Card */}
+          <div className="p-6 rounded-3xl border border-border/80 bg-card shadow-xs space-y-3 print:border-black print:shadow-none">
+            <div className="flex items-center justify-between pb-3 border-b border-border/70 print:border-black">
+              <div className="flex items-center gap-2">
+                <MapPin className="h-4 w-4 text-muted-foreground print:text-black" />
+                <h3 className="font-bold text-sm text-foreground print:text-black">
+                  Billing Address Snapshot
+                </h3>
+              </div>
+            </div>
+
             {order.billing_address ? (
-              <div className="p-3.5 rounded-2xl bg-muted/30 border border-border/60 flex flex-col gap-0.5">
-                <span className="font-bold text-foreground text-sm">
+              <div className="text-xs flex flex-col space-y-1">
+                <span className="font-bold text-foreground text-sm print:text-black">
                   {order.billing_address.full_name}
                 </span>
-                <span className="text-muted-foreground font-medium">
-                  {order.billing_address.phone}
+                <span className="text-muted-foreground font-mono">
+                  Phone: {order.billing_address.phone}
                 </span>
-                <span className="text-foreground mt-1">
+                <span className="text-foreground mt-1 print:text-black">
                   {order.billing_address.address_line1}
                 </span>
                 {order.billing_address.address_line2 && (
@@ -509,65 +678,65 @@ export function OrderDetailView({ order }: OrderDetailViewProps) {
                     {order.billing_address.address_line2}
                   </span>
                 )}
-                <span className="text-foreground font-semibold">
+                <span className="text-foreground font-semibold print:text-black">
                   {order.billing_address.city}, {order.billing_address.state} —{" "}
                   {order.billing_address.postal_code}
                 </span>
               </div>
             ) : (
               <p className="text-xs text-muted-foreground italic px-1">
-                Same as delivery address.
+                Same as delivery / shipping address.
               </p>
             )}
           </div>
         </div>
 
-        {/* Customer & Payment Information */}
+        {/* Right Column: Customer & Payment Information */}
         <div className="space-y-6">
           {/* Customer Account */}
-          <div className="p-6 rounded-3xl border border-border/80 bg-card shadow-xs space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-border/70">
+          <div className="p-6 rounded-3xl border border-border/80 bg-card shadow-xs space-y-4 print:border-black print:shadow-none">
+            <div className="flex items-center justify-between pb-3 border-b border-border/70 print:border-black">
               <div className="flex items-center gap-2">
-                <User className="h-4 w-4 text-primary" />
-                <h3 className="font-bold text-sm text-foreground">
+                <User className="h-4 w-4 text-primary print:text-black" />
+                <h3 className="font-bold text-sm text-foreground print:text-black">
                   Customer Profile
                 </h3>
               </div>
-              <span className="text-[10px] font-mono text-muted-foreground">
-                UID: {order.user_id.slice(0, 8)}...
+              <span className="text-[10px] font-mono text-muted-foreground print:hidden">
+                UID: {order.user_id ? `${order.user_id.slice(0, 8)}...` : "N/A"}
               </span>
             </div>
 
             <div className="flex items-center gap-3.5">
-              <div className="h-10 w-10 rounded-2xl bg-primary/10 text-primary flex items-center justify-center font-bold text-sm">
-                {(order.customer?.full_name || order.shipping_address.full_name || "C")[0]}
+              <div className="h-10 w-10 rounded-2xl bg-primary/10 text-primary flex items-center justify-center font-bold text-sm shrink-0">
+                {(order.customer?.full_name || order.shipping_address?.full_name || "C")[0]}
               </div>
-              <div className="flex flex-col">
-                <span className="font-bold text-foreground text-sm">
-                  {order.customer?.full_name || order.shipping_address.full_name}
+              <div className="flex flex-col min-w-0">
+                <span className="font-bold text-foreground text-sm truncate print:text-black">
+                  {order.customer?.full_name || order.shipping_address?.full_name || "Guest Customer"}
                 </span>
-                <span className="text-xs text-muted-foreground">
+                <span className="text-xs text-muted-foreground truncate">
                   {order.customer?.email || "No email on record"}
                 </span>
-                <span className="text-xs text-muted-foreground font-medium">
-                  {order.customer?.phone || order.shipping_address.phone}
+                <span className="text-xs text-muted-foreground font-medium font-mono">
+                  {order.customer?.phone || order.shipping_address?.phone || "—"}
                 </span>
               </div>
             </div>
           </div>
 
           {/* Payment & Gateway Card */}
-          <div className="p-6 rounded-3xl border border-border/80 bg-card shadow-xs space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-border/70">
+          <div className="p-6 rounded-3xl border border-border/80 bg-card shadow-xs space-y-4 print:border-black print:shadow-none">
+            <div className="flex items-center justify-between pb-3 border-b border-border/70 print:border-black">
               <div className="flex items-center gap-2">
-                <CreditCard className="h-4 w-4 text-primary" />
-                <h3 className="font-bold text-sm text-foreground">
-                  Payment Information
+                <CreditCard className="h-4 w-4 text-primary print:text-black" />
+                <h3 className="font-bold text-sm text-foreground print:text-black">
+                  Payment Details
                 </h3>
               </div>
 
               {/* Payment Status Dropdown for Admin */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 print:hidden">
                 <select
                   value={order.payment_status}
                   disabled={isChangingPayment}
@@ -586,66 +755,34 @@ export function OrderDetailView({ order }: OrderDetailViewProps) {
             </div>
 
             <div className="space-y-2 text-xs">
-              <div className="flex items-center justify-between py-1 border-b border-border/50">
+              <div className="flex items-center justify-between py-1 border-b border-border/50 print:border-gray-300">
+                <span className="text-muted-foreground font-medium">Payment Status:</span>
+                <span className="font-bold uppercase text-foreground print:text-black">
+                  {order.payment_status}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between py-1 border-b border-border/50 print:border-gray-300">
                 <span className="text-muted-foreground font-medium">Payment Method:</span>
-                <span className="font-bold text-foreground uppercase flex items-center gap-1">
-                  {order.payment_method === "cod" ? (
-                    <>
-                      <Banknote className="h-3.5 w-3.5" /> Cash on Delivery (COD)
-                    </>
-                  ) : (
-                    <>
-                      <CreditCard className="h-3.5 w-3.5" /> Razorpay Online Gateway
-                    </>
-                  )}
+                <span className="font-bold text-foreground print:text-black flex items-center gap-1">
+                  {order.payment_method || "Online"}
                 </span>
               </div>
 
               {order.razorpay_order_id && (
-                <div className="flex items-center justify-between py-1 border-b border-border/50">
-                  <span className="text-muted-foreground font-medium">Razorpay Order ID:</span>
-                  <div className="flex items-center gap-1 font-mono text-foreground font-semibold">
-                    <span>{order.razorpay_order_id}</span>
-                    <button
-                      type="button"
-                      onClick={() => copyToClipboard("rzp_order", order.razorpay_order_id!)}
-                      className="p-1 hover:bg-muted text-muted-foreground"
-                    >
-                      {copiedField === "rzp_order" ? (
-                        <Check className="h-3 w-3 text-emerald-600" />
-                      ) : (
-                        <Copy className="h-3 w-3" />
-                      )}
-                    </button>
-                  </div>
+                <div className="flex items-center justify-between py-1 border-b border-border/50 print:border-gray-300">
+                  <span className="text-muted-foreground font-medium">Gateway Order ID:</span>
+                  <span className="font-mono text-foreground font-semibold print:text-black">
+                    {order.razorpay_order_id}
+                  </span>
                 </div>
               )}
 
               {order.razorpay_payment_id && (
-                <div className="flex items-center justify-between py-1 border-b border-border/50">
-                  <span className="text-muted-foreground font-medium">Payment Transaction ID:</span>
-                  <div className="flex items-center gap-1 font-mono text-foreground font-semibold">
-                    <span>{order.razorpay_payment_id}</span>
-                    <button
-                      type="button"
-                      onClick={() => copyToClipboard("rzp_pay", order.razorpay_payment_id!)}
-                      className="p-1 hover:bg-muted text-muted-foreground"
-                    >
-                      {copiedField === "rzp_pay" ? (
-                        <Check className="h-3 w-3 text-emerald-600" />
-                      ) : (
-                        <Copy className="h-3 w-3" />
-                      )}
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {order.razorpay_signature && (
-                <div className="flex items-center justify-between py-1">
-                  <span className="text-muted-foreground font-medium">Signature Status:</span>
-                  <span className="inline-flex items-center gap-1 font-bold text-emerald-600">
-                    <ShieldCheck className="h-3.5 w-3.5" /> Cryptographically Verified
+                <div className="flex items-center justify-between py-1 border-b border-border/50 print:border-gray-300">
+                  <span className="text-muted-foreground font-medium">Transaction ID:</span>
+                  <span className="font-mono text-foreground font-semibold print:text-black">
+                    {order.razorpay_payment_id}
                   </span>
                 </div>
               )}
@@ -655,22 +792,22 @@ export function OrderDetailView({ order }: OrderDetailViewProps) {
       </div>
 
       {/* Immutable Item Snapshots Table */}
-      <div className="p-6 rounded-3xl border border-border/80 bg-card shadow-xs space-y-4">
-        <div className="flex items-center justify-between pb-3 border-b border-border/70">
+      <div className="p-6 rounded-3xl border border-border/80 bg-card shadow-xs space-y-4 print:border-black print:shadow-none">
+        <div className="flex items-center justify-between pb-3 border-b border-border/70 print:border-black">
           <div className="flex items-center gap-2">
-            <Package className="h-4 w-4 text-primary" />
-            <h3 className="font-bold text-sm text-foreground">
+            <Package className="h-4 w-4 text-primary print:text-black" />
+            <h3 className="font-bold text-sm text-foreground print:text-black">
               Immutable Order Items Snapshot
             </h3>
           </div>
-          <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground bg-muted px-2 py-0.5 rounded-md">
-            {order.items.length} {order.items.length === 1 ? "Line Item" : "Line Items"}
+          <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground bg-muted px-2 py-0.5 rounded-md print:bg-transparent print:text-black">
+            {items.length} {items.length === 1 ? "Line Item" : "Line Items"}
           </span>
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-muted/40 border-b border-border/80 text-muted-foreground font-bold uppercase tracking-wider text-[10px]">
+            <thead className="bg-muted/40 border-b border-border/80 text-muted-foreground font-bold uppercase tracking-wider text-[10px] print:bg-gray-100 print:text-black print:border-black">
               <tr>
                 <th className="py-3 px-4">Item & Variant Snapshot</th>
                 <th className="py-3 px-4 text-right">Unit Price</th>
@@ -678,51 +815,69 @@ export function OrderDetailView({ order }: OrderDetailViewProps) {
                 <th className="py-3 px-4 text-right">Subtotal</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border/60">
-              {order.items.map((item) => (
-                <tr key={item.id} className="hover:bg-muted/10 transition-colors">
-                  <td className="py-3.5 px-4">
-                    <div className="flex flex-col">
-                      <span className="font-bold text-foreground text-sm">
-                        {item.product_name}
-                      </span>
-                      {item.variant_name && (
-                        <span className="text-[11px] text-muted-foreground">
-                          Variant: {item.variant_name}
-                        </span>
-                      )}
-                      {item.product_id && (
-                        <Link
-                          href={`/admin/products`}
-                          className="text-[10px] text-primary hover:underline mt-0.5 font-mono"
-                        >
-                          Catalog PID: {item.product_id.slice(0, 8)}...
-                        </Link>
-                      )}
-                    </div>
-                  </td>
-                  <td className="py-3.5 px-4 text-right font-medium text-muted-foreground">
-                    ₹{item.unit_price.toLocaleString("en-IN")}
-                  </td>
-                  <td className="py-3.5 px-4 text-center font-bold text-foreground">
-                    {item.quantity}
-                  </td>
-                  <td className="py-3.5 px-4 text-right font-bold text-foreground">
-                    ₹{item.subtotal.toLocaleString("en-IN")}
+            <tbody className="divide-y divide-border/60 print:divide-gray-300">
+              {items.length > 0 ? (
+                items.map((item) => (
+                  <tr key={item.id} className="hover:bg-muted/10 transition-colors">
+                    <td className="py-3.5 px-4">
+                      <div className="flex items-center gap-3">
+                        {item.image_url && (
+                          <div className="relative h-10 w-10 rounded-lg overflow-hidden border border-border shrink-0 print:hidden">
+                            <Image
+                              src={item.image_url}
+                              alt={item.product_name}
+                              fill
+                              className="object-cover"
+                              unoptimized
+                            />
+                          </div>
+                        )}
+                        <div className="flex flex-col min-w-0">
+                          <span className="font-bold text-foreground text-sm print:text-black">
+                            {item.product_name}
+                          </span>
+                          {item.variant_name && (
+                            <span className="text-[11px] text-muted-foreground print:text-gray-700">
+                              Variant: {item.variant_name}
+                            </span>
+                          )}
+                          {item.product_id && (
+                            <span className="text-[10px] text-muted-foreground font-mono print:hidden">
+                              PID: {item.product_id.slice(0, 8)}...
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="py-3.5 px-4 text-right font-medium text-muted-foreground print:text-black">
+                      ₹{item.unit_price.toLocaleString("en-IN")}
+                    </td>
+                    <td className="py-3.5 px-4 text-center font-bold text-foreground print:text-black">
+                      {item.quantity}
+                    </td>
+                    <td className="py-3.5 px-4 text-right font-bold text-foreground print:text-black">
+                      ₹{item.subtotal.toLocaleString("en-IN")}
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={4} className="py-8 text-center text-muted-foreground italic">
+                    No items found in this order snapshot.
                   </td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
         </div>
 
         {/* Pricing Math Summary */}
-        <div className="border-t border-border/70 pt-4 flex justify-end">
+        <div className="border-t border-border/70 pt-4 flex justify-end print:border-black">
           <div className="w-full sm:w-72 space-y-2 text-xs">
-            <div className="flex justify-between text-muted-foreground">
+            <div className="flex justify-between text-muted-foreground print:text-black">
               <span>Items Subtotal:</span>
-              <span className="font-medium text-foreground">
-                ₹{order.subtotal.toLocaleString("en-IN")}
+              <span className="font-medium text-foreground print:text-black">
+                ₹{(order.subtotal || 0).toLocaleString("en-IN")}
               </span>
             </div>
 
@@ -733,31 +888,93 @@ export function OrderDetailView({ order }: OrderDetailViewProps) {
               </div>
             )}
 
-            <div className="flex justify-between text-muted-foreground">
+            <div className="flex justify-between text-muted-foreground print:text-black">
               <span>Shipping Fee:</span>
-              <span className="font-medium text-foreground">
+              <span className="font-medium text-foreground print:text-black">
                 {order.shipping_fee === 0 ? "Free" : `₹${order.shipping_fee}`}
               </span>
             </div>
 
             {order.tax > 0 && (
-              <div className="flex justify-between text-muted-foreground">
-                <span>Estimated Tax:</span>
-                <span className="font-medium text-foreground">
+              <div className="flex justify-between text-muted-foreground print:text-black">
+                <span>Estimated Taxes / GST:</span>
+                <span className="font-medium text-foreground print:text-black">
                   ₹{order.tax.toLocaleString("en-IN")}
                 </span>
               </div>
             )}
 
-            <div className="border-t border-border/80 pt-2 flex justify-between text-sm font-black text-foreground">
+            <div className="border-t border-border/80 pt-2 flex justify-between text-sm font-black text-foreground print:text-black print:border-black">
               <span>Grand Total:</span>
-              <span className="text-base text-primary">
-                ₹{order.total.toLocaleString("en-IN")}
+              <span className="text-base text-primary print:text-black">
+                ₹{(order.total || 0).toLocaleString("en-IN")}
               </span>
             </div>
           </div>
         </div>
+
+        {/* Print Invoice Signatory Footer (Visible only during printing) */}
+        <div className="hidden print:block pt-12 mt-12 border-t border-gray-300">
+          <div className="flex justify-between items-end text-xs text-gray-700">
+            <div>
+              <p className="font-bold">Terms & Conditions:</p>
+              <p className="text-[10px] text-gray-600">
+                1. All handcrafted items are inspected for ritual purity before dispatch.
+              </p>
+              <p className="text-[10px] text-gray-600">
+                2. Sacred items damaged during logistics must be reported within 48 hours.
+              </p>
+              <p className="text-[10px] text-gray-600 mt-2 font-semibold">
+                Thank you for choosing Kanhaiya Collection Varanasi!
+              </p>
+            </div>
+            <div className="text-right">
+              <div className="w-48 border-b border-black mb-1"></div>
+              <p className="font-bold text-black">Authorized Signatory</p>
+              <p className="text-[10px] text-gray-500">For Kanhaiya Collection</p>
+            </div>
+          </div>
+        </div>
       </div>
+
+      {/* CONFIRMATION DIALOG MODAL FOR SENSITIVE TRANSITIONS */}
+      {confirmDialog.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+          <div className="w-full max-w-md bg-card border border-border rounded-3xl p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center gap-3 text-amber-600">
+              <AlertTriangle className="h-6 w-6 shrink-0" />
+              <h3 className="text-base font-bold text-foreground">
+                {confirmDialog.title}
+              </h3>
+            </div>
+
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              {confirmDialog.description}
+            </p>
+
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-border">
+              <button
+                type="button"
+                onClick={() => setConfirmDialog({ isOpen: false, targetStatus: null, title: "", description: "" })}
+                className="px-4 py-2 rounded-xl border border-border text-xs font-semibold text-muted-foreground hover:bg-muted"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => confirmDialog.targetStatus && executeStatusChange(confirmDialog.targetStatus)}
+                className={`px-4 py-2 rounded-xl text-xs font-bold text-white shadow-sm ${
+                  confirmDialog.targetStatus === "cancelled" || confirmDialog.targetStatus === "refunded"
+                    ? "bg-destructive hover:bg-destructive/90"
+                    : "bg-primary hover:bg-primary/90"
+                }`}
+              >
+                Confirm Transition
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

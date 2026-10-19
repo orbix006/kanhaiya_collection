@@ -7,6 +7,12 @@ import {
   isSafeParent,
   getDescendantCategoryIds,
 } from "@/lib/data/categories";
+import {
+  moveCategoryInStore,
+  swapCategoryOrderInStore,
+  changeCategoryHierarchyLevelInStore,
+  reorderCategoriesInStore,
+} from "@/lib/mock-data/admin-store";
 import type { Category } from "@/lib/data/homepage";
 
 export interface CategoryPayload {
@@ -200,4 +206,102 @@ export async function deleteCategoryAction(categoryId: string) {
     message: `Successfully deleted '${targetName}'${cascadeNote}.`,
     cascadeCount: descendantIds.length,
   };
+}
+
+export async function moveCategoryAction(
+  categoryId: string,
+  targetParentId?: string | null,
+  position?: "before" | "after" | "inside",
+  targetSiblingId?: string
+) {
+  if (!categoryId) return { error: "Category ID is required." };
+
+  const auth = await verifyAdminCaller();
+  if (!auth.authorized) {
+    return { error: auth.error || "Forbidden: Administrator privileges required." };
+  }
+
+  // Update in shared mock store
+  const localRes = moveCategoryInStore(categoryId, targetParentId, position, targetSiblingId);
+  if (!localRes.success) {
+    return { error: localRes.error || "Failed to move category." };
+  }
+
+  revalidatePath("/admin/categories");
+  revalidatePath("/admin/products");
+  revalidatePath("/shop");
+  revalidatePath("/categories");
+  revalidatePath("/");
+
+  return { success: true, category: localRes.category };
+}
+
+export async function swapCategoryOrderAction(categoryId: string, direction: "up" | "down") {
+  if (!categoryId) return { error: "Category ID is required." };
+
+  const auth = await verifyAdminCaller();
+  if (!auth.authorized) {
+    return { error: auth.error || "Forbidden: Administrator privileges required." };
+  }
+
+  const localRes = swapCategoryOrderInStore(categoryId, direction);
+  if (!localRes.success) {
+    return { error: localRes.error || "Failed to swap category order." };
+  }
+
+  revalidatePath("/admin/categories");
+  revalidatePath("/admin/products");
+  revalidatePath("/shop");
+  revalidatePath("/categories");
+  revalidatePath("/");
+
+  return { success: true };
+}
+
+export async function changeCategoryHierarchyLevelAction(categoryId: string, action: "indent" | "outdent") {
+  if (!categoryId) return { error: "Category ID is required." };
+
+  const auth = await verifyAdminCaller();
+  if (!auth.authorized) {
+    return { error: auth.error || "Forbidden: Administrator privileges required." };
+  }
+
+  const localRes = changeCategoryHierarchyLevelInStore(categoryId, action);
+  if (!localRes.success) {
+    return { error: localRes.error || "Failed to change category hierarchy level." };
+  }
+
+  revalidatePath("/admin/categories");
+  revalidatePath("/admin/products");
+  revalidatePath("/shop");
+  revalidatePath("/categories");
+  revalidatePath("/");
+
+  return { success: true };
+}
+
+export async function reorderCategoriesAction(
+  updates: Array<{ id: string; parent_id: string | null; display_order: number }>
+) {
+  if (!Array.isArray(updates) || updates.length === 0) {
+    return { error: "Updates list is required." };
+  }
+
+  const auth = await verifyAdminCaller();
+  if (!auth.authorized) {
+    return { error: auth.error || "Forbidden: Administrator privileges required." };
+  }
+
+  const localRes = reorderCategoriesInStore(updates);
+  if (!localRes.success) {
+    return { error: localRes.error || "Failed to reorder categories." };
+  }
+
+  revalidatePath("/admin/categories");
+  revalidatePath("/admin/products");
+  revalidatePath("/shop");
+  revalidatePath("/categories");
+  revalidatePath("/");
+
+  return { success: true };
 }
