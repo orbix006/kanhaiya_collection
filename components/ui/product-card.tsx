@@ -3,22 +3,30 @@
 import React from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Product } from "@/lib/store";
 import { ArrowUpRight } from "lucide-react";
 
-interface ProductCardProps {
-  product: Product;
-  categoryName?: string;
-  className?: string;
-  onView?: (product: Product) => void;
+interface ProductCardItem {
+  id: string;
+  slug: string;
+  name: string;
+  base_price: number;
+  compare_at_price?: number | null;
+  image_url: string | null;
 }
 
-export function ProductCard({
+interface ProductCardProps<T extends ProductCardItem> {
+  product: T;
+  categoryName?: string;
+  className?: string;
+  onView?: (product: T) => void;
+}
+
+export function ProductCard<T extends ProductCardItem>({
   product,
   categoryName,
   className = "",
   onView,
-}: ProductCardProps) {
+}: ProductCardProps<T>) {
   const formattedPrice = new Intl.NumberFormat("en-IN", {
     style: "currency",
     currency: "INR",
@@ -64,7 +72,7 @@ export function ProductCard({
 
   return (
     <Link
-      href={`/products/${product.slug}`}
+      href={`/shop/product/${product.slug}`}
       onClick={handleClick}
       className={`group relative flex flex-col rounded-2xl bg-[#FFFDF7] border border-[#E8DCC8] overflow-hidden transition-all duration-300 hover:shadow-[0_8px_24px_rgba(59,36,22,0.08)] hover:border-[#C8891A]/50 hover:-translate-y-1 ${className}`}
     >

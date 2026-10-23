@@ -86,6 +86,9 @@ export interface ShopFilterParams {
   searchQuery?: string;
   minPrice?: number;
   maxPrice?: number;
+  availability?: "in-stock" | "out-of-stock";
+  festival?: string;
+  material?: string;
   sort?: string; // 'price_asc' | 'price_desc' | 'newest' | 'top_rated' | 'featured'
   page?: number;
   pageSize?: number;
@@ -907,6 +910,9 @@ export async function getShopProducts(params: ShopFilterParams): Promise<ShopQue
     searchQuery,
     minPrice,
     maxPrice,
+    availability,
+    festival,
+    material,
     sort = "featured",
     page = 1,
     pageSize = 12,
@@ -962,7 +968,21 @@ export async function getShopProducts(params: ShopFilterParams): Promise<ShopQue
 
     // 2. Trigram-friendly name search (schema index: idx_products_name_trgm on products using gin (name gin_trgm_ops))
     if (searchQuery && searchQuery.trim()) {
-      dbQuery = dbQuery.ilike("name", `%${searchQuery.trim()}%`);
+      const term = searchQuery.trim().replace(/[^a-zA-Z0-9 _-]/g, " ").trim();
+      if (term) {
+        const matchingCategory = !activeCategory
+          ? allCategories.find((category) =>
+              (category.name + " " + category.slug).toLowerCase().includes(term.toLowerCase())
+            )
+          : null;
+
+        if (matchingCategory) {
+          const descendants = getDescendantCategoryIds(matchingCategory.id, allCategories);
+          dbQuery = dbQuery.in("category_id", [matchingCategory.id, ...descendants]);
+        } else {
+          dbQuery = dbQuery.or("name.ilike.%" + term + "%,sku.ilike.%" + term + "%");
+        }
+      }
     }
 
     // 3. Price range filters
@@ -971,6 +991,28 @@ export async function getShopProducts(params: ShopFilterParams): Promise<ShopQue
     }
     if (maxPrice !== undefined && !isNaN(maxPrice) && maxPrice > 0) {
       dbQuery = dbQuery.lte("base_price", maxPrice);
+    }
+
+    if (availability === "in-stock") {
+      dbQuery = dbQuery.gt("stock_quantity", 0);
+    } else if (availability === "out-of-stock") {
+      dbQuery = dbQuery.lte("stock_quantity", 0);
+    }
+
+    // 3b. Festival filter
+    if (festival && festival.trim()) {
+      const festTerm = festival.trim().replace(/[^a-zA-Z0-9 _-]/g, " ").trim();
+      if (festTerm) {
+        dbQuery = dbQuery.or(`description.ilike.%${festTerm}%,name.ilike.%${festTerm}%`);
+      }
+    }
+
+    // 3c. Material filter
+    if (material && material.trim()) {
+      const matTerm = material.trim().replace(/[^a-zA-Z0-9 _-]/g, " ").trim();
+      if (matTerm) {
+        dbQuery = dbQuery.or(`description.ilike.%${matTerm}%,name.ilike.%${matTerm}%`);
+      }
     }
 
     // 4. Sorting
@@ -1003,7 +1045,7 @@ export async function getShopProducts(params: ShopFilterParams): Promise<ShopQue
 
     const { data: dbProducts, count, error } = await dbQuery;
 
-    if (!error && dbProducts && dbProducts.length > 0) {
+    if (!error && dbProducts) {
       const items: ProductItem[] = (dbProducts as unknown as CatalogDbProduct[]).map((p) => {
         const sortedImages = p.product_images
           ? [...p.product_images].sort(
@@ -1079,12 +1121,25 @@ export async function getShopProducts(params: ShopFilterParams): Promise<ShopQue
   // Trigram / text search matching
   if (searchQuery && searchQuery.trim()) {
     const term = searchQuery.trim().toLowerCase();
-    filtered = filtered.filter(
-      (p) =>
-        p.name.toLowerCase().includes(term) ||
-        (p.brand && p.brand.toLowerCase().includes(term)) ||
-        (p.description && p.description.toLowerCase().includes(term))
-    );
+    const matchingCategory = !activeCategory
+      ? allCategories.find((category) =>
+          (category.name + " " + category.slug).toLowerCase().includes(term)
+        )
+      : null;
+
+    if (matchingCategory) {
+      const descendants = getDescendantCategoryIds(matchingCategory.id, allCategories);
+      const categoryIds = new Set([matchingCategory.id, ...descendants]);
+      filtered = filtered.filter((product) => product.category_id && categoryIds.has(product.category_id));
+    } else {
+      filtered = filtered.filter(
+        (p) =>
+          p.name.toLowerCase().includes(term) ||
+          (p.sku && p.sku.toLowerCase().includes(term)) ||
+          (p.brand && p.brand.toLowerCase().includes(term)) ||
+          (p.description && p.description.toLowerCase().includes(term))
+      );
+    }
   }
 
   // Price filtering
@@ -1093,6 +1148,40 @@ export async function getShopProducts(params: ShopFilterParams): Promise<ShopQue
   }
   if (maxPrice !== undefined && !isNaN(maxPrice) && maxPrice > 0) {
     filtered = filtered.filter((p) => p.base_price <= maxPrice);
+  }
+
+  if (availability === "in-stock") {
+    filtered = filtered.filter((p) => p.stock_quantity > 0);
+  } else if (availability === "out-of-stock") {
+    filtered = filtered.filter((p) => p.stock_quantity <= 0);
+  }
+
+  // Festival filtering
+  if (festival && festival.trim()) {
+    const festLower = festival.trim().toLowerCase();
+    filtered = filtered.filter((p) => {
+      const desc = (p.description || "").toLowerCase();
+      const name = (p.name || "").toLowerCase();
+      const hasVariantAttr = p.variants?.some((v) => {
+        const attrs = v.attributes || {};
+        return Object.values(attrs).some((val) => String(val).toLowerCase().includes(festLower));
+      });
+      return desc.includes(festLower) || name.includes(festLower) || Boolean(hasVariantAttr);
+    });
+  }
+
+  // Material filtering
+  if (material && material.trim()) {
+    const matLower = material.trim().toLowerCase();
+    filtered = filtered.filter((p) => {
+      const desc = (p.description || "").toLowerCase();
+      const name = (p.name || "").toLowerCase();
+      const hasVariantAttr = p.variants?.some((v) => {
+        const attrs = v.attributes || {};
+        return Object.values(attrs).some((val) => String(val).toLowerCase().includes(matLower));
+      });
+      return desc.includes(matLower) || name.includes(matLower) || Boolean(hasVariantAttr);
+    });
   }
 
   // Sorting

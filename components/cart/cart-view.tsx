@@ -17,12 +17,15 @@ import {
   Sparkles,
   Loader2,
   CheckCircle2,
+  Tag,
 } from "lucide-react";
 import type { CartSummary, CartItemWithDetails } from "@/lib/data/cart";
 import {
   updateCartQuantityAction,
   removeCartItemAction,
   clearCartAction,
+  applyCouponAction,
+  removeCouponAction,
 } from "@/app/(public)/cart/actions";
 
 interface CartViewProps {
@@ -35,6 +38,10 @@ export function CartView({ initialCart }: CartViewProps) {
   const [isPending, startTransition] = useTransition();
   const [busyItemId, setBusyItemId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [couponCodeInput, setCouponCodeInput] = useState("");
+  const [couponError, setCouponError] = useState<string | null>(null);
+  const [couponSuccess, setCouponSuccess] = useState<string | null>(null);
+  const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
 
   const dispatchCartEvent = (newCount: number) => {
     if (typeof window !== "undefined") {
@@ -158,6 +165,38 @@ export function CartView({ initialCart }: CartViewProps) {
         router.refresh();
       }
     });
+  };
+
+  const handleApplyCoupon = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!couponCodeInput.trim()) return;
+    setIsApplyingCoupon(true);
+    setCouponError(null);
+    setCouponSuccess(null);
+
+    const res = await applyCouponAction(couponCodeInput.trim());
+    setIsApplyingCoupon(false);
+
+    if (res.error) {
+      setCouponError(res.error);
+    } else if (res.success) {
+      setCouponSuccess(res.message || "Coupon applied!");
+      setCouponCodeInput("");
+      router.refresh();
+    }
+  };
+
+  const handleRemoveCoupon = async () => {
+    setIsApplyingCoupon(true);
+    setCouponError(null);
+    setCouponSuccess(null);
+
+    const res = await removeCouponAction();
+    setIsApplyingCoupon(false);
+    if (res.success) {
+      setCouponSuccess("Coupon removed.");
+      router.refresh();
+    }
   };
 
   if (cart.items.length === 0) {
@@ -451,11 +490,78 @@ export function CartView({ initialCart }: CartViewProps) {
                 </span>
               </div>
 
+              {cart.discount > 0 && (
+                <div className="flex justify-between text-emerald-600 dark:text-emerald-400 font-medium">
+                  <span className="flex items-center gap-1">
+                    <Tag className="h-3.5 w-3.5" />
+                    <span>Coupon Discount {cart.applied_coupon ? `(${cart.applied_coupon.code})` : ""}</span>
+                  </span>
+                  <span className="font-semibold">-₹{cart.discount.toLocaleString("en-IN")}</span>
+                </div>
+              )}
+
               <div className="flex justify-between text-muted-foreground">
                 <span>Taxes & GST</span>
                 <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">
                   Inclusive (18% GST)
                 </span>
+              </div>
+
+              {/* Coupon Application Box */}
+              <div className="pt-2 pb-1 border-t border-border/60">
+                {cart.applied_coupon ? (
+                  <div className="p-3 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Tag className="h-4 w-4 text-primary shrink-0" />
+                      <div className="min-w-0">
+                        <span className="font-mono font-bold text-xs text-primary block truncate">
+                          {cart.applied_coupon.code}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground block truncate">
+                          {cart.applied_coupon.description || `₹${cart.discount.toLocaleString("en-IN")} savings unlocked`}
+                        </span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleRemoveCoupon}
+                      disabled={isApplyingCoupon}
+                      className="text-[11px] font-bold text-destructive hover:underline shrink-0"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ) : (
+                  <form onSubmit={handleApplyCoupon} className="space-y-1.5">
+                    <label htmlFor="cart-coupon-input" className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                      <Tag className="h-3.5 w-3.5 text-primary" />
+                      <span>Have a Promo Coupon?</span>
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        id="cart-coupon-input"
+                        type="text"
+                        placeholder="e.g. WELCOME10"
+                        value={couponCodeInput}
+                        onChange={(e) => setCouponCodeInput(e.target.value.toUpperCase())}
+                        className="flex-1 h-9 px-3 rounded-xl border border-input bg-background text-xs uppercase font-mono tracking-wider focus:outline-hidden focus:border-primary"
+                      />
+                      <button
+                        type="submit"
+                        disabled={isApplyingCoupon || !couponCodeInput.trim()}
+                        className="h-9 px-3.5 rounded-xl bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/90 disabled:opacity-50 transition-colors shadow-2xs cursor-pointer flex items-center justify-center gap-1"
+                      >
+                        {isApplyingCoupon ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Apply"}
+                      </button>
+                    </div>
+                    {couponError && (
+                      <p className="text-[11px] font-medium text-destructive mt-1">{couponError}</p>
+                    )}
+                    {couponSuccess && (
+                      <p className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400 mt-1">{couponSuccess}</p>
+                    )}
+                  </form>
+                )}
               </div>
 
               <div className="pt-3 border-t border-border flex justify-between items-baseline">

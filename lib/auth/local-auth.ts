@@ -209,23 +209,58 @@ export async function clearSessionCookie() {
   cookieStore.delete(COOKIE_NAME);
 }
 
-export async function getLocalSession(): Promise<{
+export async function getLocalSession(
+  requestOrCookie?: Request | { headers?: Headers | { get(name: string): string | null }; cookies?: { get(name: string): { value?: string } | undefined } } | string | null
+): Promise<{
   id: string;
   email: string;
   full_name: string | null;
   role: "admin" | "user";
 } | null> {
   try {
-    const cookieStore = await cookies();
-    const rawCookie = cookieStore.get(COOKIE_NAME)?.value;
+    let rawCookie: string | undefined = undefined;
+
+    if (typeof requestOrCookie === "string") {
+      const match = requestOrCookie.match(new RegExp(`(?:^|;\\s*)${COOKIE_NAME}=([^;]*)`));
+      rawCookie = match ? match[1] : requestOrCookie;
+    } else if (requestOrCookie && typeof requestOrCookie === "object") {
+      if ("cookies" in requestOrCookie && typeof requestOrCookie.cookies?.get === "function") {
+        rawCookie = requestOrCookie.cookies.get(COOKIE_NAME)?.value;
+      }
+      if (!rawCookie && "headers" in requestOrCookie && requestOrCookie.headers) {
+        let headerValue: string | null = null;
+        if (typeof (requestOrCookie.headers as { get?: unknown }).get === "function") {
+          headerValue = (requestOrCookie.headers as Headers).get("cookie");
+        } else if ("cookie" in requestOrCookie.headers) {
+          const cookieProp = (requestOrCookie.headers as Record<string, unknown>)["cookie"];
+          if (typeof cookieProp === "string") {
+            headerValue = cookieProp;
+          }
+        }
+        if (headerValue) {
+          const match = headerValue.match(new RegExp(`(?:^|;\\s*)${COOKIE_NAME}=([^;]*)`));
+          rawCookie = match ? match[1] : undefined;
+        }
+      }
+    }
+
+    if (!rawCookie) {
+      try {
+        const cookieStore = await cookies();
+        rawCookie = cookieStore.get(COOKIE_NAME)?.value;
+      } catch {
+        // Outside Next.js request context (e.g. standalone test execution)
+      }
+    }
+
     if (!rawCookie) return null;
 
-    let parsed: any = null;
+    let parsed: { id?: string; email?: string; full_name?: string; role?: string } | null = null;
     try {
-      parsed = JSON.parse(decodeURIComponent(rawCookie));
+      parsed = JSON.parse(decodeURIComponent(rawCookie)) as { id?: string; email?: string; full_name?: string; role?: string };
     } catch {
       try {
-        parsed = JSON.parse(rawCookie);
+        parsed = JSON.parse(rawCookie) as { id?: string; email?: string; full_name?: string; role?: string };
       } catch {
         return null;
       }

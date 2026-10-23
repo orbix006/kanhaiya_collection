@@ -8,12 +8,14 @@ import {
   getFestiveOffer,
 } from "@/lib/store";
 import { getActiveFestiveCampaigns } from "@/lib/data/cms";
+import { getActiveTestimonials } from "@/lib/data/homepage";
 import { HeroBanner } from "@/components/home/hero-banner";
 import { RecentlyViewed } from "@/components/home/recently-viewed";
 import { BestsellerSection } from "@/components/home/bestseller-section";
 import { NewlyAddedSection } from "@/components/home/newly-added-section";
 import { FestiveOfferSection } from "@/components/home/festive-offer-section";
 import { CategoriesSection } from "@/components/home/categories-section";
+import { TestimonialsSection } from "@/components/home/testimonials-section";
 
 export const revalidate = 0; // Dynamic server rendering for live admin updates
 
@@ -33,6 +35,7 @@ export default async function HomePage() {
     newlyAdded,
     festiveOfferData,
     festiveCampaigns,
+    testimonials,
   ] = await Promise.all([
     getActiveBanners(),
     getActiveCategories(),
@@ -41,6 +44,7 @@ export default async function HomePage() {
     getNewlyAddedProducts(10),
     getFestiveOffer(),
     getActiveFestiveCampaigns(),
+    getActiveTestimonials(),
   ]);
 
   return (
@@ -67,6 +71,9 @@ export default async function HomePage() {
 
       {/* 6. Categories (All active categories) */}
       <CategoriesSection categories={categories} />
+
+      {/* 7. Customer Reviews & Ratings (Wall of Love) */}
+      <TestimonialsSection testimonials={testimonials} />
     </div>
   );
 }

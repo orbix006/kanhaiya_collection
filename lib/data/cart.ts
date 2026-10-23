@@ -1,5 +1,50 @@
 import { createClient } from "@/lib/supabase/server";
-import { FALLBACK_PRODUCT_DETAILS, type ProductDetail } from "@/lib/data/products";
+import { cookies } from "next/headers";
+import { getLocalSession } from "@/lib/auth/local-auth";
+import { FALLBACK_PRODUCT_DETAILS } from "@/lib/data/products";
+
+/**
+ * Resolves the active user ID for cart operations across Supabase auth,
+ * local development auth, or persistent guest cookie session.
+ */
+export async function getCartUserId(): Promise<string> {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const isConfigured =
+    Boolean(supabaseUrl) &&
+    supabaseUrl !== "https://placeholder-project.supabase.co" &&
+    supabaseUrl?.startsWith("http");
+
+  if (isConfigured) {
+    try {
+      const supabase = await createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (user?.id) return user.id;
+    } catch {
+      // Continue
+    }
+  }
+
+  // Check local development auth session
+  try {
+    const session = await getLocalSession();
+    if (session?.id) return session.id;
+  } catch {
+    // Continue
+  }
+
+  // Check guest cart cookie
+  try {
+    const cookieStore = await cookies();
+    const guestCookie = cookieStore.get("guest_cart_id")?.value;
+    if (guestCookie) return guestCookie;
+  } catch {
+    // Continue
+  }
+
+  return "demo-user-id";
+}
 
 export interface CartProductSnapshot {
   id: string;
@@ -48,6 +93,14 @@ export interface CartItemWithDetails {
   exceeds_stock: boolean;
 }
 
+export interface CartAppliedCoupon {
+  code: string;
+  discount: number;
+  discount_type: "percentage" | "fixed";
+  discount_value: number;
+  description?: string | null;
+}
+
 export interface CartSummary {
   items: CartItemWithDetails[];
   item_count: number;
@@ -61,6 +114,7 @@ export interface CartSummary {
   has_stock_exceeded: boolean;
   free_shipping_threshold: number;
   amount_for_free_shipping: number;
+  applied_coupon?: CartAppliedCoupon | null;
 }
 
 export const FREE_SHIPPING_THRESHOLD = 1999;
@@ -72,35 +126,74 @@ const demoCartStore: Map<string, Array<{ id: string; user_id: string; product_id
 /**
  * Calculates deterministic pricing totals server-side directly from item data
  */
-export function calculateCartTotals(items: CartItemWithDetails[]): Omit<CartSummary, "items" | "item_count" | "distinct_count" | "has_out_of_stock" | "has_stock_exceeded"> {
+export function calculateCartTotals(
+  items: CartItemWithDetails[],
+  appliedCouponCode?: string | null
+): Omit<CartSummary, "items" | "item_count" | "distinct_count" | "has_out_of_stock" | "has_stock_exceeded"> {
   const subtotal = items.reduce((acc, item) => acc + item.subtotal, 0);
   const shipping_fee = subtotal >= FREE_SHIPPING_THRESHOLD || subtotal === 0 ? 0 : STANDARD_SHIPPING_FEE;
-  const discount = 0;
   const tax = 0; // Prices are tax-inclusive
-  const total = subtotal - discount + shipping_fee + tax;
+
+  let discount = 0;
+  let applied_coupon: CartAppliedCoupon | null = null;
+
+  if (appliedCouponCode && subtotal > 0) {
+    try {
+      const { validateCoupon } = require("@/lib/data/coupons");
+      const result = validateCoupon(appliedCouponCode, subtotal);
+      if (result.valid && result.coupon) {
+        discount = result.discount;
+        applied_coupon = {
+          code: result.coupon.code,
+          discount: result.discount,
+          discount_type: result.coupon.discount_type,
+          discount_value: result.coupon.discount_value,
+          description: result.coupon.description,
+        };
+      }
+    } catch {
+      // Ignore coupon calculation if module loading fails
+    }
+  }
+
+  const total = Math.max(0, subtotal - discount + shipping_fee + tax);
   const amount_for_free_shipping = Math.max(0, FREE_SHIPPING_THRESHOLD - subtotal);
 
   return {
     subtotal: Math.round(subtotal * 100) / 100,
     shipping_fee,
-    discount,
+    discount: Math.round(discount * 100) / 100,
     tax,
     total: Math.round(total * 100) / 100,
     free_shipping_threshold: FREE_SHIPPING_THRESHOLD,
     amount_for_free_shipping: Math.round(amount_for_free_shipping * 100) / 100,
+    applied_coupon,
   };
 }
 
 /**
  * Fetches user's cart from database backed by `cart_items` with live stock and server-calculated totals
  */
-export async function getUserCart(userId: string): Promise<CartSummary> {
+export async function getUserCart(
+  userId: string,
+  explicitCouponCode?: string | null
+): Promise<CartSummary> {
+  let activeCouponCode = explicitCouponCode;
+  if (activeCouponCode === undefined) {
+    try {
+      const cookieStore = await cookies();
+      activeCouponCode = cookieStore.get("applied_coupon_code")?.value || null;
+    } catch {
+      activeCouponCode = null;
+    }
+  }
+
   const isConfigured =
     Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL) &&
     process.env.NEXT_PUBLIC_SUPABASE_URL !== "https://placeholder-project.supabase.co";
 
-  if (!isConfigured) {
-    // Offline / local development fallback
+  if (!isConfigured || userId.startsWith("guest_") || userId === "demo-user-id") {
+    // Offline / guest in-memory fallback
     const rawItems = demoCartStore.get(userId) || [];
     const detailedItems: CartItemWithDetails[] = [];
 
@@ -157,7 +250,7 @@ export async function getUserCart(userId: string): Promise<CartSummary> {
       });
     }
 
-    const totals = calculateCartTotals(detailedItems);
+    const totals = calculateCartTotals(detailedItems, activeCouponCode);
     const itemCount = detailedItems.reduce((acc, i) => acc + i.quantity, 0);
 
     return {
@@ -225,9 +318,44 @@ export async function getUserCart(userId: string): Promise<CartSummary> {
     };
   }
 
+  interface CartRowProductImage {
+    image_url: string;
+    is_primary?: boolean;
+    display_order?: number;
+  }
+  interface CartRowProductVariant {
+    id: string;
+    variant_name: string;
+    sku?: string | null;
+    price: number | string;
+    compare_at_price?: number | string | null;
+    stock_quantity: number | string;
+    is_active?: boolean;
+  }
+  interface CartRowProduct {
+    id: string;
+    name: string;
+    slug: string;
+    base_price: number | string;
+    compare_at_price?: number | string | null;
+    stock_quantity: number | string;
+    is_active: boolean;
+    product_images?: CartRowProductImage[];
+  }
+  interface CartRowData {
+    id: string;
+    user_id: string;
+    product_id: string;
+    variant_id: string | null;
+    quantity: number | string;
+    added_at: string;
+    products: CartRowProduct | null;
+    product_variants: CartRowProductVariant | null;
+  }
+
   const detailedItems: CartItemWithDetails[] = [];
 
-  for (const row of cartRows as any[]) {
+  for (const row of (cartRows as unknown as CartRowData[])) {
     const prod = row.products;
     if (!prod) continue;
 
@@ -237,8 +365,8 @@ export async function getUserCart(userId: string): Promise<CartSummary> {
 
     const images = prod.product_images || [];
     const primaryImg =
-      images.find((img: any) => img.is_primary)?.image_url ||
-      images.sort((a: any, b: any) => a.display_order - b.display_order)[0]?.image_url ||
+      images.find((img) => img.is_primary)?.image_url ||
+      images.sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0))[0]?.image_url ||
       null;
 
     const qty = Number(row.quantity);
@@ -267,7 +395,7 @@ export async function getUserCart(userId: string): Promise<CartSummary> {
             price: variant.price ? Number(variant.price) : null,
             compare_at_price: variant.compare_at_price ? Number(variant.compare_at_price) : null,
             stock_quantity: Number(variant.stock_quantity),
-            is_active: variant.is_active,
+            is_active: variant.is_active ?? true,
           }
         : null,
       unit_price: unitPrice,
@@ -278,7 +406,7 @@ export async function getUserCart(userId: string): Promise<CartSummary> {
     });
   }
 
-  const totals = calculateCartTotals(detailedItems);
+  const totals = calculateCartTotals(detailedItems, activeCouponCode);
   const itemCount = detailedItems.reduce((acc, i) => acc + i.quantity, 0);
 
   return {
@@ -299,7 +427,7 @@ export async function getUserCartCount(userId: string): Promise<number> {
     Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL) &&
     process.env.NEXT_PUBLIC_SUPABASE_URL !== "https://placeholder-project.supabase.co";
 
-  if (!isConfigured) {
+  if (!isConfigured || userId.startsWith("guest_") || userId === "demo-user-id") {
     const rawItems = demoCartStore.get(userId) || [];
     return rawItems.reduce((acc, i) => acc + i.quantity, 0);
   }

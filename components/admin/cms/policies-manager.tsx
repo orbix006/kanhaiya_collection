@@ -6,6 +6,7 @@ import {
   FileText,
   Shield,
   RotateCcw,
+  Truck,
   ExternalLink,
   CheckCircle2,
   AlertCircle,
@@ -17,7 +18,6 @@ import {
   Clock,
   Save,
   Check,
-  Send,
   Info,
 } from "lucide-react";
 import { savePolicyAction } from "@/app/(admin)/admin/cms/actions";
@@ -55,18 +55,25 @@ const POLICY_TYPES: {
     route: "/privacy",
   },
   {
+    type: "shipping",
+    label: "Shipping & Delivery",
+    shortDesc: "Dispatch timelines, free shipping threshold & fragile handling",
+    icon: Truck,
+    route: "/shipping",
+  },
+  {
+    type: "return",
+    label: "Return & Refund Policy",
+    shortDesc: "7-day return guarantee, inspection & refund turnaround",
+    icon: RotateCcw,
+    route: "/return",
+  },
+  {
     type: "cancellation",
     label: "Cancellation Policy",
     shortDesc: "Pre-dispatch cancellation window & refund reversal guidelines",
     icon: AlertCircle,
     route: "/cancellation",
-  },
-  {
-    type: "refund",
-    label: "Refund Policy",
-    shortDesc: "7-day return guarantee, inspection & refund turnaround",
-    icon: RotateCcw,
-    route: "/refund",
   },
 ];
 
@@ -170,25 +177,25 @@ function renderInlineMarkdown(text: string) {
 }
 
 export function PoliciesManager({ initialPolicies }: PoliciesManagerProps) {
-  const [policies, setPolicies] = useState<AdminSitePolicy[]>(initialPolicies);
+  const [policies, setPolicies] = useState<AdminSitePolicy[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const raw =
+          localStorage.getItem(ADMIN_STORE_STORAGE_KEY) ||
+          localStorage.getItem("kanhaiya_admin_mock_store_v7") ||
+          localStorage.getItem("kanhaiya_admin_mock_store_v6");
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed.sitePolicies) && parsed.sitePolicies.length > 0) {
+            return parsed.sitePolicies;
+          }
+        }
+      } catch {}
+    }
+    return initialPolicies;
+  });
   const [activeType, setActiveType] = useState<PolicyType>("terms");
   const [viewMode, setViewMode] = useState<"split" | "edit" | "preview">("split");
-
-  // Client hydration from mock store
-  useEffect(() => {
-    try {
-      const raw =
-        localStorage.getItem(ADMIN_STORE_STORAGE_KEY) ||
-        localStorage.getItem("kanhaiya_admin_mock_store_v7") ||
-        localStorage.getItem("kanhaiya_admin_mock_store_v6");
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed.sitePolicies) && parsed.sitePolicies.length > 0) {
-          setPolicies(parsed.sitePolicies);
-        }
-      }
-    } catch {}
-  }, []);
 
   // Form State for Active Policy
   const [title, setTitle] = useState(() => {
@@ -197,7 +204,7 @@ export function PoliciesManager({ initialPolicies }: PoliciesManagerProps) {
   });
   const [content, setContent] = useState(() => {
     const cur = initialPolicies.find((p) => p.type === "terms");
-    return (cur as any)?.draft_content || cur?.content || "";
+    return cur?.draft_content || cur?.content || "";
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
@@ -220,7 +227,7 @@ export function PoliciesManager({ initialPolicies }: PoliciesManagerProps) {
     const current = policies.find((p) => p.type === type);
     if (current) {
       setTitle(current.title || "");
-      setContent((current as any).draft_content || current.content || "");
+      setContent(current.draft_content || current.content || "");
     } else {
       const fallbackMeta = POLICY_TYPES.find((t) => t.type === type);
       setTitle(fallbackMeta?.label || "Policy");
@@ -238,7 +245,7 @@ export function PoliciesManager({ initialPolicies }: PoliciesManagerProps) {
   }, [activeType]);
 
   const hasDraft = useMemo(() => {
-    return Boolean((activePolicyData as any)?.draft_content);
+    return Boolean(activePolicyData?.draft_content);
   }, [activePolicyData]);
 
   const wordCount = useMemo(() => {
@@ -356,7 +363,7 @@ export function PoliciesManager({ initialPolicies }: PoliciesManagerProps) {
           const Icon = pt.icon;
           const isSelected = activeType === pt.type;
           const existing = policies.find((p) => p.type === pt.type);
-          const hasUnpublishedDraft = Boolean((existing as any)?.draft_content);
+          const hasUnpublishedDraft = Boolean(existing?.draft_content);
 
           return (
             <button

@@ -3,9 +3,11 @@ import { getAllActiveCategories, type Category, type ProductItem } from "@/lib/d
 import { getShopProducts } from "@/lib/data/products";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl =
+  const rawBaseUrl =
     process.env.NEXT_PUBLIC_SITE_URL || "https://kanhaiyacollection.com";
+  const baseUrl = rawBaseUrl.replace(/\/+$/, "");
 
+  // Canonical public static routes (excludes redirect-only routes like /faq, /refund, /privacy-policy)
   const staticRoutes: MetadataRoute.Sitemap = [
     {
       url: `${baseUrl}`,
@@ -32,7 +34,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.7,
     },
     {
-      url: `${baseUrl}/faq`,
+      url: `${baseUrl}/faqs`,
       lastModified: new Date(),
       changeFrequency: "monthly",
       priority: 0.5,
@@ -67,12 +69,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "monthly",
       priority: 0.4,
     },
-    {
-      url: `${baseUrl}/refund`,
-      lastModified: new Date(),
-      changeFrequency: "monthly",
-      priority: 0.4,
-    },
   ];
 
   try {
@@ -87,23 +83,24 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       })),
     ]);
 
-    const categoryRoutes: MetadataRoute.Sitemap = (categories || []).map(
-      (cat: Category) => ({
+    const categoryRoutes: MetadataRoute.Sitemap = (categories || [])
+      .filter((cat: Category) => cat.slug && cat.slug.trim())
+      .map((cat: Category) => ({
         url: `${baseUrl}/shop?category=${encodeURIComponent(cat.slug)}`,
         lastModified: new Date(),
         changeFrequency: "weekly",
         priority: 0.8,
-      })
-    );
+      }));
 
-    const productRoutes: MetadataRoute.Sitemap = (
-      shopResult?.products || []
-    ).map((prod: ProductItem) => ({
-      url: `${baseUrl}/shop/${encodeURIComponent(prod.slug)}`,
-      lastModified: new Date(),
-      changeFrequency: "weekly",
-      priority: 0.8,
-    }));
+    // Canonical product routes: /shop/product/[slug]
+    const productRoutes: MetadataRoute.Sitemap = (shopResult?.products || [])
+      .filter((prod: ProductItem) => prod.slug && prod.slug.trim())
+      .map((prod: ProductItem) => ({
+        url: `${baseUrl}/shop/product/${encodeURIComponent(prod.slug)}`,
+        lastModified: new Date(),
+        changeFrequency: "weekly",
+        priority: 0.8,
+      }));
 
     return [...staticRoutes, ...categoryRoutes, ...productRoutes];
   } catch (err) {

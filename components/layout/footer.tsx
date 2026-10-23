@@ -240,8 +240,8 @@ export function Footer() {
               Cancellation Policy
             </Link>
             <span className="text-[#C8891A]/30">•</span>
-            <Link href="/refund" className="hover:text-[#C8891A] transition-colors">
-              Refund Policy
+            <Link href="/return" className="hover:text-[#C8891A] transition-colors">
+              Return & Refund Policy
             </Link>
           </div>
         </div>

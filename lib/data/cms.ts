@@ -79,6 +79,33 @@ export interface Faq {
 
 export type PolicyType = "terms" | "privacy" | "cancellation" | "refund" | "shipping" | "return";
 
+export type DatabasePolicyType = "privacy" | "terms" | "shipping" | "return";
+export const SUPPORTED_DB_POLICY_TYPES: readonly DatabasePolicyType[] = [
+  "privacy",
+  "terms",
+  "shipping",
+  "return",
+] as const;
+
+export function isSupportedDatabasePolicyType(type: string): type is DatabasePolicyType {
+  return SUPPORTED_DB_POLICY_TYPES.includes(type as DatabasePolicyType);
+}
+
+/**
+ * Maps an application policy type to its corresponding database enum value if supported,
+ * or returns null if the policy type is not present in the database enum (e.g. cancellation).
+ * 'refund' is mapped to 'return' as both represent the canonical Return & Refund policy.
+ */
+export function mapPolicyTypeToDatabase(type: PolicyType): DatabasePolicyType | null {
+  if (type === "refund" || type === "return") {
+    return "return";
+  }
+  if (isSupportedDatabasePolicyType(type)) {
+    return type;
+  }
+  return null;
+}
+
 export interface SitePolicy {
   id: string;
   type: PolicyType;
@@ -378,42 +405,50 @@ For prepaid orders canceled prior to dispatch, an immediate 100% refund is initi
   refund: {
     id: "policy-refund",
     type: "refund",
-    title: "Refund Policy",
-    content: `### 1. 7-Day Refund Commitment
-We want you to have complete peace of mind when acquiring sacred brass idols, thalis, and temple textiles from Kanhaiya Collection. If you are not entirely satisfied, you may request a full refund within **7 days of delivery**.
+    title: "Return & Refund Policy",
+    content: `### 1. 7-Day Hassle-Free Returns & Refund Commitment
+We want you to have complete peace of mind when acquiring sacred brass idols, thalis, temple textiles, and puja accessories from Kanhaiya Collection. If you are not entirely satisfied, you may initiate a return or exchange within **7 days of delivery**.
 
-### 2. Refund Verification & Quality Inspection
-- All returned sacred items undergo inspection at our artisan center within 48 business hours of receipt.
-- Returned goods must be unblemished, in original brass tag seals, pooja boxes, and protective packaging.
+### 2. Return Eligibility & Quality Inspection
+- All returned sacred items undergo inspection at our artisan fulfillment center within 48 business hours of receipt.
+- Items must be in original, unblemished condition with authentic brass tag seals, pooja boxes, and protective packaging intact.
+- Custom-engraved temple thalis or bespoke sanctum murtis cannot be returned unless damaged during transit.
 
-### 3. Refund Timelines & Payment Channels
-- **Prepaid Orders (UPI, Net Banking, Credit/Debit Cards)**: Credited to the original payment source within **3 to 5 business days**.
+### 3. Complimentary Reverse Pickup
+- Submit a return request through your account orders portal or email **care@kanhaiyacollection.com** or call **+91 98290 12345** with your order number.
+- Our courier partner will schedule a complimentary reverse pickup within 48 hours.
+
+### 4. Refund Timelines & Payment Channels
+- **Prepaid Orders (UPI, Net Banking, Credit/Debit Cards)**: Credited to the original payment source within **3 to 5 business days** following quality inspection.
 - **Cash on Delivery (COD) Orders**: Refunded securely via instant UPI transfer or direct NEFT bank transfer upon receiving your verified bank details.
 
-### 4. Damaged or In-Transit Defect Protection
-In the rare event of transit damage to brass idols or glass chimneys, report within 48 hours of delivery with photos to **care@kanhaiyacollection.com** for an instant priority replacement or full refund.`,
+### 5. Damaged or In-Transit Defect Protection
+In the rare event of transit damage to brass idols or glass deepams, please report within 48 hours of delivery with photos to **care@kanhaiyacollection.com** for an instant priority replacement or full refund.`,
     display_order: 4,
   },
   return: {
     id: "policy-return",
     type: "return",
     title: "Return & Refund Policy",
-    content: `### 1. 7-Day Hassle-Free Returns
-We want you to be completely delighted with your heirloom pieces. If for any reason you are not satisfied, you may initiate a return or exchange within **7 days of delivery**.
+    content: `### 1. 7-Day Hassle-Free Returns & Refund Commitment
+We want you to have complete peace of mind when acquiring sacred brass idols, thalis, temple textiles, and puja accessories from Kanhaiya Collection. If you are not entirely satisfied, you may initiate a return or exchange within **7 days of delivery**.
 
-### 2. Eligibility Criteria
-- The garment must be in its original, unworn, unwashed condition with all original tags, authenticity seals, and packaging intact.
-- Items marked as Final Clearance or customized/altered pieces cannot be returned.
+### 2. Return Eligibility & Quality Inspection
+- All returned sacred items undergo inspection at our artisan fulfillment center within 48 business hours of receipt.
+- Items must be in original, unblemished condition with authentic brass tag seals, pooja boxes, and protective packaging intact.
+- Custom-engraved temple thalis or bespoke sanctum murtis cannot be returned unless damaged during transit.
 
-### 3. Return Pickup Process
-- Submit a return request through your account orders portal or email **support@kanhaiyacollection.com**.
+### 3. Complimentary Reverse Pickup
+- Submit a return request through your account orders portal or email **care@kanhaiyacollection.com** or call **+91 98290 12345** with your order number.
 - Our courier partner will schedule a complimentary reverse pickup within 48 hours.
 
-### 4. Refund Processing
-- Once your return is received and inspected at our Jaipur warehouse (typically 2 business days), your refund will be processed.
-- Prepaid orders: Credited back to the original source payment method within 5–7 working days.
-- COD orders: Refunded via direct bank transfer (NEFT/UPI) to the account provided by the customer.`,
-    display_order: 5,
+### 4. Refund Timelines & Payment Channels
+- **Prepaid Orders (UPI, Net Banking, Credit/Debit Cards)**: Credited to the original payment source within **3 to 5 business days** following quality inspection.
+- **Cash on Delivery (COD) Orders**: Refunded securely via instant UPI transfer or direct NEFT bank transfer upon receiving your verified bank details.
+
+### 5. Damaged or In-Transit Defect Protection
+In the rare event of transit damage to brass idols or glass deepams, please report within 48 hours of delivery with photos to **care@kanhaiyacollection.com** for an instant priority replacement or full refund.`,
+    display_order: 4,
   },
 };
 
@@ -692,7 +727,7 @@ export async function getSitePoliciesAdmin(): Promise<SitePolicy[]> {
         display_order: idx + 1,
       })) as SitePolicy[];
     }
-    const policies = (data as any[]).map((p) => ({
+    const policies = (data as Array<SitePolicy & { display_order?: number }>).map((p) => ({
       ...p,
       display_order: p.display_order ?? FALLBACK_POLICIES[p.type as PolicyType]?.display_order ?? 0,
     })) as SitePolicy[];
@@ -712,13 +747,17 @@ export async function getPublicPolicies(): Promise<SitePolicy[]> {
 }
 
 export async function getPublicPolicy(type: PolicyType): Promise<SitePolicy> {
-  if (!isSupabaseConfigured()) {
+  const dbType = mapPolicyTypeToDatabase(type);
+
+  // If Supabase is unconfigured or the policy type is not in the database enum (e.g. cancellation),
+  // safely retrieve from the in-memory/mock store or fallback policies without DB enum crashes.
+  if (!isSupabaseConfigured() || !dbType) {
     const { getMockPolicyByType } = await import("@/lib/mock-data/admin-store");
     const found = getMockPolicyByType(type);
     if (found) {
       return { ...found, display_order: 1 } as SitePolicy;
     }
-    return FALLBACK_POLICIES[type];
+    return FALLBACK_POLICIES[type] || FALLBACK_POLICIES.return;
   }
 
   try {
@@ -726,21 +765,21 @@ export async function getPublicPolicy(type: PolicyType): Promise<SitePolicy> {
     const { data, error } = await supabase
       .from("site_policies")
       .select("*")
-      .eq("type", type as any)
+      .eq("type", dbType)
       .maybeSingle();
 
     if (error || !data) {
       const { getMockPolicyByType } = await import("@/lib/mock-data/admin-store");
       const found = getMockPolicyByType(type);
       if (found) return { ...found, display_order: 1 } as SitePolicy;
-      return FALLBACK_POLICIES[type];
+      return FALLBACK_POLICIES[type] || FALLBACK_POLICIES.return;
     }
     return data as SitePolicy;
   } catch {
     const { getMockPolicyByType } = await import("@/lib/mock-data/admin-store");
     const found = getMockPolicyByType(type);
     if (found) return { ...found, display_order: 1 } as SitePolicy;
-    return FALLBACK_POLICIES[type];
+    return FALLBACK_POLICIES[type] || FALLBACK_POLICIES.return;
   }
 }
 

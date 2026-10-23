@@ -5,6 +5,7 @@ import { Footer } from "@/components/layout/footer";
 import { BrandStatement } from "@/components/layout/brand-statement";
 import { LocationProvider } from "@/components/layout/location-context";
 import { LocationModal } from "@/components/layout/location-modal";
+import { WhatsAppStickyButton } from "@/components/layout/whatsapp-sticky-button";
 
 export default async function PublicLayout({
   children,
@@ -55,6 +56,8 @@ export default async function PublicLayout({
         <BrandStatement />
         <Footer />
         <LocationModal />
+        {/* Floating WhatsApp CTA */}
+        <WhatsAppStickyButton />
       </div>
     </LocationProvider>
   );

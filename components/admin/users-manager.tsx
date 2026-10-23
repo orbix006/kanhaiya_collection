@@ -31,6 +31,7 @@ import {
   ArrowRight,
   Sparkles,
   Info,
+  MessageCircle,
 } from "lucide-react";
 import {
   type MockCustomer,
@@ -41,6 +42,7 @@ import {
   getMockCustomerOrders,
 } from "@/lib/mock-data/admin-store";
 import { updateUserRoleAction } from "@/app/(admin)/admin/users/actions";
+import { WhatsAppOutreachModal } from "./whatsapp-outreach-modal";
 
 export type CustomerProfileItem = MockCustomer;
 
@@ -80,6 +82,13 @@ export function UsersManager({
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [whatsAppModal, setWhatsAppModal] = useState<{
+    isOpen: boolean;
+    targetCustomer: MockCustomer | null;
+  }>({
+    isOpen: false,
+    targetCustomer: null,
+  });
 
   // Client hydration from localStorage mock store
   useEffect(() => {
@@ -395,6 +404,17 @@ export function UsersManager({
               </select>
             </div>
 
+            {/* WhatsApp Outreach Action */}
+            <button
+              type="button"
+              onClick={() => setWhatsAppModal({ isOpen: true, targetCustomer: null })}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#25D366] text-white hover:bg-[#20ba5a] text-xs font-bold transition-all shadow-2xs shrink-0 cursor-pointer"
+              title="Broadcast promotional offers via WhatsApp"
+            >
+              <MessageCircle className="h-4 w-4" />
+              <span>Broadcast Offer</span>
+            </button>
+
             {/* Clear Filters */}
             {(searchTerm || roleFilter !== "all") && (
               <button
@@ -579,6 +599,16 @@ export function UsersManager({
                           >
                             <Eye className="h-3.5 w-3.5" />
                             <span>Details</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setWhatsAppModal({ isOpen: true, targetCustomer: user })}
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-500/20 text-xs font-semibold transition-colors shadow-2xs"
+                            title="Send Offer to Customer via WhatsApp"
+                          >
+                            <MessageCircle className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                            <span>Send Offer</span>
                           </button>
 
                           {user.role === "admin" ? (
@@ -783,6 +813,16 @@ export function UsersManager({
                   </div>
                 </div>
               </div>
+
+              {/* WhatsApp Offer Outreach CTA */}
+              <button
+                type="button"
+                onClick={() => setWhatsAppModal({ isOpen: true, targetCustomer: selectedCustomer })}
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#25D366] text-white hover:bg-[#20ba5a] text-xs font-bold shadow-xs transition-colors cursor-pointer"
+              >
+                <MessageCircle className="h-4 w-4" />
+                <span>Send WhatsApp Offer to {selectedCustomer.full_name || "Customer"}</span>
+              </button>
 
               {/* Saved Delivery Addresses (addresses schema: type, default, lines) */}
               <div className="space-y-3">
@@ -1003,6 +1043,14 @@ export function UsersManager({
           </div>
         </div>
       )}
+
+      {/* WhatsApp Outreach Modal */}
+      <WhatsAppOutreachModal
+        isOpen={whatsAppModal.isOpen}
+        onClose={() => setWhatsAppModal({ isOpen: false, targetCustomer: null })}
+        selectedCustomer={whatsAppModal.targetCustomer}
+        allCustomers={profiles}
+      />
     </div>
   );
 }

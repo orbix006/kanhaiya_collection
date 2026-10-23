@@ -113,7 +113,7 @@ export function SettingsManager({ initialSettings }: SettingsManagerProps) {
     setToastMessage(null);
 
     try {
-      const res = await saveSiteSettingsAction("footer", settings);
+      const res = await saveSiteSettingsAction("footer", { ...settings });
       if (res.error) {
         setToastMessage({ text: res.error, type: "error" });
       } else {

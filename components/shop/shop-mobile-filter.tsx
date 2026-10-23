@@ -10,6 +10,9 @@ interface ShopMobileFilterProps {
   currentCategorySlug?: string;
   minPriceParam?: number;
   maxPriceParam?: number;
+  currentAvailability?: "in-stock" | "out-of-stock";
+  currentFestival?: string;
+  currentMaterial?: string;
   activeFilterCount: number;
 }
 
@@ -18,6 +21,9 @@ export function ShopMobileFilter({
   currentCategorySlug,
   minPriceParam,
   maxPriceParam,
+  currentAvailability,
+  currentFestival,
+  currentMaterial,
   activeFilterCount,
 }: ShopMobileFilterProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -67,6 +73,9 @@ export function ShopMobileFilter({
               currentCategorySlug={currentCategorySlug}
               minPriceParam={minPriceParam}
               maxPriceParam={maxPriceParam}
+              currentAvailability={currentAvailability}
+              currentFestival={currentFestival}
+              currentMaterial={currentMaterial}
               onFilterChange={() => setIsOpen(false)}
             />
           </div>

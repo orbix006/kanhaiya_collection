@@ -18,6 +18,7 @@ import {
   Loader2,
   Lock,
   Building,
+  Tag,
 } from "lucide-react";
 import type { CartSummary } from "@/lib/data/cart";
 import type { AddressItem } from "@/components/account/address-manager";
@@ -750,6 +751,23 @@ export function CheckoutView({
                   ₹{cart.subtotal.toLocaleString("en-IN")}
                 </span>
               </div>
+
+              {cart.discount > 0 && (
+                <div className="flex justify-between items-center text-emerald-600 dark:text-emerald-400">
+                  <span className="flex items-center gap-1.5 font-medium">
+                    <Tag className="h-3.5 w-3.5" />
+                    <span>Coupon Discount</span>
+                    {cart.applied_coupon && (
+                      <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded-sm bg-emerald-500/10 border border-emerald-500/20">
+                        {cart.applied_coupon.code}
+                      </span>
+                    )}
+                  </span>
+                  <span className="font-semibold">
+                    -₹{cart.discount.toLocaleString("en-IN")}
+                  </span>
+                </div>
+              )}
 
               <div className="flex justify-between text-muted-foreground">
                 <span className="flex items-center gap-1.5">

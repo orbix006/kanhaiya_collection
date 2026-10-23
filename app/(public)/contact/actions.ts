@@ -108,6 +108,26 @@ export async function submitContactAction(
     process.env.NEXT_PUBLIC_SUPABASE_URL !== "https://placeholder-project.supabase.co";
 
   if (!isConfigured) {
+    try {
+      const { loadMockStore, saveMockStore } = await import("@/lib/mock-data/admin-store");
+      const store = loadMockStore();
+      if (!store.contactSubmissions) store.contactSubmissions = [];
+      const newSubmission = {
+        id: `sub-${Date.now()}`,
+        name,
+        email,
+        phone,
+        message,
+        status: "new" as const,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      store.contactSubmissions.unshift(newSubmission);
+      saveMockStore(store);
+    } catch {
+      // Non-fatal
+    }
+
     return {
       success: true,
       message: "Thank you for reaching out! We have received your inquiry and our concierge team will get in touch shortly.",
@@ -185,6 +205,27 @@ export async function submitNewsletterAction(
     "Thank you for subscribing! Check your inbox soon for exclusive festive collections.";
 
   if (!isConfigured) {
+    try {
+      const { loadMockStore, saveMockStore } = await import("@/lib/mock-data/admin-store");
+      const store = loadMockStore();
+      if (!store.leads) store.leads = [];
+      const newLead = {
+        id: `lead-${Date.now()}`,
+        name,
+        email,
+        phone: null,
+        source: "newsletter" as const,
+        message: "Subscribed to storefront newsletter updates.",
+        status: "new" as const,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      store.leads.unshift(newLead);
+      saveMockStore(store);
+    } catch {
+      // Non-fatal
+    }
+
     return {
       success: true,
       message: genericSuccessMessage,

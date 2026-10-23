@@ -70,7 +70,7 @@ const STATUS_CONFIG: Record<
     icon: CheckCircle2,
   },
   processing: {
-    label: "Processing",
+    label: "Packed",
     bg: "bg-indigo-500/10",
     text: "text-indigo-700 dark:text-indigo-400",
     border: "border-indigo-500/20",

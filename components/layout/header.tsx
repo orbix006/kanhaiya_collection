@@ -14,6 +14,7 @@ import {
   Search,
 } from "lucide-react";
 import { logoutAction } from "@/app/(auth)/actions";
+import { getCartAction } from "@/app/(public)/cart/actions";
 import { useLocation } from "./location-context";
 import { SearchBar } from "./search-bar";
 import { AnnouncementRibbon } from "./announcement-ribbon";
@@ -32,6 +33,42 @@ export function Header({ user, profile }: HeaderProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+  const [cartCount, setCartCount] = useState<number>(0);
+  const mounted = React.useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
+
+  React.useEffect(() => {
+
+    const refreshCartCount = async () => {
+      try {
+        const res = await getCartAction();
+        if (res?.cart?.item_count !== undefined) {
+          setCartCount(res.cart.item_count);
+        }
+      } catch {
+        // Non-fatal
+      }
+    };
+
+    refreshCartCount();
+
+    const onCartUpdated = (e: Event) => {
+      const customEvent = e as CustomEvent<{ count?: number }>;
+      if (typeof customEvent.detail?.count === "number") {
+        setCartCount(customEvent.detail.count);
+      } else {
+        refreshCartCount();
+      }
+    };
+
+    window.addEventListener("cart:updated", onCartUpdated);
+    return () => {
+      window.removeEventListener("cart:updated", onCartUpdated);
+    };
+  }, []);
 
   const pathname = usePathname();
   const { location, openModal } = useLocation();
@@ -166,6 +203,20 @@ export function Header({ user, profile }: HeaderProps) {
                 </span>
               ) : null}
             </button>
+
+            {/* CART ICON WITH LIVE BADGE COUNT */}
+            <Link
+              href="/cart"
+              aria-label={`Shopping bag with ${mounted ? cartCount : 0} items`}
+              className="relative flex items-center justify-center h-9 w-9 sm:h-10 sm:w-10 rounded-full border border-[#E8DCC8] bg-[#FFFDF7] text-[#3B2416] hover:bg-[#F8F1E3] hover:border-[#C8891A] hover:text-[#C8891A] transition-all shadow-2xs"
+            >
+              <ShoppingBag className="h-4 w-4 sm:h-5 sm:w-5" />
+              {mounted && cartCount > 0 && (
+                <span className="absolute -top-1 -right-1 flex h-4.5 min-w-[18px] sm:h-5 sm:min-w-[20px] items-center justify-center rounded-full bg-[#C8891A] px-1 text-[10px] sm:text-[11px] font-bold text-white shadow-xs">
+                  {cartCount > 99 ? "99+" : cartCount}
+                </span>
+              )}
+            </Link>
 
             {/* LOGIN / ACCOUNT ICON (Authentication-aware Dropdown) */}
             <div className="relative">
@@ -303,6 +354,22 @@ export function Header({ user, profile }: HeaderProps) {
               }`}
             >
               Categories
+            </Link>
+
+            <Link
+              href="/cart"
+              onClick={() => setMobileMenuOpen(false)}
+              className="flex items-center justify-between py-1.5 text-base font-medium text-[#7C6753] hover:text-[#3B2416] transition-colors"
+            >
+              <span className="flex items-center gap-2">
+                <ShoppingBag className="h-4 w-4 text-[#C8891A]" />
+                <span>Shopping Bag</span>
+              </span>
+              {mounted && cartCount > 0 && (
+                <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[#C8891A] px-1.5 text-xs font-bold text-white">
+                  {cartCount}
+                </span>
+              )}
             </Link>
 
             <Link

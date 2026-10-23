@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
+import { verifyAdminCaller } from "@/lib/auth/admin";
 import {
   loadMockStore,
   saveMockStore,
@@ -16,7 +17,7 @@ import {
 
 export const dynamic = "force-dynamic";
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
     const store = loadMockStore();
     return NextResponse.json({
@@ -25,9 +26,9 @@ export async function GET(req: NextRequest) {
       categories: store.categories,
       timestamp: Date.now(),
     });
-  } catch (error: any) {
+  } catch {
     return NextResponse.json(
-      { error: error?.message || "Failed to load catalog." },
+      { error: "Failed to load catalog." },
       { status: 500 }
     );
   }
@@ -35,10 +36,26 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = await verifyAdminCaller(req);
+    if (!auth.authorized) {
+      const isUnauthenticated = Boolean(auth.error?.includes("Unauthorized"));
+      return NextResponse.json(
+        { error: auth.error || "Administrator authorization required." },
+        { status: isUnauthenticated ? 401 : 403 }
+      );
+    }
+
+    if (process.env.NODE_ENV === "production" && auth.isDemo) {
+      return NextResponse.json(
+        { error: "Local mock catalog mutations are prohibited in production." },
+        { status: 403 }
+      );
+    }
+
     const body = await req.json();
     const { action, payload, productId, categoryId, shouldArchive, targetParentId, position, targetSiblingId, direction, levelAction, updates } = body;
 
-    let result: any = { success: false };
+    let result: { success: boolean; error?: string } = { success: false };
 
     // Product Actions
     if (action === "upsert") {
@@ -67,25 +84,34 @@ export async function POST(req: NextRequest) {
         saveMockStore(body.store);
         result = { success: true };
       }
+    } else {
+      return NextResponse.json(
+        { error: "Invalid or unsupported catalog action." },
+        { status: 400 }
+      );
     }
 
     if (result.success) {
-      revalidatePath("/admin/categories");
-      revalidatePath("/admin/products");
-      revalidatePath("/shop");
-      revalidatePath("/categories");
-      revalidatePath("/");
-      if (payload?.slug) {
-        revalidatePath(`/shop/product/${payload.slug}`);
-        revalidatePath(`/product/${payload.slug}`);
-        revalidatePath(`/products/${payload.slug}`);
+      try {
+        revalidatePath("/admin/categories");
+        revalidatePath("/admin/products");
+        revalidatePath("/shop");
+        revalidatePath("/categories");
+        revalidatePath("/");
+        if (payload?.slug) {
+          revalidatePath(`/shop/product/${payload.slug}`);
+          revalidatePath(`/product/${payload.slug}`);
+          revalidatePath(`/products/${payload.slug}`);
+        }
+      } catch {
+        // Revalidation is non-fatal in standalone/script contexts
       }
     }
 
     return NextResponse.json(result);
-  } catch (error: any) {
+  } catch {
     return NextResponse.json(
-      { error: error?.message || "Catalog update failed." },
+      { error: "Catalog update failed." },
       { status: 500 }
     );
   }

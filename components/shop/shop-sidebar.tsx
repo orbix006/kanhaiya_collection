@@ -19,6 +19,9 @@ interface ShopSidebarProps {
   currentCategorySlug?: string;
   minPriceParam?: number;
   maxPriceParam?: number;
+  currentAvailability?: "in-stock" | "out-of-stock";
+  currentFestival?: string;
+  currentMaterial?: string;
   onFilterChange?: () => void; // Optional callback for mobile closing
 }
 
@@ -29,11 +32,29 @@ const PRICE_PRESETS = [
   { label: "Above ₹10,000", min: 10000, max: 50000 },
 ];
 
+const FESTIVAL_OPTIONS = [
+  { label: "All Celebrations", value: "" },
+  { label: "Janmashtami", value: "Janmashtami" },
+  { label: "Diwali", value: "Diwali" },
+  { label: "Navratri", value: "Navratri" },
+];
+
+const MATERIAL_OPTIONS = [
+  { label: "All Materials", value: "" },
+  { label: "Pure Brass", value: "Brass" },
+  { label: "Silk & Cloth", value: "Silk" },
+  { label: "Silver", value: "Silver" },
+  { label: "Wooden", value: "Wooden" },
+];
+
 export function ShopSidebar({
   categories,
   currentCategorySlug,
   minPriceParam,
   maxPriceParam,
+  currentAvailability,
+  currentFestival,
+  currentMaterial,
   onFilterChange,
 }: ShopSidebarProps) {
   const router = useRouter();
@@ -128,7 +149,10 @@ export function ShopSidebar({
     Boolean(searchParams.get("q")) ||
     Boolean(searchParams.get("minPrice")) ||
     Boolean(searchParams.get("maxPrice")) ||
-    Boolean(searchParams.get("sort"));
+    Boolean(searchParams.get("sort")) ||
+    Boolean(searchParams.get("availability")) ||
+    Boolean(searchParams.get("festival")) ||
+    Boolean(searchParams.get("material"));
 
   const renderCategoryNode = (node: CategoryTreeNode) => {
     const hasChildren = node.children && node.children.length > 0;
@@ -244,6 +268,73 @@ export function ShopSidebar({
         </div>
       </div>
 
+      {/* Availability Filter Section */}
+      <div className="flex flex-col gap-2 pt-4 border-t border-border/60">
+        <label htmlFor="shop-availability" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+          Availability
+        </label>
+        <select
+          id="shop-availability"
+          value={currentAvailability || ""}
+          onChange={(event) =>
+            updateQuery({
+              availability: event.target.value || null,
+            })
+          }
+          className="h-9 rounded-xl border border-border/80 bg-card px-3 text-xs text-foreground focus:border-primary focus:outline-hidden"
+        >
+          <option value="">Any availability</option>
+          <option value="in-stock">In stock</option>
+          <option value="out-of-stock">Out of stock</option>
+        </select>
+      </div>
+
+      {/* Festival Filter Section */}
+      <div className="flex flex-col gap-2 pt-4 border-t border-border/60">
+        <label htmlFor="shop-festival" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+          Festival & Occasion
+        </label>
+        <select
+          id="shop-festival"
+          value={currentFestival || ""}
+          onChange={(event) =>
+            updateQuery({
+              festival: event.target.value || null,
+            })
+          }
+          className="h-9 rounded-xl border border-border/80 bg-card px-3 text-xs text-foreground focus:border-primary focus:outline-hidden"
+        >
+          {FESTIVAL_OPTIONS.map((opt) => (
+            <option key={opt.label} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Material Filter Section */}
+      <div className="flex flex-col gap-2 pt-4 border-t border-border/60">
+        <label htmlFor="shop-material" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+          Material
+        </label>
+        <select
+          id="shop-material"
+          value={currentMaterial || ""}
+          onChange={(event) =>
+            updateQuery({
+              material: event.target.value || null,
+            })
+          }
+          className="h-9 rounded-xl border border-border/80 bg-card px-3 text-xs text-foreground focus:border-primary focus:outline-hidden"
+        >
+          {MATERIAL_OPTIONS.map((opt) => (
+            <option key={opt.label} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
       {/* Price Filter Section */}
       <div className="flex flex-col gap-3 pt-4 border-t border-border/60">
         <div className="flex items-center justify-between">
@@ -282,6 +373,36 @@ export function ShopSidebar({
               </button>
             );
           })}
+        </div>
+
+        {/* Interactive Price Range Slider */}
+        <div className="flex flex-col gap-1.5 pt-2">
+          <div className="flex items-center justify-between text-[11px] text-muted-foreground font-medium">
+            <span>Price Ceiling:</span>
+            <span className="font-bold text-foreground">
+              {maxPriceInput && Number(maxPriceInput) > 0
+                ? `Up to ₹${Number(maxPriceInput).toLocaleString("en-IN")}`
+                : "Up to ₹50,000+"}
+            </span>
+          </div>
+          <input
+            type="range"
+            min="500"
+            max="50000"
+            step="500"
+            value={maxPriceInput && Number(maxPriceInput) > 0 ? Number(maxPriceInput) : 50000}
+            onChange={(e) => {
+              const val = e.target.value;
+              setMaxPriceInput(val === "50000" ? "" : val);
+            }}
+            className="w-full h-1.5 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
+            aria-label="Filter maximum price slider"
+          />
+          <div className="flex justify-between text-[10px] text-muted-foreground">
+            <span>₹500</span>
+            <span>₹25,000</span>
+            <span>₹50,000+</span>
+          </div>
         </div>
 
         {/* Custom Min / Max Price Inputs */}

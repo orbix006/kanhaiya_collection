@@ -23,7 +23,7 @@ export async function middleware(request: NextRequest) {
 
   // 1. Local Development Mode Authorization Guard
   if (!isConfigured) {
-    const protectedRoutes = ["/admin", "/account", "/cart", "/checkout"];
+    const protectedRoutes = ["/admin", "/account", "/checkout"];
     const demoCookieRaw = request.cookies.get("demo_user")?.value;
     let demoUser: { email?: string; role?: string } | null = null;
     if (demoCookieRaw) {
@@ -92,8 +92,8 @@ export async function middleware(request: NextRequest) {
     // Role check is performed authoritatively in AdminLayout and server actions
   }
 
-  // Authenticated user routes protection (/account, /cart, /checkout)
-  const protectedRoutes = ["/account", "/cart", "/checkout"];
+  // Authenticated user routes protection (/account, /checkout)
+  const protectedRoutes = ["/account", "/checkout"];
   if (protectedRoutes.some((route) => pathname.startsWith(route))) {
     if (!user) {
       const loginUrl = new URL("/login", request.url);

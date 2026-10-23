@@ -17,6 +17,9 @@ export function ShopActiveFilters({ categories }: ShopActiveFiltersProps) {
   const minPrice = searchParams.get("minPrice");
   const maxPrice = searchParams.get("maxPrice");
   const sort = searchParams.get("sort");
+  const availability = searchParams.get("availability");
+  const festival = searchParams.get("festival");
+  const material = searchParams.get("material");
 
   const currentCategory = categorySlug
     ? categories.find((c) => c.slug === categorySlug)
@@ -44,7 +47,7 @@ export function ShopActiveFilters({ categories }: ShopActiveFiltersProps) {
   };
 
   const hasAnyFilter = Boolean(
-    categorySlug || searchQuery || minPrice || maxPrice || sort
+    categorySlug || searchQuery || minPrice || maxPrice || sort || availability || festival || material
   );
 
   if (!hasAnyFilter) return null;
@@ -100,6 +103,53 @@ export function ShopActiveFilters({ categories }: ShopActiveFiltersProps) {
             onClick={removePriceFilter}
             className="p-0.5 rounded-full hover:bg-primary/20 transition-colors cursor-pointer"
             aria-label="Remove price filter"
+          >
+            <X className="h-3 w-3" />
+          </button>
+        </span>
+      )}
+
+      {availability && (
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-xs font-medium text-primary animate-in fade-in">
+          <Tag className="h-3 w-3" />
+          <span>Availability: {availability === "in-stock" ? "In stock" : "Out of stock"}</span>
+          <button
+            type="button"
+            onClick={() => removeFilter("availability")}
+            className="p-0.5 rounded-full hover:bg-primary/20 transition-colors cursor-pointer"
+            aria-label="Remove availability filter"
+          >
+            <X className="h-3 w-3" />
+          </button>
+        </span>
+      )}
+
+      {/* Festival Filter Chip */}
+      {festival && (
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-xs font-medium text-amber-800 dark:text-amber-300 animate-in fade-in">
+          <Tag className="h-3 w-3" />
+          <span>Festival: {festival}</span>
+          <button
+            type="button"
+            onClick={() => removeFilter("festival")}
+            className="p-0.5 rounded-full hover:bg-amber-500/20 transition-colors cursor-pointer"
+            aria-label="Remove festival filter"
+          >
+            <X className="h-3 w-3" />
+          </button>
+        </span>
+      )}
+
+      {/* Material Filter Chip */}
+      {material && (
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-stone-500/10 border border-stone-500/20 text-xs font-medium text-stone-800 dark:text-stone-300 animate-in fade-in">
+          <Tag className="h-3 w-3" />
+          <span>Material: {material}</span>
+          <button
+            type="button"
+            onClick={() => removeFilter("material")}
+            className="p-0.5 rounded-full hover:bg-stone-500/20 transition-colors cursor-pointer"
+            aria-label="Remove material filter"
           >
             <X className="h-3 w-3" />
           </button>

@@ -6,6 +6,7 @@ import {
   getProductReviews,
   checkUserReviewEligibility,
   recordProductView,
+  getShopProducts,
 } from "@/lib/data/products";
 import { ProductDetailView } from "@/components/product/product-detail-view";
 
@@ -39,6 +40,9 @@ export async function generateMetadata({
       product.meta_description ||
       product.description ||
       `Buy authentic ${product.name} online at Kanhaiya Collection.`,
+    alternates: {
+      canonical: `/shop/product/${product.slug}`,
+    },
     openGraph: {
       title: product.name,
       description: product.description || undefined,
@@ -69,14 +73,21 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
   }
 
   // 4. Fetch reviews & eligibility in parallel
-  const [reviewsData, eligibility] = await Promise.all([
+  const [reviewsData, eligibility, relatedResult] = await Promise.all([
     getProductReviews(product.id, user?.id),
     checkUserReviewEligibility(product.id, user?.id),
+    product.category?.slug
+      ? getShopProducts({ categorySlug: product.category.slug, pageSize: 8 })
+      : Promise.resolve({ products: [] }),
   ]);
+  const relatedProducts = relatedResult.products
+    .filter((item) => item.slug !== product.slug)
+    .slice(0, 4);
 
   return (
     <ProductDetailView
       product={product}
+      relatedProducts={relatedProducts}
       reviews={reviewsData.reviews}
       userPendingReview={reviewsData.userPendingReview}
       reviewSummary={reviewsData.summary}

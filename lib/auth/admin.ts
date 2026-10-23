@@ -13,7 +13,9 @@ export interface AdminAuthResult {
  * Verifies that the caller has an active authenticated administrator role.
  * Enforces authoritative server-side role check ('admin') across both Supabase and local environments.
  */
-export async function verifyAdminCaller(): Promise<AdminAuthResult> {
+export async function verifyAdminCaller(
+  reqOrCookie?: any
+): Promise<AdminAuthResult> {
   const supabase = await createClient();
 
   if (!isSupabaseConfigured()) {
@@ -24,7 +26,7 @@ export async function verifyAdminCaller(): Promise<AdminAuthResult> {
         supabase,
       };
     }
-    const session = await getLocalSession();
+    const session = await getLocalSession(reqOrCookie);
     if (!session) {
       return {
         authorized: false,
@@ -35,6 +37,7 @@ export async function verifyAdminCaller(): Promise<AdminAuthResult> {
     if (session.role !== "admin") {
       return {
         authorized: false,
+        user: session,
         error: "Forbidden: Only administrators are authorized to perform this operation.",
         supabase,
       };
@@ -65,6 +68,7 @@ export async function verifyAdminCaller(): Promise<AdminAuthResult> {
     if (profileError || !profile || profile.role !== "admin") {
       return {
         authorized: false,
+        user,
         error: "Forbidden: Only administrators are authorized to perform this operation.",
         supabase,
       };

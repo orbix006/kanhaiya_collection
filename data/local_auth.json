@@ -29,6 +29,36 @@
       "role": "user",
       "created_at": "2026-10-14T04:29:30.412Z",
       "updated_at": "2026-10-14T04:29:30.606Z"
+    },
+    {
+      "id": "usr_99cd730598f7419dbf46fc77844a91bf",
+      "full_name": "Ordinary Customer",
+      "email": "customer-test-1792750015117@kanhaiya.test",
+      "password_hash": "2beda3c211a227aa7be5e0b5302201a31b7b34b5b2be520c44f8b5a812894463d260c82aa0c2109ba644e8e8e6de1db0bcdcf0628a2fa4da5a3be0a4c5db8764",
+      "salt": "2602bc5154c1edf532b417c35d58152d",
+      "role": "user",
+      "created_at": "2026-10-23T10:06:55.124Z",
+      "updated_at": "2026-10-23T10:06:55.124Z"
+    },
+    {
+      "id": "usr_e1141163cd6e48629e8bbbeb9063f0d7",
+      "full_name": "Ordinary Customer",
+      "email": "customer-test-1792768920010@kanhaiya.test",
+      "password_hash": "c3acb79862eb37a21551adfdb1219d80543ae060fa8110c43886c1c727b7083fbda2d9e5db7d3e899d24303c50609515961549eb11df950473e9bbd76b56fcde",
+      "salt": "d6ec4f5dbe73643bc94489e3f3d271a9",
+      "role": "user",
+      "created_at": "2026-10-23T15:22:00.017Z",
+      "updated_at": "2026-10-23T15:22:00.017Z"
+    },
+    {
+      "id": "usr_bb9830ed54e743dc9b6ab13433629b98",
+      "full_name": "Ordinary Customer",
+      "email": "customer-test-1792770516159@kanhaiya.test",
+      "password_hash": "11bc392ae28e86609678b8ea6e44c535102d7276b9fe55e4654f42d1198db8f4218cc367ba0a9e25643683ed3e1902be0b0fb20e998f5137e7d2023ee4c5c300",
+      "salt": "901925f4c3d408441a62fd42751ac06b",
+      "role": "user",
+      "created_at": "2026-10-23T15:48:36.171Z",
+      "updated_at": "2026-10-23T15:48:36.171Z"
     }
   ]
 }

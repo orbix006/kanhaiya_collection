@@ -2,10 +2,12 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 import {
   getUserCart,
   getUserCartCount,
   getDemoCartStore,
+  getCartUserId,
   type AddToCartInput,
   type UpdateQuantityInput,
 } from "@/lib/data/cart";
@@ -24,21 +26,7 @@ function safeRevalidate(path: string, type?: "layout" | "page") {
  * Server action to fetch the user's authenticated cart
  */
 export async function getCartAction() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  const isConfigured =
-    Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL) &&
-    process.env.NEXT_PUBLIC_SUPABASE_URL !== "https://placeholder-project.supabase.co";
-
-  const userId = user?.id || (!isConfigured ? "demo-user-id" : null);
-
-  if (!userId) {
-    return { error: "Please sign in to view your shopping cart.", requiresAuth: true };
-  }
-
+  const userId = await getCartUserId();
   const cart = await getUserCart(userId);
   return { success: true, cart };
 }
@@ -46,7 +34,13 @@ export async function getCartAction() {
 /**
  * Add product or variant to cart with strict stock validation
  */
-export async function addToCartAction(input: AddToCartInput) {
+export async function addToCartAction(input: AddToCartInput): Promise<{
+  success?: boolean;
+  message?: string;
+  newCartCount?: number;
+  error?: string;
+  requiresAuth?: boolean;
+}> {
   const { productId, variantId = null, quantity } = input;
 
   if (!productId || typeof quantity !== "number" || quantity <= 0) {
@@ -62,18 +56,26 @@ export async function addToCartAction(input: AddToCartInput) {
     Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL) &&
     process.env.NEXT_PUBLIC_SUPABASE_URL !== "https://placeholder-project.supabase.co";
 
-  const userId = user?.id || (!isConfigured ? "demo-user-id" : null);
+  const userId = await getCartUserId();
 
-  if (!userId) {
-    return {
-      error: "Please sign in to add items to your shopping cart.",
-      requiresAuth: true,
-    };
+  // If this is a guest user, ensure the guest cookie is initialized
+  try {
+    const cookieStore = await cookies();
+    if (!cookieStore.get("guest_cart_id") && !user) {
+      cookieStore.set("guest_cart_id", userId, {
+        path: "/",
+        httpOnly: true,
+        sameSite: "lax",
+        maxAge: 60 * 60 * 24 * 30, // 30 days
+      });
+    }
+  } catch {
+    // Non-fatal
   }
 
   try {
-    if (!isConfigured) {
-      // Local dev / offline fallback
+    if (!isConfigured || userId.startsWith("guest_") || userId === "demo-user-id") {
+      // Local dev / guest fallback
       const fallbackProd = FALLBACK_PRODUCT_DETAILS.find((p) => p.id === productId);
       if (!fallbackProd || !fallbackProd.is_active) {
         return { error: "Product not found or unavailable." };
@@ -227,8 +229,9 @@ export async function addToCartAction(input: AddToCartInput) {
       message: "Added to your shopping bag!",
       newCartCount,
     };
-  } catch (err: any) {
-    return { error: err.message || "Failed to add item to cart." };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Failed to add item to cart.";
+    return { error: message };
   }
 }
 
@@ -239,19 +242,11 @@ export async function updateCartQuantityAction(input: UpdateQuantityInput) {
   const { cartItemId, quantity } = input;
 
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
   const isConfigured =
     Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL) &&
     process.env.NEXT_PUBLIC_SUPABASE_URL !== "https://placeholder-project.supabase.co";
 
-  const userId = user?.id || (!isConfigured ? "demo-user-id" : null);
-
-  if (!userId) {
-    return { error: "Authentication required." };
-  }
+  const userId = await getCartUserId();
 
   // If quantity <= 0, remove item
   if (quantity <= 0) {
@@ -259,7 +254,7 @@ export async function updateCartQuantityAction(input: UpdateQuantityInput) {
   }
 
   try {
-    if (!isConfigured) {
+    if (!isConfigured || userId.startsWith("guest_") || userId === "demo-user-id") {
       const store = getDemoCartStore();
       const userItems = store.get(userId) || [];
       const item = userItems.find((it) => it.id === cartItemId);
@@ -311,8 +306,13 @@ export async function updateCartQuantityAction(input: UpdateQuantityInput) {
       return { error: "Cart item not found." };
     }
 
-    const prod = (cartItem as any).products;
-    const variant = (cartItem as any).product_variants;
+    interface CartItemStockCheck {
+      products?: { stock_quantity: number } | null;
+      product_variants?: { stock_quantity: number } | null;
+    }
+    const typedItem = cartItem as unknown as CartItemStockCheck;
+    const prod = typedItem.products;
+    const variant = typedItem.product_variants;
 
     const availableStock = variant
       ? variant.stock_quantity
@@ -341,8 +341,9 @@ export async function updateCartQuantityAction(input: UpdateQuantityInput) {
     safeRevalidate("/", "layout");
 
     return { success: true, newCartCount };
-  } catch (err: any) {
-    return { error: err.message || "Failed to update quantity." };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Failed to update quantity.";
+    return { error: message };
   }
 }
 
@@ -351,22 +352,14 @@ export async function updateCartQuantityAction(input: UpdateQuantityInput) {
  */
 export async function removeCartItemAction(cartItemId: string) {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
   const isConfigured =
     Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL) &&
     process.env.NEXT_PUBLIC_SUPABASE_URL !== "https://placeholder-project.supabase.co";
 
-  const userId = user?.id || (!isConfigured ? "demo-user-id" : null);
-
-  if (!userId) {
-    return { error: "Authentication required." };
-  }
+  const userId = await getCartUserId();
 
   try {
-    if (!isConfigured) {
+    if (!isConfigured || userId.startsWith("guest_") || userId === "demo-user-id") {
       const store = getDemoCartStore();
       const userItems = store.get(userId) || [];
       const filtered = userItems.filter((it) => it.id !== cartItemId);
@@ -397,8 +390,9 @@ export async function removeCartItemAction(cartItemId: string) {
     safeRevalidate("/", "layout");
 
     return { success: true, newCartCount };
-  } catch (err: any) {
-    return { error: err.message || "Failed to remove item." };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Failed to remove item.";
+    return { error: message };
   }
 }
 
@@ -407,22 +401,14 @@ export async function removeCartItemAction(cartItemId: string) {
  */
 export async function clearCartAction() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
   const isConfigured =
     Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL) &&
     process.env.NEXT_PUBLIC_SUPABASE_URL !== "https://placeholder-project.supabase.co";
 
-  const userId = user?.id || (!isConfigured ? "demo-user-id" : null);
-
-  if (!userId) {
-    return { error: "Authentication required." };
-  }
+  const userId = await getCartUserId();
 
   try {
-    if (!isConfigured) {
+    if (!isConfigured || userId.startsWith("guest_") || userId === "demo-user-id") {
       const store = getDemoCartStore();
       store.delete(userId);
 
@@ -442,12 +428,96 @@ export async function clearCartAction() {
       return { error: error.message };
     }
 
+    try {
+      const cookieStore = await cookies();
+      cookieStore.delete("applied_coupon_code");
+    } catch {
+      // Continue
+    }
+
     safeRevalidate("/cart");
     safeRevalidate("/checkout");
     safeRevalidate("/", "layout");
 
     return { success: true, newCartCount: 0 };
-  } catch (err: any) {
-    return { error: err.message || "Failed to clear cart." };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Failed to clear cart.";
+    return { error: message };
   }
 }
+
+/**
+ * Apply a promotional coupon to the active shopping session
+ */
+export async function applyCouponAction(couponCode: string) {
+  try {
+    const userId = await getCartUserId();
+    // Fetch cart with null to evaluate against pre-coupon subtotal
+    const cart = await getUserCart(userId, null);
+
+    if (cart.items.length === 0) {
+      return { error: "Please add products to your bag before applying a coupon." };
+    }
+
+    const { validateCoupon } = await import("@/lib/data/coupons");
+    const result = validateCoupon(couponCode, cart.subtotal);
+
+    if (!result.valid || !result.coupon) {
+      return { error: result.error || "Invalid coupon code." };
+    }
+
+    try {
+      const cookieStore = await cookies();
+      cookieStore.set("applied_coupon_code", result.coupon.code, {
+        path: "/",
+        httpOnly: true,
+        sameSite: "lax",
+        maxAge: 60 * 60 * 24 * 7, // 7 days
+      });
+    } catch {
+      // Context without cookies
+    }
+
+    safeRevalidate("/cart");
+    safeRevalidate("/checkout");
+
+    return {
+      success: true,
+      coupon: {
+        code: result.coupon.code,
+        discount: result.discount,
+        discount_type: result.coupon.discount_type,
+        discount_value: result.coupon.discount_value,
+        description: result.coupon.description,
+      },
+      discount: result.discount,
+      message: `Coupon "${result.coupon.code}" applied successfully! You saved ₹${result.discount.toLocaleString("en-IN")}.`,
+    };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Failed to apply coupon.";
+    return { error: msg };
+  }
+}
+
+/**
+ * Remove the applied promotional coupon from the active session
+ */
+export async function removeCouponAction() {
+  try {
+    try {
+      const cookieStore = await cookies();
+      cookieStore.delete("applied_coupon_code");
+    } catch {
+      // Context without cookies
+    }
+
+    safeRevalidate("/cart");
+    safeRevalidate("/checkout");
+
+    return { success: true, message: "Coupon removed." };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Failed to remove coupon.";
+    return { error: msg };
+  }
+}
+

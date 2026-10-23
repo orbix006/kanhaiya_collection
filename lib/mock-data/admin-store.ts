@@ -3201,7 +3201,39 @@ export function generateProductBatchNumber(): string {
   return candidate;
 }
 
-export function upsertProductInStore(prod: Partial<MockProductDetail> & { name: string; base_price: number }): {
+export interface UpsertProductImageInput {
+  id?: string;
+  product_id?: string;
+  image_url: string;
+  alt_text?: string | null;
+  display_order?: number;
+  is_primary?: boolean;
+  created_at?: string;
+}
+
+export interface UpsertProductVariantInput {
+  id?: string;
+  product_id?: string;
+  variant_name: string;
+  sku?: string | null;
+  attributes?: Record<string, string>;
+  price?: number | null;
+  compare_at_price?: number | null;
+  stock_quantity?: number;
+  image_url?: string | null;
+  is_active?: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export type UpsertProductInput = Omit<Partial<MockProductDetail>, "images" | "variants"> & {
+  name: string;
+  base_price: number;
+  images?: UpsertProductImageInput[];
+  variants?: UpsertProductVariantInput[];
+};
+
+export function upsertProductInStore(prod: UpsertProductInput): {
   success: boolean;
   error?: string;
   product?: MockProductDetail;

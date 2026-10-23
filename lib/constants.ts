@@ -1,9 +1,15 @@
+const rawBusinessPhone = process.env.NEXT_PUBLIC_BUSINESS_PHONE || "+91 98290 12345";
+const cleanBusinessPhone = rawBusinessPhone.replace(/[\s\-()]/g, "");
+const whatsappDigits = process.env.NEXT_PUBLIC_BUSINESS_WHATSAPP || cleanBusinessPhone.replace(/^\+/, "");
+
 export const CONTACT_CONFIG = {
-  // Configurable brand contact channels (no fake details displayed)
-  instagramUrl: "https://instagram.com/kanhaiyacollection",
+  // Configurable brand contact channels using verified store details
+  instagramUrl: process.env.NEXT_PUBLIC_INSTAGRAM_URL || "https://instagram.com/kanhaiya_collection",
   googleMapsUrl: "https://maps.google.com/?q=Kanhaiya+Collection",
-  whatsappUrl: "https://wa.me/910000000000",
-  phoneUrl: "tel:+910000000000",
+  whatsappUrl: `https://wa.me/${whatsappDigits}`,
+  phoneUrl: `tel:${cleanBusinessPhone}`,
+  phoneDisplay: rawBusinessPhone,
+  email: process.env.NEXT_PUBLIC_BUSINESS_EMAIL || "care@kanhaiyacollection.com",
 };
 
 export interface SearchProduct {

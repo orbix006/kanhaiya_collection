@@ -73,10 +73,17 @@ export async function createRazorpayOrder(params: CreateOrderParams): Promise<Ra
         receipt: order.receipt || null,
         status: order.status,
       };
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("[Razorpay Order Creation Error]:", err);
-      throw new Error(err.message || "Failed to initiate Razorpay order.");
+      const message = err instanceof Error ? err.message : "Failed to initiate Razorpay order.";
+      throw new Error(message);
     }
+  }
+
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      "Online payment processing via Razorpay is currently unconfigured in this environment. Please choose Cash on Delivery or configure RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in server environment variables."
+    );
   }
 
   // Development sandbox fallback if live keys aren't configured

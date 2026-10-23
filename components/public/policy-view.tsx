@@ -9,9 +9,9 @@ interface PolicyViewProps {
 const POLICY_NAV: { type: PolicyType; title: string; href: string }[] = [
   { type: "terms", title: "Terms of Service", href: "/terms" },
   { type: "privacy", title: "Privacy Policy", href: "/privacy" },
-  { type: "cancellation", title: "Cancellation Policy", href: "/cancellation" },
-  { type: "refund", title: "Refund Policy", href: "/refund" },
   { type: "shipping", title: "Shipping & Delivery", href: "/shipping" },
+  { type: "return", title: "Return & Refund Policy", href: "/return" },
+  { type: "cancellation", title: "Cancellation Policy", href: "/cancellation" },
 ];
 
 /**

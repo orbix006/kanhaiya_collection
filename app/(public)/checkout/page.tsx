@@ -1,27 +1,74 @@
-import Link from "next/link";
-import { ShieldCheck, ArrowRight } from "lucide-react";
+import type { Metadata } from "next";
+import { redirect } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
+import { getLocalSession } from "@/lib/auth/local-auth";
+import { getUserCart } from "@/lib/data/cart";
+import { CheckoutView } from "@/components/checkout/checkout-view";
+import type { AddressItem } from "@/components/account/address-manager";
 
-export default function CheckoutPage() {
+export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "Secure Checkout | Kanhaiya Collection",
+  description: "Complete your sacred order securely with Kanhaiya Collection.",
+};
+
+export default async function CheckoutPage() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const isConfigured =
+    Boolean(supabaseUrl) &&
+    supabaseUrl !== "https://placeholder-project.supabase.co" &&
+    supabaseUrl?.startsWith("http");
+
+  let userEmail = "customer@example.com";
+  let userId = "demo-user-id";
+  let savedAddresses: AddressItem[] = [];
+
+  if (isConfigured) {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      redirect("/login?redirect=/checkout");
+    }
+
+    userId = user.id;
+    userEmail = user.email || "customer@example.com";
+
+    const { data: addressRows } = await supabase
+      .from("addresses")
+      .select("*")
+      .eq("user_id", userId)
+      .order("is_default", { ascending: false })
+      .order("created_at", { ascending: false });
+
+    savedAddresses = (addressRows as AddressItem[]) || [];
+  } else {
+    // Local / development mode
+    const localSession = await getLocalSession();
+    if (!localSession) {
+      redirect("/login?redirect=/checkout");
+    }
+    userId = localSession.id;
+    userEmail = localSession.email;
+  }
+
+  const cart = await getUserCart(userId);
+
+  // If cart is empty, redirect back to cart
+  if (cart.items.length === 0) {
+    redirect("/cart");
+  }
+
   return (
-    <div className="container mx-auto max-w-4xl px-4 py-20 text-center">
-      <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-[#F8F1E3] text-[#C8891A] ring-1 ring-[#C8891A]/30 mb-6">
-        <ShieldCheck className="h-8 w-8" />
-      </div>
-      <h1 className="font-serif text-3xl sm:text-4xl font-bold tracking-tight text-[#3B2416]">
-        Secure Checkout
-      </h1>
-      <p className="mt-3 text-sm sm:text-base text-[#7C6753] max-w-md mx-auto">
-        Checkout will open once our launch orders commence.
-      </p>
-      <div className="mt-8">
-        <Link
-          href="/"
-          className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-[#C8891A] text-white text-sm font-medium hover:bg-[#B37814] transition-all shadow-xs"
-        >
-          <span>Return to Home</span>
-          <ArrowRight className="h-4 w-4" />
-        </Link>
-      </div>
-    </div>
+    <main className="min-h-screen bg-[#FFFDF7] py-6 sm:py-10">
+      <CheckoutView
+        cart={cart}
+        savedAddresses={savedAddresses}
+        userEmail={userEmail}
+      />
+    </main>
   );
 }

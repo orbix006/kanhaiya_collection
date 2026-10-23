@@ -2,7 +2,11 @@
 
 import { revalidatePath as nextRevalidatePath } from "next/cache";
 import { verifyAdminCaller } from "@/lib/auth/admin";
-import type { PolicyType } from "@/lib/data/cms";
+import {
+  type PolicyType,
+  mapPolicyTypeToDatabase,
+  SUPPORTED_DB_POLICY_TYPES,
+} from "@/lib/data/cms";
 
 function revalidatePath(path: string, type?: "layout" | "page") {
   try {
@@ -199,7 +203,7 @@ export async function saveTestimonialAction(payload: TestimonialPayload) {
 
   if (auth.isDemo) {
     const { saveMockTestimonial } = await import("@/lib/mock-data/admin-store");
-    const res = saveMockTestimonial(payload as any);
+    const res = saveMockTestimonial(payload as Parameters<typeof saveMockTestimonial>[0]);
     if (!res.success) {
       return { error: res.error || "Failed to save testimonial." };
     }
@@ -610,8 +614,14 @@ export async function savePolicyAction(
     const res = saveMockPolicy(type, validTitle, validContent, isDraft);
     if (!res.success) return { error: res.error || "Failed to save policy." };
     revalidatePath(`/${type}`);
-    if (type === "refund") revalidatePath("/return");
-    if (type === "privacy") revalidatePath("/privacy-policy");
+    if (type === "refund" || type === "return") {
+      revalidatePath("/return");
+      revalidatePath("/refund");
+    }
+    if (type === "privacy") {
+      revalidatePath("/privacy");
+      revalidatePath("/privacy-policy");
+    }
     revalidatePath("/admin/cms/policies");
     revalidatePath("/", "layout");
     return {
@@ -623,9 +633,16 @@ export async function savePolicyAction(
     };
   }
 
+  const dbType = mapPolicyTypeToDatabase(type);
+  if (!dbType) {
+    return {
+      error: `Policy type '${type}' is not yet supported in the database enum (supported: ${SUPPORTED_DB_POLICY_TYPES.join(", ")}). A database migration (ALTER TYPE public.site_policy_type ADD VALUE '${type}') is required before saving to Supabase.`,
+    };
+  }
+
   const { supabase } = auth;
-  const payload: Record<string, any> = {
-    type,
+  const payload: Record<string, unknown> = {
+    type: dbType,
     title: validTitle,
     content: validContent,
     updated_at: new Date().toISOString(),
@@ -644,6 +661,14 @@ export async function savePolicyAction(
   if (error) return { error: `Failed to save policy: ${error.message}` };
 
   revalidatePath(`/${type}`);
+  if (type === "refund" || type === "return") {
+    revalidatePath("/return");
+    revalidatePath("/refund");
+  }
+  if (type === "privacy") {
+    revalidatePath("/privacy");
+    revalidatePath("/privacy-policy");
+  }
   revalidatePath("/admin/cms/policies");
   revalidatePath("/", "layout");
   return { success: true, message: `${validTitle} updated successfully.`, policy: data };
@@ -678,7 +703,7 @@ export async function updatePolicyOrderAction(
 // 7. Site Settings Actions
 // -----------------------------------------------------------------------------
 
-export async function saveSiteSettingsAction(key: string, value: Record<string, any>) {
+export async function saveSiteSettingsAction(key: string, value: Record<string, unknown>) {
   const auth = await verifyAdminCaller();
   if (!auth.authorized) return { error: auth.error };
 

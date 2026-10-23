@@ -216,7 +216,7 @@ export function OrderDetailView({
               {[
                 { label: "Order Placed", desc: "Pending" },
                 { label: "Confirmed", desc: "Stock Allocated" },
-                { label: "Processing", desc: "Handcrafted" },
+                { label: "Packed", desc: "Preparing for dispatch" },
                 { label: "Shipped", desc: "In Transit" },
                 { label: "Delivered", desc: "Fulfilled" },
               ].map((step, idx) => {

@@ -597,6 +597,151 @@ export async function getAdminOrderById(orderId: string): Promise<OrderDetails |
   };
 }
 
+/**
+ * Public Order Tracking Lookup:
+ * Allows a patron to look up order status and milestone progression by order_number and phone/email verification.
+ * Verifies contact against shipping_address phone or email to prevent unauthorized data exposure.
+ */
+export async function trackPublicOrder(
+  orderNumber: string,
+  contact: string
+): Promise<OrderDetails | null> {
+  const cleanOrderNumber = orderNumber.trim().toUpperCase();
+  const cleanContact = contact.trim().toLowerCase().replace(/[\s\-\(\)\+]/g, "");
+
+  if (!cleanOrderNumber || !cleanContact) {
+    return null;
+  }
+
+  const isConfigured =
+    Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL) &&
+    process.env.NEXT_PUBLIC_SUPABASE_URL !== "https://placeholder-project.supabase.co";
+
+  if (!isConfigured) {
+    initDemoOrdersIfEmpty();
+    const allOrders: OrderDetails[] = [];
+    for (const list of demoOrdersStore.values()) {
+      allOrders.push(...list);
+    }
+
+    const found = allOrders.find(
+      (o) => o.order_number.toUpperCase() === cleanOrderNumber || o.id === orderNumber.trim()
+    );
+
+    if (!found) return null;
+
+    // Contact verification
+    const phone = (found.shipping_address?.phone || "").replace(/[\s\-\(\)\+]/g, "");
+    const email = (found.customer?.email || "").toLowerCase();
+    const phoneMatches = phone && (phone.endsWith(cleanContact) || cleanContact.endsWith(phone));
+    const emailMatches = email && email === contact.trim().toLowerCase();
+
+    // If contact is roughly matching or demo phone is present
+    if (!phoneMatches && !emailMatches && !phone.includes(cleanContact)) {
+      return null;
+    }
+
+    return found;
+  }
+
+  const supabase = await createClient();
+  const { data: order, error } = await supabase
+    .from("orders")
+    .select(`
+      id,
+      user_id,
+      order_number,
+      status,
+      payment_status,
+      payment_method,
+      razorpay_order_id,
+      razorpay_payment_id,
+      razorpay_signature,
+      subtotal,
+      discount,
+      shipping_fee,
+      tax,
+      total,
+      shipping_address,
+      billing_address,
+      placed_at,
+      updated_at,
+      order_items (
+        id,
+        order_id,
+        product_id,
+        variant_id,
+        product_name,
+        variant_name,
+        unit_price,
+        quantity,
+        subtotal
+      )
+    `)
+    .ilike("order_number", cleanOrderNumber)
+    .maybeSingle();
+
+  if (error || !order) {
+    return null;
+  }
+
+  const shippingAddr = order.shipping_address as any;
+  const billingAddr = order.billing_address as any;
+  const phone = (shippingAddr?.phone || billingAddr?.phone || "").replace(/[\s\-\(\)\+]/g, "");
+  const shippingEmail = (shippingAddr?.email || billingAddr?.email || "").trim().toLowerCase();
+  const phoneMatches = phone && (phone.endsWith(cleanContact) || cleanContact.endsWith(phone));
+  const emailMatches = shippingEmail && shippingEmail === contact.trim().toLowerCase();
+
+  if (!phoneMatches && !emailMatches) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("phone")
+      .eq("id", order.user_id)
+      .maybeSingle();
+
+    const profilePhone = (profile?.phone || "").replace(/[\s\-\(\)\+]/g, "");
+    const profilePhoneMatches = profilePhone && (profilePhone.endsWith(cleanContact) || cleanContact.endsWith(profilePhone));
+
+    if (!profilePhoneMatches) {
+      return null;
+    }
+  }
+
+  return {
+    id: order.id,
+    user_id: order.user_id,
+    order_number: order.order_number,
+    status: order.status as OrderStatus,
+    payment_status: order.payment_status as PaymentStatus,
+    payment_method: order.payment_method,
+    razorpay_order_id: order.razorpay_order_id,
+    razorpay_payment_id: order.razorpay_payment_id,
+    razorpay_signature: order.razorpay_signature,
+    subtotal: Number(order.subtotal),
+    discount: Number(order.discount),
+    shipping_fee: Number(order.shipping_fee),
+    tax: Number(order.tax),
+    total: Number(order.total),
+    shipping_address: order.shipping_address as unknown as AddressSnapshot,
+    billing_address: order.billing_address as unknown as AddressSnapshot | null,
+    placed_at: order.placed_at,
+    updated_at: order.updated_at,
+    items: (order.order_items || []).map((it: any) => ({
+      id: it.id,
+      order_id: it.order_id,
+      product_id: it.product_id,
+      variant_id: it.variant_id,
+      product_name: it.product_name,
+      variant_name: it.variant_name,
+      unit_price: Number(it.unit_price),
+      quantity: Number(it.quantity),
+      subtotal: Number(it.subtotal),
+    })),
+    can_cancel: order.status === "pending",
+  };
+}
+
 export function getDemoOrdersStore() {
   return demoOrdersStore;
 }
+

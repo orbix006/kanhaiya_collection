@@ -15,12 +15,15 @@ import type {
   ProductReviewItem,
   ProductRatingSummary,
 } from "@/lib/data/products";
+import type { ProductItem } from "@/lib/data/homepage";
 import { ProductGallery } from "./product-gallery";
 import { ProductPurchasePanel } from "./product-purchase-panel";
 import { ProductReviewsSection } from "./product-reviews-section";
+import { ProductCard } from "@/components/ui/product-card";
 
 interface ProductDetailViewProps {
   product: ProductDetail;
+  relatedProducts: ProductItem[];
   reviews: ProductReviewItem[];
   userPendingReview: ProductReviewItem | null;
   reviewSummary: ProductRatingSummary;
@@ -33,6 +36,7 @@ interface ProductDetailViewProps {
 
 export function ProductDetailView({
   product,
+  relatedProducts,
   reviews,
   userPendingReview,
   reviewSummary,
@@ -165,7 +169,7 @@ export function ProductDetailView({
           <div>
             <div className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-primary mb-1">
               <Sparkles className="h-3.5 w-3.5" />
-              <span>Authentic Craftsmanship</span>
+              <span>Product Information</span>
             </div>
             <h2 className="text-2xl font-bold tracking-tight text-foreground">
               Product Overview & Description
@@ -173,30 +177,10 @@ export function ProductDetailView({
           </div>
 
           <p className="text-sm sm:text-base text-foreground/80 leading-relaxed whitespace-pre-line">
-            {product.description ||
-              "Handcrafted with exquisite attention to detail using pure fabrics and artisanal techniques."}
+            {product.description || "Product details have not been added yet."}
           </p>
 
-          {/* Key Product Highlights */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4">
-            <div className="p-4 rounded-2xl border border-border/70 bg-card flex flex-col gap-1">
-              <span className="text-xs font-bold uppercase tracking-wider text-primary">
-                Fabric & Material
-              </span>
-              <span className="text-xs text-muted-foreground">
-                100% pure authentic handloom weave with natural dye techniques.
-              </span>
-            </div>
 
-            <div className="p-4 rounded-2xl border border-border/70 bg-card flex flex-col gap-1">
-              <span className="text-xs font-bold uppercase tracking-wider text-primary">
-                Care Instructions
-              </span>
-              <span className="text-xs text-muted-foreground">
-                Dry clean recommended for initial wears. Store in a cool, moisture-free closet.
-              </span>
-            </div>
-          </div>
         </div>
 
         {/* Specifications Table */}
@@ -216,26 +200,36 @@ export function ProductDetailView({
             <div className="py-2.5 flex justify-between">
               <dt className="text-muted-foreground">Category</dt>
               <dd className="font-semibold text-foreground">
-                {product.category?.name || "Apparel"}
+                {product.category?.name || "Uncategorized"}
               </dd>
             </div>
             <div className="py-2.5 flex justify-between">
               <dt className="text-muted-foreground">SKU Code</dt>
               <dd className="font-mono text-foreground">
-                {product.sku || "N/A"}
+                {product.sku || "Not assigned"}
               </dd>
-            </div>
-            <div className="py-2.5 flex justify-between">
-              <dt className="text-muted-foreground">Country of Origin</dt>
-              <dd className="font-semibold text-foreground">India</dd>
-            </div>
-            <div className="py-2.5 flex justify-between">
-              <dt className="text-muted-foreground">Warranty / Guarantee</dt>
-              <dd className="font-semibold text-foreground">Authenticity Guaranteed</dd>
             </div>
           </dl>
         </div>
       </div>
+
+      {relatedProducts.length > 0 && (
+        <section className="mt-16 border-t border-border/70 pt-12" aria-label="Related products">
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold tracking-tight text-foreground">Related Products</h2>
+            <p className="mt-1 text-sm text-muted-foreground">More items from this category.</p>
+          </div>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 sm:gap-6 md:grid-cols-4">
+            {relatedProducts.map((item) => (
+              <ProductCard
+                key={item.id}
+                product={item}
+                categoryName={item.category_id === product.category_id ? product.category?.name || undefined : undefined}
+              />
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Customer Reviews & Moderation Section */}
       <div className="mt-16">

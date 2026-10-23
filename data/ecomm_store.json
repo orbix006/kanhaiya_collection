@@ -1,14 +1,14 @@
 {
   "banners": [
     {
-      "id": "ban-rk-collection",
-      "image_url": "https://images.unsplash.com/photo-1599707367072-cd6ada2bc375?auto=format&fit=crop&w=1600&q=80",
-      "title": "Divine Brass Radha Krishna Murtis — Handcrafted in Varanasi",
-      "link_url": "/shop?category=idols",
+      "id": "ban-sacred-aromas",
+      "image_url": "https://images.unsplash.com/photo-1608571423902-eed4a5ad8108?auto=format&fit=crop&w=1600&q=80",
+      "title": "Pure Temple Chandan & Handcrafted Cow-Dung Sambrani Dhoop",
+      "link_url": "/shop?category=sacred-aromas",
       "display_order": 1,
       "is_active": true,
-      "created_at": "2026-10-01T10:00:00.000Z",
-      "updated_at": "2026-10-01T10:00:00.000Z"
+      "created_at": "2026-10-03T10:00:00.000Z",
+      "updated_at": "2026-10-23T15:50:48.969Z"
     },
     {
       "id": "ban-akhand-diya",
@@ -18,17 +18,17 @@
       "display_order": 2,
       "is_active": true,
       "created_at": "2026-10-02T10:00:00.000Z",
-      "updated_at": "2026-10-02T10:00:00.000Z"
+      "updated_at": "2026-10-23T15:50:48.969Z"
     },
     {
-      "id": "ban-sacred-aromas",
-      "image_url": "https://images.unsplash.com/photo-1608571423902-eed4a5ad8108?auto=format&fit=crop&w=1600&q=80",
-      "title": "Pure Temple Chandan & Handcrafted Cow-Dung Sambrani Dhoop",
-      "link_url": "/shop?category=sacred-aromas",
+      "id": "ban-rk-collection",
+      "image_url": "https://images.unsplash.com/photo-1599707367072-cd6ada2bc375?auto=format&fit=crop&w=1600&q=80",
+      "title": "Divine Brass Radha Krishna Murtis — Handcrafted in Varanasi",
+      "link_url": "/shop?category=idols",
       "display_order": 3,
       "is_active": true,
-      "created_at": "2026-10-03T10:00:00.000Z",
-      "updated_at": "2026-10-03T10:00:00.000Z"
+      "created_at": "2026-10-01T10:00:00.000Z",
+      "updated_at": "2026-10-23T15:50:48.969Z"
     },
     {
       "id": "ban-temple-brass",
@@ -170,7 +170,7 @@
       "is_active": true,
       "show_on_homepage": true,
       "created_at": "2026-10-02T13:00:00.000Z",
-      "updated_at": "2026-10-19T12:38:31.381Z"
+      "updated_at": "2026-10-23T15:39:12.806Z"
     },
     {
       "id": "cat-radha-krishna",
@@ -183,7 +183,7 @@
       "is_active": true,
       "show_on_homepage": true,
       "created_at": "2026-10-03T10:00:00.000Z",
-      "updated_at": "2026-10-19T12:38:31.408Z"
+      "updated_at": "2026-10-23T15:39:12.817Z"
     },
     {
       "id": "cat-laddu-gopal",
@@ -196,7 +196,7 @@
       "is_active": true,
       "show_on_homepage": true,
       "created_at": "2026-10-03T10:30:00.000Z",
-      "updated_at": "2026-10-19T12:38:31.408Z"
+      "updated_at": "2026-10-23T15:39:12.817Z"
     },
     {
       "id": "cat-glass-diya",
@@ -240,7 +240,33 @@
   ],
   "products": [
     {
-      "id": "prod-1792413511500-5krv",
+      "id": "prod-1792770516255-cji8",
+      "category_id": "cat_sarees",
+      "name": "Security Test Silk Sari 1792770516236",
+      "slug": "security-test-silk-sari-1792770516236",
+      "description": "Security Test Silk Sari 1792770516236 - Handcrafted authentic piece from Kanhaiya Collection.",
+      "brand": "Kanhaiya Collection",
+      "sku": "KC-PRD-008",
+      "batch_number": "BATCH-202610-0008",
+      "base_price": 4999,
+      "compare_at_price": null,
+      "stock_quantity": 10,
+      "sold_count": 0,
+      "is_active": false,
+      "is_featured_top_seller": false,
+      "top_seller_display_order": null,
+      "avg_rating": 0,
+      "review_count": 0,
+      "meta_title": null,
+      "meta_description": null,
+      "created_at": "2026-10-23T15:48:36.255Z",
+      "updated_at": "2026-10-23T15:48:36.255Z",
+      "category": null,
+      "images": [],
+      "variants": []
+    },
+    {
+      "id": "prod-1792769952868-h0iu",
       "category_id": null,
       "name": "Consecrated Brass Maha Meru Yantra (5 Inch)",
       "slug": "consecrated-brass-maha-meru-5-inch",
@@ -259,18 +285,18 @@
       "review_count": 0,
       "meta_title": null,
       "meta_description": null,
-      "created_at": "2026-10-19T12:38:31.500Z",
-      "updated_at": "2026-10-19T12:38:31.500Z",
+      "created_at": "2026-10-23T15:39:12.868Z",
+      "updated_at": "2026-10-23T15:39:12.868Z",
       "category": null,
       "images": [
         {
           "id": "img-y1",
-          "product_id": "prod-1792413511500-5krv",
+          "product_id": "prod-1792769952868-h0iu",
           "image_url": "https://images.unsplash.com/photo-yantra-1.jpg",
           "alt_text": "Yantra view",
           "display_order": 1,
           "is_primary": true,
-          "created_at": "2026-10-19T12:38:31.467Z"
+          "created_at": "2026-10-23T15:39:12.863Z"
         }
       ],
       "variants": []
@@ -433,8 +459,8 @@
       "batch_number": "BATCH-202609-0003",
       "base_price": 3499,
       "compare_at_price": 4299,
-      "stock_quantity": 12,
-      "sold_count": 42,
+      "stock_quantity": 10,
+      "sold_count": 44,
       "is_active": true,
       "is_featured_top_seller": false,
       "top_seller_display_order": null,
@@ -466,7 +492,7 @@
           },
           "price": 3499,
           "compare_at_price": 4299,
-          "stock_quantity": 12,
+          "stock_quantity": 10,
           "image_url": "https://images.unsplash.com/photo-1582738411706-bfc8e691d1c2?auto=format&fit=crop&w=800&q=80",
           "is_active": true,
           "created_at": "2026-09-30T10:00:00.000Z",
@@ -485,8 +511,8 @@
       "batch_number": "BATCH-202609-0004",
       "base_price": 349,
       "compare_at_price": 449,
-      "stock_quantity": 120,
-      "sold_count": 210,
+      "stock_quantity": 119,
+      "sold_count": 211,
       "is_active": true,
       "is_featured_top_seller": true,
       "top_seller_display_order": 3,
@@ -518,7 +544,7 @@
           },
           "price": 349,
           "compare_at_price": 449,
-          "stock_quantity": 80,
+          "stock_quantity": 79,
           "image_url": "https://images.unsplash.com/photo-1608571423902-eed4a5ad8108?auto=format&fit=crop&w=800&q=80",
           "is_active": true,
           "created_at": "2026-10-01T09:00:00.000Z",
@@ -680,28 +706,28 @@
   },
   "announcements": [
     {
-      "id": "ann-1",
-      "text": "Shubh Deepavali Special: Complimentary Brass Diya Set with sacred orders above ₹2,499. Use code DIWALI108.",
+      "id": "ann-3",
+      "text": "Authentic Shilpa Shastra Brass Idols hand-sculpted by master sthapatis and artisans in Varanasi.",
       "is_active": true,
-      "display_order": 1,
-      "created_at": "2026-10-01T10:00:00.000Z",
-      "updated_at": "2026-10-01T10:00:00.000Z"
+      "display_order": 2,
+      "created_at": "2026-10-03T10:00:00.000Z",
+      "updated_at": "2026-10-23T15:50:49.088Z"
     },
     {
       "id": "ann-2",
       "text": "Free Nationwide Sacred Dispatch across India on all consecrated Puja Thalis, Akhand Diyas & Murtis.",
       "is_active": true,
-      "display_order": 2,
+      "display_order": 3,
       "created_at": "2026-10-02T10:00:00.000Z",
-      "updated_at": "2026-10-02T10:00:00.000Z"
+      "updated_at": "2026-10-23T15:50:49.088Z"
     },
     {
-      "id": "ann-3",
-      "text": "Authentic Shilpa Shastra Brass Idols hand-sculpted by master sthapatis and artisans in Varanasi.",
+      "id": "ann-1",
+      "text": "Shubh Deepavali Special: Complimentary Brass Diya Set with sacred orders above ₹2,499. Use code DIWALI108.",
       "is_active": true,
-      "display_order": 3,
-      "created_at": "2026-10-03T10:00:00.000Z",
-      "updated_at": "2026-10-03T10:00:00.000Z"
+      "display_order": 4,
+      "created_at": "2026-10-01T10:00:00.000Z",
+      "updated_at": "2026-10-23T15:50:49.088Z"
     }
   ],
   "festive_campaigns": [
@@ -766,8 +792,8 @@
       "phone": "+91 98220 11223",
       "message": "Seeking custom 24-inch brass Radha Krishna murti consecrated for new temple consecration in Varanasi.",
       "status": "new",
-      "created_at": "2026-10-19T08:38:29.952Z",
-      "updated_at": "2026-10-19T08:38:29.952Z"
+      "created_at": "2026-10-23T11:39:11.934Z",
+      "updated_at": "2026-10-23T11:39:11.934Z"
     },
     {
       "id": "sub-2",
@@ -776,8 +802,8 @@
       "phone": "+91 97110 33445",
       "message": "Would like to inquire about wholesale Akhand Diya gift packaging for Diwali corporate gifting.",
       "status": "in_progress",
-      "created_at": "2026-10-18T00:38:29.952Z",
-      "updated_at": "2026-10-19T00:38:29.952Z"
+      "created_at": "2026-10-22T03:39:11.934Z",
+      "updated_at": "2026-10-23T03:39:11.934Z"
     },
     {
       "id": "sub-3",
@@ -786,8 +812,8 @@
       "phone": "+91 98334 55667",
       "message": "Requesting certified chemical test report and brass purity guarantee certificate for temple bell installation.",
       "status": "resolved",
-      "created_at": "2026-10-16T12:38:29.952Z",
-      "updated_at": "2026-10-18T18:38:29.952Z"
+      "created_at": "2026-10-20T15:39:11.934Z",
+      "updated_at": "2026-10-22T21:39:11.934Z"
     },
     {
       "id": "sub-4",
@@ -796,8 +822,8 @@
       "phone": "+91 94450 67890",
       "message": "Can the Ashtalakshmi puja thali set be engraved with custom family kuladevata shlokas on the outer rim?",
       "status": "new",
-      "created_at": "2026-10-19T10:38:29.952Z",
-      "updated_at": "2026-10-19T10:38:29.952Z"
+      "created_at": "2026-10-23T13:39:11.934Z",
+      "updated_at": "2026-10-23T13:39:11.934Z"
     }
   ],
   "leads": [
@@ -809,8 +835,8 @@
       "source": "Temple Bulk Order Inquiry",
       "message": "Requested catalog and pricing schedule for 50+ brass murtis and 200 akhand deepams.",
       "status": "new",
-      "created_at": "2026-10-19T06:38:29.952Z",
-      "updated_at": "2026-10-19T06:38:29.952Z"
+      "created_at": "2026-10-23T09:39:11.934Z",
+      "updated_at": "2026-10-23T09:39:11.934Z"
     },
     {
       "id": "lead-2",
@@ -820,8 +846,8 @@
       "source": "Wholesale Partner Portal",
       "message": "Commercial retail inquiries for stocking Kanhaiya certified sambrani dhoop cones in Mumbai outlets.",
       "status": "contacted",
-      "created_at": "2026-10-17T12:38:29.952Z",
-      "updated_at": "2026-10-18T16:38:29.952Z"
+      "created_at": "2026-10-21T15:39:11.934Z",
+      "updated_at": "2026-10-22T19:39:11.934Z"
     },
     {
       "id": "lead-3",
@@ -831,8 +857,8 @@
       "source": "newsletter",
       "message": "Subscribed to auspicious muhurat alerts and festival restock drops.",
       "status": "converted",
-      "created_at": "2026-10-16T04:38:29.952Z",
-      "updated_at": "2026-10-18T12:38:29.952Z"
+      "created_at": "2026-10-20T07:39:11.934Z",
+      "updated_at": "2026-10-22T15:39:11.934Z"
     },
     {
       "id": "lead-4",
@@ -842,8 +868,8 @@
       "source": "popup",
       "message": "Inquired about international air express shipping rates for Germany delivery.",
       "status": "closed",
-      "created_at": "2026-10-14T12:38:29.952Z",
-      "updated_at": "2026-10-18T00:38:29.952Z"
+      "created_at": "2026-10-18T15:39:11.934Z",
+      "updated_at": "2026-10-22T03:39:11.934Z"
     }
   ],
   "responseNotes": [
@@ -853,7 +879,7 @@
       "entity_type": "contact_submission",
       "note": "Discussed bulk packaging options for Akhand Diya gift boxes over phone with Ananya. Sent digital catalog sample via mock note.",
       "responder": "Admin (Amber)",
-      "created_at": "2026-10-19T00:38:29.952Z"
+      "created_at": "2026-10-23T03:39:11.934Z"
     },
     {
       "id": "note-2",
@@ -861,7 +887,7 @@
       "entity_type": "contact_submission",
       "note": "Emailed metallurgical brass certification doc and purity report. Client acknowledged receipt.",
       "responder": "Admin (Amber)",
-      "created_at": "2026-10-18T18:38:29.952Z"
+      "created_at": "2026-10-22T21:39:11.934Z"
     },
     {
       "id": "note-3",
@@ -869,7 +895,7 @@
       "entity_type": "lead",
       "note": "Followed up with Omkar Spiritual Boutique buyer regarding sambrani cones consignment terms.",
       "responder": "Admin (Amber)",
-      "created_at": "2026-10-18T16:38:29.952Z"
+      "created_at": "2026-10-22T19:39:11.934Z"
     }
   ],
   "sitePolicies": [
