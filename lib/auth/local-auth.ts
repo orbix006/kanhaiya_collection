@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import crypto from "crypto";
 import { cookies } from "next/headers";
+import { resolveUserRole } from "@/lib/auth/role-check";
 
 export interface LocalUser {
   id: string;
@@ -151,34 +152,60 @@ export async function setLocalUserRole(
   return user;
 }
 
-export function ensureDevAdminUser(): LocalUser {
-  const email = "admin@kanhaiya.local";
-  let user = findLocalUserByEmail(email);
-  if (!user) {
-    const { hash, salt } = hashPassword("AdminPreviewPass2026!");
-    const now = new Date().toISOString();
-    user = {
+export function ensureDefaultAdminUsers(): void {
+  const admins = [
+    {
       id: "usr_dev_admin_preview",
-      full_name: "Local Dev Administrator",
-      email: email,
-      password_hash: hash,
-      salt,
-      role: "admin",
-      created_at: now,
-      updated_at: now,
-    };
-    const users = getLocalUsers();
-    users.push(user);
-    saveLocalUsers(users);
-  } else if (user.role !== "admin") {
-    user.role = "admin";
-    user.updated_at = new Date().toISOString();
-    const users = getLocalUsers();
-    const idx = users.findIndex((u) => u.email === email);
-    if (idx !== -1) users[idx] = user;
+      email: "admin@kanhaiya.local",
+      fullName: "Local Dev Administrator",
+    },
+    {
+      id: "8ccd5c84-1b51-4bed-a3b7-7727387cbaa2",
+      email: "avaatdesigns.info@gmail.com",
+      fullName: "Avaat Designs Admin",
+    },
+  ];
+
+  const users = getLocalUsers();
+  let modified = false;
+
+  for (const admin of admins) {
+    const existing = users.find(
+      (u) =>
+        u.email.toLowerCase() === admin.email.toLowerCase() ||
+        u.id === admin.id
+    );
+
+    if (!existing) {
+      const { hash, salt } = hashPassword("AdminPreviewPass2026!");
+      const now = new Date().toISOString();
+      users.push({
+        id: admin.id,
+        full_name: admin.fullName,
+        email: admin.email,
+        password_hash: hash,
+        salt,
+        role: "admin",
+        created_at: now,
+        updated_at: now,
+      });
+      modified = true;
+    } else if (existing.role !== "admin") {
+      existing.role = "admin";
+      existing.updated_at = new Date().toISOString();
+      modified = true;
+    }
+  }
+
+  if (modified) {
     saveLocalUsers(users);
   }
-  return user;
+}
+
+export function ensureDevAdminUser(): LocalUser {
+  ensureDefaultAdminUsers();
+  const email = "admin@kanhaiya.local";
+  return findLocalUserByEmail(email)!;
 }
 
 export async function setSessionCookie(user: {
@@ -269,22 +296,24 @@ export async function getLocalSession(
     if (!parsed || !parsed.email) return null;
     const userId = parsed.id || "usr_demo_admin";
 
-    // Authoritatively verify against database store so role changes are immediate
+    // Authoritatively verify against database store and centralized RBAC
     const storedUser = findLocalUserById(userId) || findLocalUserByEmail(parsed.email);
     if (storedUser) {
+      const role = resolveUserRole(storedUser);
       return {
         id: storedUser.id,
         email: storedUser.email,
         full_name: storedUser.full_name,
-        role: storedUser.role,
+        role: role as "admin" | "user",
       };
     }
 
+    const role = resolveUserRole(parsed);
     return {
       id: userId,
       email: parsed.email,
       full_name: parsed.full_name || "Demo Administrator",
-      role: parsed.role === "admin" ? "admin" : "user",
+      role: role as "admin" | "user",
     };
   } catch {
     return null;

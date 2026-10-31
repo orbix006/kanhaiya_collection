@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
 import { getLocalSession } from "@/lib/auth/local-auth";
-import { FALLBACK_PRODUCT_DETAILS } from "@/lib/data/products";
+import { loadMockProducts } from "@/lib/mock-data/admin-store";
 
 /**
  * Resolves the active user ID for cart operations across Supabase auth,
@@ -198,7 +198,8 @@ export async function getUserCart(
     const detailedItems: CartItemWithDetails[] = [];
 
     for (const item of rawItems) {
-      const fallbackProd = FALLBACK_PRODUCT_DETAILS.find((p) => p.id === item.product_id);
+      const mockProducts = loadMockProducts();
+      const fallbackProd = mockProducts.find((p) => p.id === item.product_id);
       if (!fallbackProd) continue;
 
       const fallbackVariant = item.variant_id
@@ -450,3 +451,5 @@ export async function getUserCartCount(userId: string): Promise<number> {
 export function getDemoCartStore() {
   return demoCartStore;
 }
+
+

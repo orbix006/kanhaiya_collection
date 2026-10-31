@@ -6,16 +6,17 @@ import { ProductCard } from "@/components/ui/product-card";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 interface HorizontalProductRowProps {
-  products: Product[];
-  categoryMap: Map<string, string>;
+  products?: Product[];
+  categoryMap?: Map<string, string>;
   onViewProduct?: (product: Product) => void;
 }
 
 export function HorizontalProductRow({
-  products,
-  categoryMap,
+  products = [],
+  categoryMap = new Map(),
   onViewProduct,
 }: HorizontalProductRowProps) {
+  const safeProducts = Array.isArray(products) ? products : [];
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
@@ -39,7 +40,7 @@ export function HorizontalProductRow({
         window.removeEventListener("resize", checkScroll);
       };
     }
-  }, [products.length]);
+  }, [safeProducts.length]);
 
   const scroll = (direction: "left" | "right") => {
     const el = scrollContainerRef.current;
@@ -51,7 +52,7 @@ export function HorizontalProductRow({
     });
   };
 
-  if (!products || products.length === 0) return null;
+  if (safeProducts.length === 0) return null;
 
   return (
     <div className="relative group/row w-full">
@@ -79,24 +80,22 @@ export function HorizontalProductRow({
         </button>
       )}
 
-      {/* Horizontal Scroll Track (Keeps all products in ONE continuous horizontal row) */}
+      {/* Scrollable Track */}
       <div
         ref={scrollContainerRef}
-        className="flex w-full overflow-x-auto overflow-y-hidden gap-3.5 sm:gap-5 pb-4 pt-1 snap-x snap-mandatory scroll-smooth no-scrollbar"
-        style={{
-          scrollbarWidth: "none",
-          msOverflowStyle: "none",
-        }}
+        className="flex gap-4 overflow-x-auto pb-4 pt-1 no-scrollbar scroll-smooth snap-x snap-mandatory px-1"
       >
-        {products.map((product) => (
+        {safeProducts.map((product) => (
           <div
             key={product.id}
-            className="w-[185px] sm:w-[225px] md:w-[245px] lg:w-[265px] shrink-0 snap-start"
+            className="w-[180px] xs:w-[220px] sm:w-[260px] shrink-0 snap-start"
           >
             <ProductCard
               product={product}
-              categoryName={product.category_id ? categoryMap.get(product.category_id) : undefined}
-              onView={onViewProduct}
+              categoryName={
+                product.category_id ? categoryMap.get(product.category_id) : undefined
+              }
+              onView={onViewProduct ? () => onViewProduct(product) : undefined}
             />
           </div>
         ))}

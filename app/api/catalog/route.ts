@@ -20,10 +20,16 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   try {
     const store = loadMockStore();
+    const products = Array.isArray(store?.products) ? store.products : [];
+    const categories = Array.isArray(store?.categories) ? store.categories : [];
     return NextResponse.json({
       success: true,
-      products: store.products,
-      categories: store.categories,
+      data: {
+        products,
+        categories,
+      },
+      products,
+      categories,
       timestamp: Date.now(),
     });
   } catch {
@@ -32,6 +38,17 @@ export async function GET() {
       { status: 500 }
     );
   }
+}
+
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 200,
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    },
+  });
 }
 
 export async function POST(req: NextRequest) {

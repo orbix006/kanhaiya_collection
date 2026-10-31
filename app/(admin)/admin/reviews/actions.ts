@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { isUserAdmin } from "@/lib/auth/role-check";
 import { getDemoReviewsStore } from "@/lib/data/reviews";
 
 function safeRevalidate(path: string, type?: "layout" | "page") {
@@ -63,7 +64,7 @@ export async function approveReviewAction(
     .eq("id", caller.id)
     .single();
 
-  if (!profile || profile.role !== "admin") {
+  if (!isUserAdmin(caller, profile)) {
     return { error: "Forbidden: Administrator permissions required." };
   }
 
@@ -154,7 +155,7 @@ export async function unapproveReviewAction(
     .eq("id", caller.id)
     .single();
 
-  if (!profile || profile.role !== "admin") {
+  if (!isUserAdmin(caller, profile)) {
     return { error: "Forbidden: Administrator permissions required." };
   }
 
@@ -245,7 +246,7 @@ export async function deleteReviewAction(
     .eq("id", caller.id)
     .single();
 
-  if (!profile || profile.role !== "admin") {
+  if (!isUserAdmin(caller, profile)) {
     return { error: "Forbidden: Administrator permissions required." };
   }
 

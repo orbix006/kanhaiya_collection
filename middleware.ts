@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { isUserAdmin } from "@/lib/auth/role-check";
 
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
@@ -25,7 +26,7 @@ export async function middleware(request: NextRequest) {
   if (!isConfigured) {
     const protectedRoutes = ["/admin", "/account", "/checkout"];
     const demoCookieRaw = request.cookies.get("demo_user")?.value;
-    let demoUser: { email?: string; role?: string } | null = null;
+    let demoUser: { email?: string; role?: string; id?: string } | null = null;
     if (demoCookieRaw) {
       try {
         const decoded = decodeURIComponent(demoCookieRaw);
@@ -45,9 +46,12 @@ export async function middleware(request: NextRequest) {
         loginUrl.searchParams.set("redirect", pathname);
         return NextResponse.redirect(loginUrl);
       }
-      // Note: Role authorization for /admin is authoritatively enforced server-side
-      // by AdminLayout (app/(admin)/layout.tsx) against the database record so that
-      // newly promoted administrators are not falsely blocked by stale browser cookies.
+
+      // Strict RBAC for /admin sub-routes
+      if (pathname.startsWith("/admin") && !isUserAdmin(demoUser)) {
+        const forbiddenUrl = new URL("/403", request.url);
+        return NextResponse.redirect(forbiddenUrl);
+      }
     }
     return supabaseResponse;
   }
@@ -81,7 +85,7 @@ export async function middleware(request: NextRequest) {
     user = null;
   }
 
-  // Admin route protection (/admin)
+  // Strict Admin route protection (/admin and /admin/*)
   if (pathname.startsWith("/admin")) {
     if (!user) {
       const loginUrl = new URL("/login", request.url);
@@ -89,7 +93,25 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(loginUrl);
     }
 
-    // Role check is performed authoritatively in AdminLayout and server actions
+    // Role check at middleware edge
+    let dbProfile = null;
+    try {
+      const { data } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .single();
+      dbProfile = data;
+    } catch {
+      // AdminLayout will perform authoritative fallback check
+    }
+
+    const profile = dbProfile;
+    // Enforces strict RBAC: rejects if profile.role !== "admin" unless authorized
+    if (!isUserAdmin(user, profile) || (profile && profile.role !== "admin" && !isUserAdmin(user))) {
+      const forbiddenUrl = new URL("/403", request.url);
+      return NextResponse.redirect(forbiddenUrl);
+    }
   }
 
   // Authenticated user routes protection (/account, /checkout)

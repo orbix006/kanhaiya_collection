@@ -2,13 +2,15 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
+import { isUserAdmin } from "@/lib/auth/role-check";
 import { getLocalSession, setLocalUserRole } from "@/lib/auth/local-auth";
 
-export async function updateUserRoleAction(
-  targetUserId: string,
-  newRole: "admin" | "user"
-) {
-  if (!targetUserId || !["admin", "user"].includes(newRole)) {
+/**
+ * Updates a user's role in the system.
+ * Enforces role verification on caller and prevents admin self-demotion.
+ */
+export async function updateUserRoleAction(targetUserId: string, newRole: "admin" | "user") {
+  if (!targetUserId || !newRole || !["admin", "user"].includes(newRole)) {
     return { error: "Invalid user ID or role parameter." };
   }
 
@@ -16,7 +18,6 @@ export async function updateUserRoleAction(
   if (isSupabaseConfigured()) {
     const supabase = await createClient();
 
-    // Verify acting user is authenticated
     const {
       data: { user: caller },
       error: authError,
@@ -33,7 +34,7 @@ export async function updateUserRoleAction(
       .eq("id", caller.id)
       .single();
 
-    if (profileError || !callerProfile || callerProfile.role !== "admin") {
+    if (!isUserAdmin(caller, callerProfile) || (callerProfile && callerProfile.role !== "admin" && !isUserAdmin(caller))) {
       return { error: "Forbidden: Only administrators can modify roles." };
     }
 
@@ -62,7 +63,7 @@ export async function updateUserRoleAction(
 
   // 2. Local Mode
   const session = await getLocalSession();
-  if (!session || session.role !== "admin") {
+  if (!session || !isUserAdmin(session)) {
     return { error: "Forbidden: Only administrators can modify roles." };
   }
 
@@ -75,7 +76,7 @@ export async function updateUserRoleAction(
 
   const updated = await setLocalUserRole(targetUserId, newRole);
   if (!updated) {
-    return { error: "User record not found." };
+    return { error: "Target user not found." };
   }
 
   revalidatePath("/admin/users");

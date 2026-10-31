@@ -514,7 +514,8 @@ export async function getAllCategories(): Promise<Category[]> {
 
 export async function getAllProducts(): Promise<Product[]> {
   const store = getLocalStoreData();
-  return store.products.map((p) => {
+  const prods = Array.isArray(store?.products) ? store.products : [];
+  return prods.map((p) => {
     const primaryImg =
       p.images?.find((img) => img.is_primary)?.image_url ||
       p.images?.[0]?.image_url ||
@@ -528,7 +529,8 @@ export async function getAllProducts(): Promise<Product[]> {
 
 export async function getProductBySlug(slug: string): Promise<Product | null> {
   const store = getLocalStoreData();
-  const p = store.products.find((p) => p.slug === slug && p.is_active);
+  const prods = Array.isArray(store?.products) ? store.products : [];
+  const p = prods.find((p) => p.slug === slug && p.is_active);
   if (!p) return null;
   const primaryImg =
     p.images?.find((img) => img.is_primary)?.image_url ||
@@ -542,7 +544,8 @@ export async function getProductBySlug(slug: string): Promise<Product | null> {
 
 export async function getProductsByIds(ids: string[]): Promise<Product[]> {
   const store = getLocalStoreData();
-  const map = new Map(store.products.map((p) => [p.id, p]));
+  const prods = Array.isArray(store?.products) ? store.products : [];
+  const map = new Map(prods.map((p) => [p.id, p]));
   const result: Product[] = [];
   for (const id of ids) {
     const item = map.get(id);
@@ -555,8 +558,8 @@ export async function getProductsByIds(ids: string[]): Promise<Product[]> {
 
 export async function getBestsellerProducts(limit = 8): Promise<Product[]> {
   const store = getLocalStoreData();
-  // Rank by pinned first, then sold_count desc
-  const sorted = [...store.products]
+  const prods = Array.isArray(store?.products) ? store.products : [];
+  const sorted = [...prods]
     .filter((p) => p.is_active)
     .sort((a, b) => {
       if (a.is_featured_top_seller !== b.is_featured_top_seller) {
@@ -569,7 +572,8 @@ export async function getBestsellerProducts(limit = 8): Promise<Product[]> {
 
 export async function getNewlyAddedProducts(limit = 10): Promise<Product[]> {
   const store = getLocalStoreData();
-  const sorted = [...store.products]
+  const prods = Array.isArray(store?.products) ? store.products : [];
+  const sorted = [...prods]
     .filter((p) => p.is_active)
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   return sorted.slice(0, limit);

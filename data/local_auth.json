@@ -1,6 +1,16 @@
 {
   "users": [
     {
+      "id": "8ccd5c84-1b51-4bed-a3b7-7727387cbaa2",
+      "full_name": "Avaat Designs Admin",
+      "email": "avaatdesigns.info@gmail.com",
+      "password_hash": "d42c150464abe0568dfeb456d43a3aafef530697b6095e9c40b40bdeeebcc4be6f27a1aaa910eafe1404385cb3d6ef977f7051c000324445bbd3282ad2652545",
+      "salt": "a14e5cb1ab83f9661d6c94957e0a9756",
+      "role": "admin",
+      "created_at": "2026-10-14T03:30:09.058Z",
+      "updated_at": "2026-10-31T07:00:00.000Z"
+    },
+    {
       "id": "usr_4104acb962ff4cdaae6cd0136b9cee47",
       "full_name": "Amber",
       "email": "you@example.com",
@@ -59,6 +69,26 @@
       "role": "user",
       "created_at": "2026-10-23T15:48:36.171Z",
       "updated_at": "2026-10-23T15:48:36.171Z"
+    },
+    {
+      "id": "usr_fc7883b9ac4f4f0baa495423e49ad71d",
+      "full_name": "Ordinary Customer",
+      "email": "customer-test-1793427351283@kanhaiya.test",
+      "password_hash": "ca70008e793ab061a5401455939e96a5fc607a8fb2acd5bfd09ed0a94b1e189988ea8ce1aa7ade44966cfad1e7b04ba6aa9abe8aec9afcf365e4d8925516149f",
+      "salt": "a16d4df8dbc3b9c628da59738b841116",
+      "role": "user",
+      "created_at": "2026-10-31T06:15:51.290Z",
+      "updated_at": "2026-10-31T06:15:51.290Z"
+    },
+    {
+      "id": "usr_7f495a40df5e48c9ba2cebe766b68a02",
+      "full_name": "Ordinary Customer",
+      "email": "customer-test-1793428419256@kanhaiya.test",
+      "password_hash": "f9defde6d59200064689350af79b124cf5a1db48f3eb5b6cab5d2906a9d832e0fe9845268847b4e0bcdd63c65c525b1ab6451af930cb71716f7e9baf25e0de6a",
+      "salt": "75fefa8a8e48771d978f7ea382c6c678",
+      "role": "user",
+      "created_at": "2026-10-31T06:33:39.264Z",
+      "updated_at": "2026-10-31T06:33:39.264Z"
     }
   ]
 }

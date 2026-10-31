@@ -4,6 +4,8 @@ import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import {
   Bell,
+  BellOff,
+  CheckCircle2,
   CheckCheck,
   Trash2,
   Package,
@@ -12,11 +14,11 @@ import {
   Star,
   ExternalLink,
 } from "lucide-react";
-import { SEED_NOTIFICATIONS, type MockNotification } from "@/lib/mock-data/admin-store";
+import { type MockNotification } from "@/lib/mock-data/admin-store";
 
 export function NotificationsDropdown() {
   const [isOpen, setIsOpen] = useState(false);
-  const [notifications, setNotifications] = useState<MockNotification[]>(SEED_NOTIFICATIONS);
+  const [notifications, setNotifications] = useState<MockNotification[]>([]);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const unreadCount = notifications.filter((n) => !n.is_read).length;
@@ -121,8 +123,14 @@ export function NotificationsDropdown() {
           {/* Notifications List */}
           <div className="max-h-80 overflow-y-auto divide-y divide-border/50">
             {notifications.length === 0 ? (
-              <div className="py-10 text-center text-xs text-muted-foreground">
-                No notifications right now.
+              <div className="py-12 px-4 text-center">
+                <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-muted/60 text-muted-foreground">
+                  <CheckCircle2 className="h-6 w-6 text-emerald-500" />
+                </div>
+                <p className="text-sm font-semibold text-foreground">No new notifications</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  You are completely caught up!
+                </p>
               </div>
             ) : (
               notifications.map((n) => (

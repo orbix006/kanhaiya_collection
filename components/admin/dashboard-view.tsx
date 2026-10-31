@@ -47,7 +47,6 @@ export function DashboardView({
 
   // Synchronize with localStorage on client mount without hydration mismatch
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setStore(loadMockStore());
   }, []);
 

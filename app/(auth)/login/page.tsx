@@ -3,7 +3,7 @@
 import { useActionState, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { loginAction, enterDevAdminPreviewAction } from "../actions";
+import { loginAction } from "../actions";
 import { Loader2, ArrowRight } from "lucide-react";
 
 function LoginForm() {
@@ -126,35 +126,6 @@ function LoginForm() {
           Sign up
         </Link>
       </div>
-
-      {/* Development-Only Admin Access Mechanism */}
-      {process.env.NODE_ENV !== "production" && (
-        <div className="pt-4 border-t border-[#E8DCC8]/70">
-          <div className="rounded-xl border border-amber-300/80 bg-amber-50/70 p-4 space-y-2.5 text-left">
-            <div className="flex items-center justify-between">
-              <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-amber-900">
-                <span className="h-2 w-2 rounded-full bg-amber-600 animate-pulse" />
-                Dev Admin Preview
-              </span>
-              <span className="text-[10px] text-amber-800 font-medium bg-amber-200/70 px-2 py-0.5 rounded-md">
-                Offline Mode
-              </span>
-            </div>
-            <p className="text-xs text-[#806B57] leading-relaxed">
-              Open and test the complete admin panel frontend with simulated administrator privileges without configuring an external Supabase backend.
-            </p>
-            <form action={enterDevAdminPreviewAction}>
-              <button
-                type="submit"
-                className="w-full h-9 inline-flex items-center justify-center gap-2 rounded-lg bg-amber-800 text-amber-50 text-xs font-semibold hover:bg-amber-900 transition-colors shadow-2xs"
-              >
-                <span>Enter Admin Preview Mode</span>
-                <ArrowRight className="h-3.5 w-3.5" />
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

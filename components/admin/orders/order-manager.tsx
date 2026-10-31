@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import {
   Package,
+  Inbox,
   Clock,
   Truck,
   CheckCircle2,
@@ -37,13 +38,8 @@ import type {
   PaymentStatus,
   AdminOrderListResult,
 } from "@/lib/data/order-types";
-import {
-  loadMockOrders,
-  updateMockOrderStatus,
-  getOrderKPIs,
-  saveMockOrderNote,
-  MockOrder,
-} from "@/lib/mock-data/admin-store";
+import { getOrderKPIs } from "@/lib/mock-data/admin-store";
+import { updateOrderStatusAction } from "@/app/(admin)/admin/orders/actions";
 import { ConfirmationDialog } from "@/components/admin/confirmation-dialog";
 
 interface OrderManagerProps {
@@ -175,26 +171,10 @@ export function OrderManager({ initialOrders }: OrderManagerProps) {
     order: null,
   });
 
-  // Client hydration from central MockStore
-  const refreshFromStore = useCallback(() => {
-    try {
-      const stored = loadMockOrders();
-      if (stored && stored.length > 0) {
-        setOrders(stored);
-        // If a drawer order is currently open, refresh its data
-        setSelectedDrawerOrder((prev) => {
-          if (!prev) return null;
-          return stored.find((o) => o.id === prev.id) || prev;
-        });
-      }
-    } catch (err) {
-      console.warn("[OrderManager] Could not load orders from mock store:", err);
-    }
-  }, []);
-
+  // Synchronize state when initialOrders prop updates
   useEffect(() => {
-    refreshFromStore();
-  }, [refreshFromStore]);
+    setOrders(initialOrders || []);
+  }, [initialOrders]);
 
   // Sync drawer notes when an order is opened
   useEffect(() => {
@@ -218,7 +198,7 @@ export function OrderManager({ initialOrders }: OrderManagerProps) {
 
   // Filtered and Sorted Orders
   const filteredOrders = useMemo(() => {
-    let result = orders.filter((order) => {
+    const result = orders.filter((order) => {
       // Status filter
       if (statusFilter === "in_progress") {
         if (order.status !== "confirmed" && order.status !== "processing" && order.status !== "shipped") {
@@ -254,8 +234,8 @@ export function OrderManager({ initialOrders }: OrderManagerProps) {
       if (searchTerm.trim()) {
         const q = searchTerm.toLowerCase().trim();
         const orderNum = order.order_number.toLowerCase();
-        const custName = (order.customer?.full_name || order.shipping_address?.full_name || (order as MockOrder).customer_name || "").toLowerCase();
-        const custEmail = (order.customer?.email || (order as MockOrder).customer_email || "").toLowerCase();
+        const custName = (order.customer?.full_name || order.shipping_address?.full_name || "Customer").toLowerCase();
+        const custEmail = (order.customer?.email || "No email on file").toLowerCase();
         const phone = (order.shipping_address?.phone || order.customer?.phone || "").toLowerCase();
         const city = (order.shipping_address?.city || "").toLowerCase();
         const itemNames = (order.items || []).map((i) => i.product_name.toLowerCase()).join(" ");
@@ -333,22 +313,31 @@ export function OrderManager({ initialOrders }: OrderManagerProps) {
   };
 
   // Execute Confirmed Decision Action
-  const handleExecuteDecision = () => {
+  const handleExecuteDecision = async () => {
     if (!confirmDialog.order) return;
     const order = confirmDialog.order;
     const isApprove = confirmDialog.actionType === "approve";
     const nextStatus: OrderStatus = isApprove ? "confirmed" : "cancelled";
 
     try {
-      const res = updateMockOrderStatus(order.id, nextStatus);
+      const res = await updateOrderStatusAction(order.id, nextStatus);
       if (res.success) {
         setActionFeedback({
           type: "success",
           message: isApprove
-            ? `Order #${order.order_number} has been approved and confirmed. Product stock decremented.`
-            : `Order #${order.order_number} has been cancelled.${order.status === "confirmed" ? " Inventory was restored." : ""}`,
+            ? `Order #${order.order_number} has been approved and confirmed.`
+            : `Order #${order.order_number} has been cancelled.`,
         });
-        refreshFromStore();
+        setOrders((prev) =>
+          prev.map((o) =>
+            o.id === order.id
+              ? { ...o, status: nextStatus, updated_at: new Date().toISOString() }
+              : o
+          )
+        );
+        if (selectedDrawerOrder?.id === order.id) {
+          setSelectedDrawerOrder((prev) => (prev ? { ...prev, status: nextStatus } : null));
+        }
       } else {
         setActionFeedback({
           type: "error",
@@ -371,14 +360,14 @@ export function OrderManager({ initialOrders }: OrderManagerProps) {
     if (!selectedDrawerOrder) return;
     setIsSavingNote(true);
     try {
-      const res = saveMockOrderNote(selectedDrawerOrder.id, orderNoteInput);
-      if (res.success) {
-        setActionFeedback({
-          type: "success",
-          message: `Note updated for order #${selectedDrawerOrder.order_number}.`,
-        });
-        refreshFromStore();
-      }
+      setOrders((prev) =>
+        prev.map((o) => (o.id === selectedDrawerOrder.id ? { ...o, notes: orderNoteInput } : o))
+      );
+      setSelectedDrawerOrder((prev) => (prev ? { ...prev, notes: orderNoteInput } : null));
+      setActionFeedback({
+        type: "success",
+        message: `Note updated for order #${selectedDrawerOrder.order_number}.`,
+      });
     } catch {
       setActionFeedback({
         type: "error",
@@ -669,6 +658,18 @@ export function OrderManager({ initialOrders }: OrderManagerProps) {
 
       {/* 3. ORDER TABLE (Phase 2 Requirement B - Fits at desktop width without horizontal scroll) */}
       <div className="rounded-2xl border border-border/80 bg-card shadow-xs overflow-hidden">
+        {orders.length === 0 ? (
+          <div className="py-16 text-center text-stone-400">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
+              <Inbox className="h-7 w-7 text-muted-foreground" />
+            </div>
+            <p className="text-lg font-medium text-foreground">No orders found</p>
+            <p className="text-sm text-stone-500 mt-1">
+              Real-time customer orders will appear here once placed.
+            </p>
+          </div>
+        ) : (
+          <>
         {/* Desktop Table View (visible on md screens and above, zero horizontal scrolling) */}
         <div className="hidden md:block w-full">
           {paginatedOrders.length === 0 ? (
@@ -717,7 +718,6 @@ export function OrderManager({ initialOrders }: OrderManagerProps) {
                   const customerName =
                     order.customer?.full_name ||
                     order.shipping_address?.full_name ||
-                    (order as MockOrder).customer_name ||
                     "Customer";
 
                   const itemsTitle =
@@ -881,7 +881,6 @@ export function OrderManager({ initialOrders }: OrderManagerProps) {
               const customerName =
                 order.customer?.full_name ||
                 order.shipping_address?.full_name ||
-                (order as MockOrder).customer_name ||
                 "Customer";
 
               return (
@@ -985,6 +984,8 @@ export function OrderManager({ initialOrders }: OrderManagerProps) {
             </button>
           </div>
         </div>
+          </>
+        )}
       </div>
 
       {/* 5. ORDER DETAIL DRAWER (Phase 2 Requirement C & D) */}
@@ -1071,7 +1072,6 @@ export function OrderManager({ initialOrders }: OrderManagerProps) {
                     <span className="font-semibold text-foreground">
                       {selectedDrawerOrder.customer?.full_name ||
                         selectedDrawerOrder.shipping_address?.full_name ||
-                        (selectedDrawerOrder as MockOrder).customer_name ||
                         "Patron"}
                     </span>
                   </div>
@@ -1087,7 +1087,6 @@ export function OrderManager({ initialOrders }: OrderManagerProps) {
                     <span className="text-muted-foreground text-[11px] block">Email Address:</span>
                     <span className="text-foreground">
                       {selectedDrawerOrder.customer?.email ||
-                        (selectedDrawerOrder as MockOrder).customer_email ||
                         "No email recorded"}
                     </span>
                   </div>

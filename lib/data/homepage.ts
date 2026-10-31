@@ -199,188 +199,8 @@ export const FALLBACK_CATEGORIES: Category[] = [
   },
 ];
 
-export const FALLBACK_PRODUCTS: ProductItem[] = [
-  {
-    id: "prod-1",
-    name: "Royal Linen Formal Shirt",
-    slug: "royal-linen-formal-shirt",
-    brand: "Kanhaiya Heritage",
-    base_price: 2499,
-    compare_at_price: 2999,
-    stock_quantity: 45,
-    avg_rating: 4.8,
-    review_count: 24,
-    image_url: "https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?auto=format&fit=crop&w=800&q=80",
-    is_featured_top_seller: true,
-    category_id: "cat-1-1",
-    category_slug: "menswear",
-  },
-  {
-    id: "prod-2",
-    name: "Handcrafted Khadi Casual Shirt",
-    slug: "handcrafted-khadi-casual-shirt",
-    brand: "Kanhaiya Heritage",
-    base_price: 1899,
-    compare_at_price: 2299,
-    stock_quantity: 30,
-    avg_rating: 4.6,
-    review_count: 18,
-    image_url: "https://images.unsplash.com/photo-1596755094514-f87e34085b2c?auto=format&fit=crop&w=800&q=80",
-    is_featured_top_seller: false,
-    category_id: "cat-1-1",
-    category_slug: "menswear",
-  },
-  {
-    id: "prod-3",
-    name: "Tailored Slim Fit Chinos",
-    slug: "tailored-slim-fit-chinos",
-    brand: "Kanhaiya Heritage",
-    base_price: 2799,
-    compare_at_price: 3499,
-    stock_quantity: 25,
-    avg_rating: 4.7,
-    review_count: 15,
-    image_url: "https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?auto=format&fit=crop&w=800&q=80",
-    is_featured_top_seller: false,
-    category_id: "cat-1-2",
-    category_slug: "menswear",
-  },
-  {
-    id: "prod-4",
-    name: "Classic Pleated Dress Trousers",
-    slug: "classic-pleated-dress-trousers",
-    brand: "Kanhaiya Heritage",
-    base_price: 3199,
-    compare_at_price: 3999,
-    stock_quantity: 20,
-    avg_rating: 4.9,
-    review_count: 31,
-    image_url: "https://images.unsplash.com/photo-1473966968600-fa801b869a1a?auto=format&fit=crop&w=800&q=80",
-    is_featured_top_seller: false,
-    category_id: "cat-1-2",
-    category_slug: "menswear",
-  },
-  {
-    id: "prod-5",
-    name: "Silk Embroidered Anarkali Dress",
-    slug: "silk-embroidered-anarkali-dress",
-    brand: "Kanhaiya Couture",
-    base_price: 5999,
-    compare_at_price: 7499,
-    stock_quantity: 15,
-    avg_rating: 4.9,
-    review_count: 42,
-    image_url: "https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?auto=format&fit=crop&w=800&q=80",
-    is_featured_top_seller: true,
-    category_id: "cat-2-1",
-    category_slug: "womenswear",
-  },
-  {
-    id: "prod-6",
-    name: "Floral Print Festive Maxi Dress",
-    slug: "floral-print-maxi-dress",
-    brand: "Kanhaiya Couture",
-    base_price: 3499,
-    compare_at_price: 4299,
-    stock_quantity: 35,
-    avg_rating: 4.7,
-    review_count: 20,
-    image_url: "https://images.unsplash.com/photo-1572804013309-59a88b7e92f1?auto=format&fit=crop&w=800&q=80",
-    is_featured_top_seller: false,
-    category_id: "cat-2-1",
-    category_slug: "womenswear",
-  },
-  {
-    id: "prod-7",
-    name: "Kanjeevaram Banarasi Silk Saree",
-    slug: "kanjeevaram-banarasi-silk-saree",
-    brand: "Kanhaiya Artisan",
-    base_price: 12999,
-    compare_at_price: 15999,
-    stock_quantity: 10,
-    avg_rating: 5.0,
-    review_count: 58,
-    image_url: "https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=800&q=80",
-    is_featured_top_seller: true,
-    category_id: "cat-2-2",
-    category_slug: "womenswear",
-  },
-  {
-    id: "prod-8",
-    name: "Chanderi Handloom Cotton Saree",
-    slug: "chanderi-handloom-cotton-saree",
-    brand: "Kanhaiya Artisan",
-    base_price: 4499,
-    compare_at_price: 5499,
-    stock_quantity: 18,
-    avg_rating: 4.8,
-    review_count: 27,
-    image_url: "https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?auto=format&fit=crop&w=800&q=80",
-    is_featured_top_seller: false,
-    category_id: "cat-2-2",
-    category_slug: "womenswear",
-  },
-  {
-    id: "prod-9",
-    name: "Handstitched Leather Mojris",
-    slug: "handstitched-leather-mojris",
-    brand: "Kanhaiya Footwear",
-    base_price: 2199,
-    compare_at_price: 2799,
-    stock_quantity: 40,
-    avg_rating: 4.7,
-    review_count: 19,
-    image_url: "https://images.unsplash.com/photo-1543163521-1bf539c55dd2?auto=format&fit=crop&w=800&q=80",
-    is_featured_top_seller: false,
-    category_id: "cat-3-1",
-    category_slug: "accessories",
-  },
-  {
-    id: "prod-10",
-    name: "Classic Oxford Leather Shoes",
-    slug: "classic-oxford-leather-shoes",
-    brand: "Kanhaiya Footwear",
-    base_price: 4299,
-    compare_at_price: 4999,
-    stock_quantity: 22,
-    avg_rating: 4.8,
-    review_count: 34,
-    image_url: "https://images.unsplash.com/photo-1533867617858-e7b97e060509?auto=format&fit=crop&w=800&q=80",
-    is_featured_top_seller: false,
-    category_id: "cat-3-1",
-    category_slug: "accessories",
-  },
-  {
-    id: "prod-11",
-    name: "Kundan Statement Necklace",
-    slug: "kundan-statement-necklace",
-    brand: "Kanhaiya Jewels",
-    base_price: 8999,
-    compare_at_price: 10999,
-    stock_quantity: 12,
-    avg_rating: 4.9,
-    review_count: 48,
-    image_url: "https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?auto=format&fit=crop&w=800&q=80",
-    is_featured_top_seller: true,
-    category_id: "cat-3-2",
-    category_slug: "accessories",
-  },
-  {
-    id: "prod-12",
-    name: "Antique Brass Chronograph Watch",
-    slug: "antique-brass-chronograph-watch",
-    brand: "Kanhaiya Time",
-    base_price: 6499,
-    compare_at_price: 7999,
-    stock_quantity: 16,
-    avg_rating: 4.9,
-    review_count: 37,
-    image_url: "https://images.unsplash.com/photo-1524805444758-089113d48a6d?auto=format&fit=crop&w=800&q=80",
-    is_featured_top_seller: false,
-    category_id: "cat-3-2",
-    category_slug: "accessories",
-  },
-];
+// Purged dummy fallback products in favor of live backend database and store
+export const FALLBACK_PRODUCTS: ProductItem[] = [];
 
 const FALLBACK_TESTIMONIALS: Testimonial[] = [
   {
@@ -597,9 +417,17 @@ export async function getContinueBrowsingProducts(userId?: string | null): Promi
 
 export async function getTopSellers(): Promise<ProductItem[]> {
   if (!isSupabaseConfigured()) {
-    return FALLBACK_PRODUCTS.filter((p) => p.is_featured_top_seller).concat(
-      FALLBACK_PRODUCTS.filter((p) => !p.is_featured_top_seller)
-    ).slice(0, 8);
+    try {
+      const { loadMockProducts } = await import("@/lib/mock-data/admin-store");
+      const loaded = loadMockProducts();
+      if (loaded && loaded.length > 0) {
+        return (loaded as unknown as ProductItem[])
+          .filter((p) => p.is_featured_top_seller)
+          .concat((loaded as unknown as ProductItem[]).filter((p) => !p.is_featured_top_seller))
+          .slice(0, 8);
+      }
+    } catch {}
+    return [];
   }
   try {
     const supabase = await createClient();
@@ -609,9 +437,17 @@ export async function getTopSellers(): Promise<ProductItem[]> {
       .limit(8);
 
     if (error || !topSellers || topSellers.length === 0) {
-      return FALLBACK_PRODUCTS.filter((p) => p.is_featured_top_seller).concat(
-        FALLBACK_PRODUCTS.filter((p) => !p.is_featured_top_seller)
-      ).slice(0, 8);
+      try {
+        const { loadMockProducts } = await import("@/lib/mock-data/admin-store");
+        const loaded = loadMockProducts();
+        if (loaded && loaded.length > 0) {
+          return (loaded as unknown as ProductItem[])
+            .filter((p) => p.is_featured_top_seller)
+            .concat((loaded as unknown as ProductItem[]).filter((p) => !p.is_featured_top_seller))
+            .slice(0, 8);
+        }
+      } catch {}
+      return [];
     }
 
     const productIds = topSellers.map((p) => p.id).filter(Boolean) as string[];
@@ -642,9 +478,17 @@ export async function getTopSellers(): Promise<ProductItem[]> {
       };
     });
   } catch {
-    return FALLBACK_PRODUCTS.filter((p) => p.is_featured_top_seller).concat(
-      FALLBACK_PRODUCTS.filter((p) => !p.is_featured_top_seller)
-    ).slice(0, 8);
+    try {
+      const { loadMockProducts } = await import("@/lib/mock-data/admin-store");
+      const loaded = loadMockProducts();
+      if (loaded && loaded.length > 0) {
+        return (loaded as unknown as ProductItem[])
+          .filter((p) => p.is_featured_top_seller)
+          .concat((loaded as unknown as ProductItem[]).filter((p) => !p.is_featured_top_seller))
+          .slice(0, 8);
+      }
+    } catch {}
+    return [];
   }
 }
 
@@ -714,7 +558,7 @@ export async function getCategoryProductSections(): Promise<CategoryProductSecti
         };
       });
     } else {
-      productItems = FALLBACK_PRODUCTS;
+      productItems = [];
     }
 
     const sections: CategoryProductSection[] = [];

@@ -6,7 +6,7 @@ import type { Category } from "@/lib/data/homepage";
 import { ShopSidebar } from "./shop-sidebar";
 
 interface ShopMobileFilterProps {
-  categories: Category[];
+  categories?: Category[];
   currentCategorySlug?: string;
   minPriceParam?: number;
   maxPriceParam?: number;
@@ -17,7 +17,7 @@ interface ShopMobileFilterProps {
 }
 
 export function ShopMobileFilter({
-  categories,
+  categories = [],
   currentCategorySlug,
   minPriceParam,
   maxPriceParam,

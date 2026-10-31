@@ -6,8 +6,8 @@ import {
   authenticateLocalUser,
   setSessionCookie,
   clearSessionCookie,
-  ensureDevAdminUser,
 } from "@/lib/auth/local-auth";
+import { isUserAdmin } from "@/lib/auth/role-check";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 
@@ -160,17 +160,19 @@ export async function loginAction(prevState: any, formData: FormData) {
         return { error: error.message };
       }
 
-      // Authoritative database check on user role
+      // Comprehensive database and metadata check on user role
       const { data: profile } = await supabase
         .from("profiles")
         .select("role")
         .eq("id", data.user.id)
         .single();
 
+      const isAdmin = isUserAdmin(data.user, profile);
+
       revalidatePath("/", "layout");
 
       // Redirect administrator automatically to /admin if no specific destination requested
-      if (profile?.role === "admin") {
+      if (isAdmin) {
         if (redirectPath === "/" || redirectPath === "/admin") {
           redirect("/admin");
         }
@@ -201,8 +203,10 @@ export async function loginAction(prevState: any, formData: FormData) {
   await setSessionCookie(result.user);
   revalidatePath("/", "layout");
 
+  const isAdmin = isUserAdmin(result.user);
+
   // Route to admin if legitimate administrator
-  if (result.user.role === "admin") {
+  if (isAdmin) {
     if (redirectPath === "/" || redirectPath === "/admin") {
       redirect("/admin");
     }
@@ -296,20 +300,3 @@ export async function resetPasswordAction(prevState: any, formData: FormData) {
 
   return { success: "Password updated successfully." };
 }
-
-/**
- * Development-Only Admin Preview Action
- * Enables instantaneous local inspection of the admin panel without connecting an external backend.
- * Protected against production execution.
- */
-export async function enterDevAdminPreviewAction() {
-  if (process.env.NODE_ENV === "production") {
-    throw new Error("Development preview is strictly prohibited in production environments.");
-  }
-
-  const devAdmin = ensureDevAdminUser();
-  await setSessionCookie(devAdmin);
-  revalidatePath("/", "layout");
-  redirect("/admin");
-}
-

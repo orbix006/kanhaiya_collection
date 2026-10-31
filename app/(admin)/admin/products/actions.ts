@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { generateSlug } from "@/lib/data/categories";
+import { isUserAdmin } from "@/lib/auth/role-check";
 
 export interface ProductImageInput {
   id?: string;
@@ -82,7 +83,7 @@ async function verifyAdminCaller() {
     .eq("id", user.id)
     .single();
 
-  if (profileError || !profile || profile.role !== "admin") {
+  if (!isUserAdmin(user, profile)) {
     return {
       authorized: false,
       error: "Forbidden: Only administrators can perform this action.",

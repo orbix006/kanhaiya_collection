@@ -1,33 +1,33 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
-import { ChevronLeft, ChevronRight, Pause, Play, Sparkles } from "lucide-react";
+import { ChevronLeft, ChevronRight, Pause, Play } from "lucide-react";
 import type { Announcement } from "@/lib/data/cms";
 import { loadMockAnnouncements } from "@/lib/mock-data/admin-store";
+
+const DEFAULT_ANNOUNCEMENT_TEXT =
+  "Shubh Deepavali Special: Complimentary Brass Diya Set with sacred orders above ₹2,499. Use code DIWALI108.";
 
 interface AnnouncementRibbonProps {
   initialAnnouncements?: Announcement[];
 }
 
 export function AnnouncementRibbon({ initialAnnouncements }: AnnouncementRibbonProps) {
-  const [announcements, setAnnouncements] = useState<Announcement[]>(() => {
-    if (initialAnnouncements && initialAnnouncements.length > 0) {
-      return initialAnnouncements;
-    }
-    if (typeof window !== "undefined") {
-      try {
-        const stored = loadMockAnnouncements();
-        if (stored && stored.length > 0) return stored;
-      } catch {}
-    }
-    return [];
-  });
+  // 1. Deterministic mount guard to guarantee SSR and client hydration markup match 100%
+  const [mounted, setMounted] = useState<boolean>(false);
 
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [isPaused, setIsPaused] = useState(false);
+  // 2. Initialize with deterministic data across Server and Client (no window/localStorage access in initializer)
+  const [announcements, setAnnouncements] = useState<Announcement[]>(
+    initialAnnouncements && initialAnnouncements.length > 0 ? initialAnnouncements : []
+  );
 
-  // Re-hydrate on mount and listen to catalog updates
+  const [currentIndex, setCurrentIndex] = useState<number>(0);
+  const [isPaused, setIsPaused] = useState<boolean>(false);
+
+  // 3. Client-side hydration sync: runs only after initial hydration mount
   useEffect(() => {
+    setMounted(true);
+
     const handleSync = () => {
       try {
         const stored = loadMockAnnouncements();
@@ -57,16 +57,45 @@ export function AnnouncementRibbon({ initialAnnouncements }: AnnouncementRibbonP
 
   // Auto-advance rotation timer
   useEffect(() => {
-    if (activeAnnouncements.length <= 1 || isPaused) return;
+    if (!mounted || activeAnnouncements.length <= 1 || isPaused) return;
 
     const interval = setInterval(() => {
       setCurrentIndex((prev) => (prev + 1) % activeAnnouncements.length);
     }, 4500);
 
     return () => clearInterval(interval);
-  }, [activeAnnouncements.length, isPaused]);
+  }, [mounted, activeAnnouncements.length, isPaused]);
 
-  // If no active announcements, the strip completely disappears from public view
+  // 4. SSR and Initial Hydration Placeholder:
+  // Render matching static structure with identical accessibility attributes (role="region", aria-label="...")
+  if (!mounted) {
+    const fallbackText =
+      (initialAnnouncements && initialAnnouncements[0]?.text) || DEFAULT_ANNOUNCEMENT_TEXT;
+
+    return (
+      <div
+        role="region"
+        aria-label="Announcements & Special Offers"
+        className="relative z-50 w-full bg-gradient-to-r from-[#2A180E] via-[#3B2416] to-[#2A180E] text-[#FFFDF7] border-b border-[#C8891A]/30 py-2 px-3 sm:px-6 transition-all font-sans select-none"
+      >
+        <div className="container mx-auto max-w-7xl flex items-center justify-between gap-2 sm:gap-4">
+          <div className="flex items-center shrink-0">
+            <div className="w-5" />
+          </div>
+          <div className="flex-1 text-center min-w-0 px-1 sm:px-4">
+            <p className="text-[11px] sm:text-xs md:text-[13px] font-medium leading-snug tracking-wide text-[#FDF8EE] break-words line-clamp-2 sm:line-clamp-1">
+              {fallbackText}
+            </p>
+          </div>
+          <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+            <div className="w-5" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 5. Post-mount: if no announcements exist or are all inactive, hide cleanly
   if (activeAnnouncements.length === 0) {
     return null;
   }

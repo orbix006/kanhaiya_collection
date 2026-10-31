@@ -15,7 +15,7 @@ import type { Category } from "@/lib/data/homepage";
 import { buildCategoryTree, type CategoryTreeNode } from "@/lib/data/categories";
 
 interface ShopSidebarProps {
-  categories: Category[];
+  categories?: Category[];
   currentCategorySlug?: string;
   minPriceParam?: number;
   maxPriceParam?: number;
@@ -48,7 +48,7 @@ const MATERIAL_OPTIONS = [
 ];
 
 export function ShopSidebar({
-  categories,
+  categories = [],
   currentCategorySlug,
   minPriceParam,
   maxPriceParam,
@@ -71,7 +71,9 @@ export function ShopSidebar({
   // Category collapse state
   const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({});
 
-  const tree = buildCategoryTree(categories.filter((c) => c.is_active));
+  const safeCategories = Array.isArray(categories) ? categories : [];
+  const activeCategories = safeCategories.filter((c) => c && c.is_active);
+  const tree = Array.isArray(activeCategories) ? buildCategoryTree(activeCategories) : [];
 
   const toggleCategoryCollapse = (id: string, e: React.MouseEvent) => {
     e.preventDefault();
@@ -264,7 +266,7 @@ export function ShopSidebar({
           </button>
 
           {/* Render category tree */}
-          {tree.map((rootNode) => renderCategoryNode(rootNode))}
+          {Array.isArray(tree) && tree.map((rootNode) => renderCategoryNode(rootNode))}
         </div>
       </div>
 

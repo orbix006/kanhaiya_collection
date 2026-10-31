@@ -40,11 +40,7 @@ import {
   updateOrderStatusAction,
   updateOrderPaymentStatusAction,
 } from "@/app/(admin)/admin/orders/actions";
-import {
-  updateMockOrderStatus,
-  updateMockOrderPaymentStatus,
-  getMockOrderById,
-} from "@/lib/mock-data/admin-store";
+
 
 interface OrderDetailViewProps {
   order: OrderDetails;
@@ -179,17 +175,10 @@ export function OrderDetailView({ order: initialOrder }: OrderDetailViewProps) {
   // Payment Status State
   const [isChangingPayment, setIsChangingPayment] = useState(false);
 
-  // Hydrate order from local mock store on mount
+  // Synchronize state when initialOrder prop updates
   useEffect(() => {
-    try {
-      const stored = getMockOrderById(initialOrder.id);
-      if (stored) {
-        setOrder(stored);
-      }
-    } catch {
-      // Fallback
-    }
-  }, [initialOrder.id]);
+    setOrder(initialOrder);
+  }, [initialOrder]);
 
   const copyToClipboard = (key: string, text: string) => {
     navigator.clipboard?.writeText(text);
@@ -253,25 +242,22 @@ export function OrderDetailView({ order: initialOrder }: OrderDetailViewProps) {
     setStatusActionMessage(null);
 
     try {
-      // 1. Update in local mock store (survives browser refresh and handles triggers)
-      const mockResult = updateMockOrderStatus(order.id, targetStatus);
-      if (!mockResult.success) {
-        setStatusActionMessage({ type: "error", text: mockResult.error || "Status transition rejected." });
-        setIsChangingStatus(false);
+      const res = await updateOrderStatusAction(order.id, targetStatus);
+      if (!res.success) {
+        setStatusActionMessage({ type: "error", text: res.error || "Status transition rejected." });
         return;
       }
 
-      // 2. Update state immediately
-      if (mockResult.order) {
-        setOrder(mockResult.order);
-      }
-
-      // 3. Sync with server action
-      await updateOrderStatusAction(order.id, targetStatus);
+      setOrder((prev) => ({
+        ...prev,
+        status: targetStatus,
+        updated_at: new Date().toISOString(),
+        can_cancel: targetStatus === "pending",
+      }));
 
       setStatusActionMessage({
         type: "success",
-        text: `Order status successfully transitioned from '${order.status}' to '${targetStatus}'. Inventory stock updated.`,
+        text: `Order status successfully transitioned from '${order.status}' to '${targetStatus}'.`,
       });
       setSelectedNextStatus(null);
     } catch (err: any) {
@@ -299,20 +285,17 @@ export function OrderDetailView({ order: initialOrder }: OrderDetailViewProps) {
     setStatusActionMessage(null);
 
     try {
-      // 1. Update in local mock store
-      const mockResult = updateMockOrderPaymentStatus(order.id, newPayment);
-      if (!mockResult.success) {
-        setStatusActionMessage({ type: "error", text: mockResult.error || "Payment update rejected." });
-        setIsChangingPayment(false);
+      const res = await updateOrderPaymentStatusAction(order.id, newPayment);
+      if (!res.success) {
+        setStatusActionMessage({ type: "error", text: res.error || "Payment update rejected." });
         return;
       }
 
-      if (mockResult.order) {
-        setOrder(mockResult.order);
-      }
-
-      // 2. Sync with server action
-      await updateOrderPaymentStatusAction(order.id, newPayment);
+      setOrder((prev) => ({
+        ...prev,
+        payment_status: newPayment,
+        updated_at: new Date().toISOString(),
+      }));
 
       setStatusActionMessage({
         type: "success",

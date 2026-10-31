@@ -33,29 +33,18 @@ import {
   canTransitionPaymentStatus,
 } from "./order-types";
 
-import { SEED_ORDERS } from "@/lib/mock-data/admin-store";
+
 
 // In-memory demo store for offline development / test resilience
 const demoOrdersStore: Map<string, OrderDetails[]> = new Map();
 
 // Helper to seed initial demo orders
 function initDemoOrdersIfEmpty(): OrderDetails[] {
-  let allOrders: OrderDetails[] = [];
+  const allOrders: OrderDetails[] = [];
   for (const list of demoOrdersStore.values()) {
     allOrders.push(...list);
   }
-
-  if (allOrders.length > 0) return allOrders;
-
-  const defaultSeedOrders: OrderDetails[] = SEED_ORDERS;
-
-  for (const o of defaultSeedOrders) {
-    const userList = demoOrdersStore.get(o.user_id) || [];
-    userList.push(o);
-    demoOrdersStore.set(o.user_id, userList);
-  }
-
-  return defaultSeedOrders;
+  return allOrders;
 }
 
 /**

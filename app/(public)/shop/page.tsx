@@ -6,6 +6,7 @@ import { ShopMobileFilter } from "@/components/shop/shop-mobile-filter";
 import { ShopSortDropdown } from "@/components/shop/shop-sort-dropdown";
 import { ShopActiveFilters } from "@/components/shop/shop-active-filters";
 import { ShopPagination } from "@/components/shop/shop-pagination";
+import { AIEmptyState } from "@/components/ui/ai-empty-state";
 import { getAllActiveCategories } from "@/lib/data/homepage";
 import { getShopProducts } from "@/lib/data/products";
 
@@ -48,22 +49,39 @@ export default async function ShopPage({ searchParams }: ShopPageProps) {
   const festival = one(params, "festival")?.trim().slice(0, 50);
   const material = one(params, "material")?.trim().slice(0, 50);
 
-  const [categories, result] = await Promise.all([
-    getAllActiveCategories(),
-    getShopProducts({
-      categorySlug,
-      searchQuery,
-      minPrice,
-      maxPrice,
-      availability,
-      festival,
-      material,
-      sort,
-      page,
-      pageSize: 12,
-    }),
-  ]);
+  let categories: any[] = [];
+  let result: any = {
+    products: [],
+    totalCount: 0,
+    page: 1,
+    pageSize: 12,
+    totalPages: 0,
+    activeCategory: null,
+  };
 
+  try {
+    const [cats, prodResult] = await Promise.all([
+      getAllActiveCategories(),
+      getShopProducts({
+        categorySlug,
+        searchQuery,
+        minPrice,
+        maxPrice,
+        availability,
+        festival,
+        material,
+        sort,
+        page,
+        pageSize: 12,
+      }),
+    ]);
+    categories = Array.isArray(cats) ? cats : [];
+    result = prodResult || result;
+  } catch {
+    categories = [];
+  }
+
+  const safeProducts = Array.isArray(result?.products) ? result.products : [];
   const selectedCategory = result.activeCategory;
   const categoryMap = new Map(categories.map((category) => [category.id, category.name]));
   const activeFilterCount = [
@@ -105,7 +123,7 @@ export default async function ShopPage({ searchParams }: ShopPageProps) {
               className="h-11 w-full rounded-xl border border-border bg-card pl-10 pr-3 text-sm text-foreground outline-hidden focus:border-primary focus:ring-2 focus:ring-primary/20"
             />
           </div>
-          <button type="submit" className="h-11 rounded-xl bg-primary px-5 text-sm font-semibold text-primary-foreground">
+          <button type="submit" className="h-11 rounded-xl bg-primary px-5 text-sm font-semibold text-primary-foreground cursor-pointer hover:bg-primary/90 transition-colors">
             Search
           </button>
         </form>
@@ -137,24 +155,25 @@ export default async function ShopPage({ searchParams }: ShopPageProps) {
               />
               <ShopSortDropdown currentSort={sort || "featured"} />
               <p className="ml-auto text-xs text-muted-foreground">
-                {result.totalCount} {result.totalCount === 1 ? "product" : "products"}
+                {result.totalCount || 0} {result.totalCount === 1 ? "product" : "products"}
               </p>
             </div>
 
             <ShopActiveFilters categories={categories} />
 
-            {result.products.length === 0 ? (
-              <div className="rounded-3xl border border-[#E8DCC8] bg-[#F8F1E3]/40 p-12 text-center">
-                <p className="font-serif text-lg text-[#3B2416]">No products match these filters.</p>
-                <p className="mt-2 text-sm text-muted-foreground">Try another search or clear some filters.</p>
-                <Link href="/shop" className="mt-4 inline-flex rounded-xl bg-primary px-5 py-2 text-xs font-semibold text-primary-foreground">
-                  View all products
-                </Link>
+            {safeProducts.length === 0 ? (
+              <div className="py-4">
+                <AIEmptyState
+                  hasFilters={activeFilterCount > 0}
+                  clearFiltersHref="/shop"
+                  actionHref="/categories"
+                  actionText="Explore Sacred Categories"
+                />
               </div>
             ) : (
               <>
                 <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 sm:gap-6 md:grid-cols-3 xl:grid-cols-4">
-                  {result.products.map((product) => (
+                  {safeProducts.map((product: any) => (
                     <ProductCard
                       key={product.id}
                       product={product}
@@ -163,10 +182,10 @@ export default async function ShopPage({ searchParams }: ShopPageProps) {
                   ))}
                 </div>
                 <ShopPagination
-                  currentPage={result.page}
-                  totalPages={result.totalPages}
-                  totalCount={result.totalCount}
-                  pageSize={result.pageSize}
+                  currentPage={result.page || 1}
+                  totalPages={result.totalPages || 1}
+                  totalCount={result.totalCount || 0}
+                  pageSize={result.pageSize || 12}
                 />
               </>
             )}

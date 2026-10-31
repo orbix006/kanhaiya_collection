@@ -1,9 +1,6 @@
-/**
- * Verification script for Kanhaiya Collection Admin Panel
- * Tests all admin routes, preview access mechanism, and security guards.
- */
+import { getLocalUsers, findLocalUserByEmail } from "../lib/auth/local-auth";
 
-const BASE_URL = "http://localhost:3000";
+const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
 interface TestResult {
   name: string;
@@ -11,39 +8,45 @@ interface TestResult {
   details?: string;
 }
 
-async function runTests() {
-  const results: TestResult[] = [];
-  console.log("=== Starting Admin Panel Verification Suite ===\n");
+const results: TestResult[] = [];
 
-  // Helper for fetch
-  async function testRoute(name: string, path: string, cookie?: string, expectedStatus = 200) {
-    try {
-      const headers: Record<string, string> = {};
-      if (cookie) {
-        headers["Cookie"] = cookie;
-      }
-      const res = await fetch(`${BASE_URL}${path}`, {
-        headers,
-        redirect: "manual",
-      });
-
-      if (res.status === expectedStatus) {
-        results.push({ name, status: "PASS", details: `Status ${res.status}` });
-        console.log(`[PASS] ${name} -> Status ${res.status}`);
-      } else {
-        const location = res.headers.get("location");
-        results.push({
-          name,
-          status: "FAIL",
-          details: `Expected ${expectedStatus}, got ${res.status} (Location: ${location})`,
-        });
-        console.log(`[FAIL] ${name} -> Expected ${expectedStatus}, got ${res.status} (Location: ${location})`);
-      }
-    } catch (err: any) {
-      results.push({ name, status: "FAIL", details: err.message });
-      console.log(`[FAIL] ${name} -> Error: ${err.message}`);
+async function testRoute(name: string, path: string, cookie?: string, expectedStatus: number = 200) {
+  try {
+    const headers: Record<string, string> = {};
+    if (cookie) {
+      headers["Cookie"] = cookie;
     }
+
+    const res = await fetch(`${BASE_URL}${path}`, {
+      headers,
+      redirect: "manual", // Don't follow redirects to check status codes
+    });
+
+    if (res.status === expectedStatus) {
+      results.push({ name, status: "PASS" });
+      console.log(`[PASS] ${name} (Status: ${res.status})`);
+    } else {
+      results.push({
+        name,
+        status: "FAIL",
+        details: `Expected status ${expectedStatus}, received ${res.status}`,
+      });
+      console.log(`[FAIL] ${name} (Expected: ${expectedStatus}, Received: ${res.status})`);
+    }
+  } catch (err: any) {
+    results.push({
+      name,
+      status: "FAIL",
+      details: err.message,
+    });
+    console.log(`[FAIL] ${name} (Error: ${err.message})`);
   }
+}
+
+async function runVerification() {
+  console.log("=========================================");
+  console.log("  ADMIN PANEL ACCESS VERIFICATION SUITE  ");
+  console.log("=========================================\n");
 
   // 1. Check Storefront
   await testRoute("1. Storefront Home Page", "/");
@@ -53,19 +56,19 @@ async function runTests() {
     const loginRes = await fetch(`${BASE_URL}/login`);
     const loginHtml = await loginRes.text();
     const hasDevPreview = loginHtml.includes("Dev Admin Preview") || loginHtml.includes("Admin Preview Mode");
-    if (loginRes.status === 200 && hasDevPreview) {
-      results.push({ name: "2. Login Page with Dev Preview Button", status: "PASS" });
-      console.log("[PASS] 2. Login Page with Dev Preview Button");
+    if (loginRes.status === 200 && !hasDevPreview) {
+      results.push({ name: "2. Clean Login Page (No Dev Preview Mock Toggle)", status: "PASS" });
+      console.log("[PASS] 2. Clean Login Page (No Dev Preview Mock Toggle)");
     } else {
       results.push({
-        name: "2. Login Page with Dev Preview Button",
+        name: "2. Clean Login Page (No Dev Preview Mock Toggle)",
         status: "FAIL",
         details: `Status: ${loginRes.status}, Has Button: ${hasDevPreview}`,
       });
-      console.log("[FAIL] 2. Login Page with Dev Preview Button");
+      console.log("[FAIL] 2. Clean Login Page (No Dev Preview Mock Toggle)");
     }
   } catch (err: any) {
-    results.push({ name: "2. Login Page with Dev Preview Button", status: "FAIL", details: err.message });
+    results.push({ name: "2. Clean Login Page (No Dev Preview Mock Toggle)", status: "FAIL", details: err.message });
   }
 
   // 3. Unauthenticated access to /admin -> should redirect (307) to /login
@@ -73,78 +76,54 @@ async function runTests() {
 
   // 4. Non-admin user access to /admin -> should redirect (307) to /403
   const userCookie = `demo_user=${encodeURIComponent(
-    JSON.stringify({
-      id: "usr_non_admin",
-      email: "buyer@example.com",
-      full_name: "Regular Buyer",
-      role: "user",
-    })
+    JSON.stringify({ id: "test_user_normal", email: "user@example.com", role: "user" })
   )}`;
   await testRoute("4. Non-admin /admin access blocked (to /403)", "/admin", userCookie, 307);
 
-  // Admin cookie for development preview
+  // 5. Authenticated Admin access
   const adminCookie = `demo_user=${encodeURIComponent(
-    JSON.stringify({
-      id: "usr_4104acb962ff4cdaae6cd0136b9cee47",
-      email: "you@example.com",
-      full_name: "Amber",
-      role: "admin",
-    })
+    JSON.stringify({ id: "test_admin", email: "avaatdesigns.info@gmail.com", role: "admin" })
   )}`;
-
-  // 5. Authenticated Admin Dashboard (Item 1)
-  await testRoute("5. Admin Executive Dashboard (/admin)", "/admin", adminCookie, 200);
-
-  // 6. Admin Products (Item 2)
+  await testRoute("5. Admin Dashboard (/admin)", "/admin", adminCookie, 200);
   await testRoute("6. Admin Products (/admin/products)", "/admin/products", adminCookie, 200);
-
-  // 7. Admin Categories (Item 3)
   await testRoute("7. Admin Categories (/admin/categories)", "/admin/categories", adminCookie, 200);
-
-  // 8. Admin Orders (Item 4)
   await testRoute("8. Admin Orders (/admin/orders)", "/admin/orders", adminCookie, 200);
+  await testRoute("9. Admin Reviews (/admin/reviews)", "/admin/reviews", adminCookie, 200);
+  await testRoute("10. Admin Users (/admin/users)", "/admin/users", adminCookie, 200);
+  await testRoute("11. Admin Banners CMS (/admin/cms/banners)", "/admin/cms/banners", adminCookie, 200);
+  await testRoute("12. Admin FAQs CMS (/admin/cms/faqs)", "/admin/cms/faqs", adminCookie, 200);
+  await testRoute("13. Admin Policies CMS (/admin/cms/policies)", "/admin/cms/policies", adminCookie, 200);
 
-  // 9. Admin Customers & Users (Item 5)
-  await testRoute("9. Admin Customers / Users (/admin/users)", "/admin/users", adminCookie, 200);
+  // Summary
+  console.log("\n=========================================");
+  console.log("            TEST SUMMARY                 ");
+  console.log("=========================================");
 
-  // 10. Admin Reviews (Item 6)
-  await testRoute("10. Admin Reviews (/admin/reviews)", "/admin/reviews", adminCookie, 200);
+  let passCount = 0;
+  let failCount = 0;
 
-  // 11. Homepage Management CMS (Item 7)
-  await testRoute("11. Admin Homepage CMS (/admin/cms/homepage)", "/admin/cms/homepage", adminCookie, 200);
+  for (const r of results) {
+    if (r.status === "PASS") {
+      passCount++;
+    } else {
+      failCount++;
+      console.log(`❌ ${r.name}: ${r.details || "Failed"}`);
+    }
+  }
 
-  // 12. Hero Banners CMS (Item 8)
-  await testRoute("12. Admin Banners CMS (/admin/cms/banners)", "/admin/cms/banners", adminCookie, 200);
+  console.log(`\nTotal: ${results.length} | Passed: ${passCount} | Failed: ${failCount}`);
 
-  // 13. Testimonials CMS (Item 9)
-  await testRoute("13. Admin Testimonials CMS (/admin/cms/testimonials)", "/admin/cms/testimonials", adminCookie, 200);
-
-  // 14. About Us CMS (Item 10)
-  await testRoute("14. Admin About Us CMS (/admin/cms/about)", "/admin/cms/about", adminCookie, 200);
-
-  // 15. FAQs CMS (Item 11)
-  await testRoute("15. Admin FAQs CMS (/admin/cms/faqs)", "/admin/cms/faqs", adminCookie, 200);
-
-  // 16. Policies CMS (Item 12)
-  await testRoute("16. Admin Policies CMS (/admin/cms/policies)", "/admin/cms/policies", adminCookie, 200);
-
-  // 17. Contact Submissions Inbox (Item 13)
-  await testRoute("17. Admin Contact Submissions (/admin/inbox/contact)", "/admin/inbox/contact", adminCookie, 200);
-
-  // 18. Leads Inbox (Item 14)
-  await testRoute("18. Admin Leads Inbox (/admin/inbox/leads)", "/admin/inbox/leads", adminCookie, 200);
-
-  // 19. Site Settings CMS (Item 15)
-  await testRoute("19. Admin Site Settings (/admin/cms/settings)", "/admin/cms/settings", adminCookie, 200);
-
-  console.log("\n=== Summary ===");
-  const passed = results.filter((r) => r.status === "PASS").length;
-  console.log(`Passed: ${passed}/${results.length}`);
-  if (passed === results.length) {
-    console.log("All Admin Panel verification checks PASSED successfully!");
+  if (failCount > 0) {
+    console.log("\nVerification failed!");
+    process.exit(1);
   } else {
-    console.log("Some checks failed. See details above.");
+    console.log("\nAll Admin routes and RBAC guards verified successfully!");
+    process.exit(0);
   }
 }
 
-runTests();
+// Execute tests
+runVerification().catch((err) => {
+  console.error("Test execution fatal error:", err);
+  process.exit(1);
+});

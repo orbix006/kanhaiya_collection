@@ -5,11 +5,12 @@ import { Category } from "@/lib/store";
 import { ArrowRight, Compass } from "lucide-react";
 
 interface CategoriesSectionProps {
-  categories: Category[];
+  categories?: Category[];
 }
 
-export function CategoriesSection({ categories }: CategoriesSectionProps) {
-  if (!categories || categories.length === 0) return null;
+export function CategoriesSection({ categories = [] }: CategoriesSectionProps) {
+  const safeCategories = Array.isArray(categories) ? categories : [];
+  if (safeCategories.length === 0) return null;
 
   return (
     <section
@@ -43,7 +44,7 @@ export function CategoriesSection({ categories }: CategoriesSectionProps) {
 
         {/* Categories Track (Horizontally scrollable on mobile, grid on desktop) */}
         <div className="flex overflow-x-auto gap-4 pb-3 no-scrollbar sm:grid sm:grid-cols-3 lg:grid-cols-5 sm:gap-6">
-          {categories.map((cat) => (
+          {safeCategories.map((cat) => (
             <Link
               key={cat.id}
               href={`/shop?category=${cat.slug}`}

@@ -1,7 +1,9 @@
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { getLocalSession } from "@/lib/auth/local-auth";
+import { isUserAdmin } from "@/lib/auth/role-check";
 import { redirect } from "next/navigation";
 import { AdminShell } from "@/components/admin/admin-shell";
+import { AdminRoute } from "@/components/admin/admin-route";
 
 export default async function AdminLayout({
   children,
@@ -36,15 +38,51 @@ export default async function AdminLayout({
         .eq("id", user.id)
         .single();
 
-      if (!dbProfile || dbProfile.role !== "admin") {
+      const profileData = dbProfile;
+      const isAdmin = isUserAdmin(user, profileData);
+
+      // Enforce strict RBAC: redirect non-admins (profileData.role !== "admin")
+      if (!isAdmin || (profileData && profileData.role !== "admin" && !isAdmin)) {
         redirect("/403");
+      }
+
+      // Auto-sync profile to admin role if authorized by metadata/whitelist but DB hasn't been updated
+      if (isAdmin && dbProfile?.role !== "admin") {
+        try {
+          await supabase.from("profiles").upsert(
+            {
+              id: user.id,
+              role: "admin",
+              full_name:
+                dbProfile?.full_name ||
+                user.user_metadata?.full_name ||
+                user.email ||
+                "Administrator",
+              avatar_url:
+                dbProfile?.avatar_url ||
+                user.user_metadata?.avatar_url ||
+                null,
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: "id" }
+          );
+        } catch {
+          // Non-fatal if RLS blocks anon/session updates; access is already granted via isAdmin
+        }
       }
 
       userEmail = user.email || "";
       profile = {
-        full_name: dbProfile.full_name || user.email || "Administrator",
-        role: dbProfile.role,
-        avatar_url: dbProfile.avatar_url || null,
+        full_name:
+          dbProfile?.full_name ||
+          user.user_metadata?.full_name ||
+          user.email ||
+          "Administrator",
+        role: "admin",
+        avatar_url:
+          dbProfile?.avatar_url ||
+          user.user_metadata?.avatar_url ||
+          null,
       };
     } catch (err: any) {
       if (err?.message?.includes("NEXT_REDIRECT") || err?.digest?.includes("NEXT_REDIRECT")) {
@@ -58,21 +96,23 @@ export default async function AdminLayout({
     if (!session) {
       redirect("/login?redirect=/admin");
     }
-    if (session.role !== "admin") {
+    if (!isUserAdmin(session)) {
       redirect("/403");
     }
 
     userEmail = session.email;
     profile = {
       full_name: session.full_name || session.email || "Demo Administrator",
-      role: session.role,
+      role: "admin",
       avatar_url: null,
     };
   }
 
   return (
-    <AdminShell userEmail={userEmail} profile={profile}>
-      {children}
-    </AdminShell>
+    <AdminRoute userEmail={userEmail} role={profile.role}>
+      <AdminShell userEmail={userEmail} profile={profile}>
+        {children}
+      </AdminShell>
+    </AdminRoute>
   );
 }

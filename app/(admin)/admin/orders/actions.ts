@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { isUserAdmin } from "@/lib/auth/role-check";
 import {
   type OrderStatus,
   type PaymentStatus,
@@ -95,7 +96,7 @@ export async function updateOrderStatusAction(
     .eq("id", caller.id)
     .single();
 
-  if (profileErr || !profile || profile.role !== "admin") {
+  if (!isUserAdmin(caller, profile)) {
     return { error: "Forbidden: Administrator privileges required to manage orders." };
   }
 
@@ -211,7 +212,7 @@ export async function updateOrderPaymentStatusAction(
     .eq("id", caller.id)
     .single();
 
-  if (!profile || profile.role !== "admin") {
+  if (!isUserAdmin(caller, profile)) {
     return { error: "Forbidden: Administrator privileges required." };
   }
 

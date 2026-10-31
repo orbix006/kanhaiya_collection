@@ -9,7 +9,7 @@ import {
   ChevronRight,
   Eye,
   Sparkles,
-  ShieldCheck,
+  BarChart3,
   MousePointerClick,
 } from "lucide-react";
 import {
@@ -38,10 +38,6 @@ export function MonthlyVisitorChart({
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
 
-  // On mount: record 1 preview hit for today
-  useEffect(() => {
-    recordPreviewVisit(window.location.pathname);
-  }, []);
 
   // Compute monthly analytics dynamically based on selectedPeriod
   const summary: MonthlyAnalyticsSummary = useMemo(() => {
@@ -177,7 +173,7 @@ export function MonthlyVisitorChart({
 
   return (
     <div className="rounded-2xl border border-border/80 bg-card shadow-xs overflow-hidden">
-      {/* 1. Header with Title, Period Navigator & Simulated Analytics Pill */}
+      {/* 1. Header with Title & Period Navigator */}
       <div className="p-5 border-b border-border/60 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
@@ -200,14 +196,6 @@ export function MonthlyVisitorChart({
 
         {/* Controls: Simulated Badge + Month Navigator */}
         <div className="flex items-center gap-3 flex-wrap">
-          {/* Explicit Simulated Demo Data Label */}
-          <div
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 text-[11px] font-semibold"
-            title="Generated deterministically for offline development preview. Production third-party analytics are not connected."
-          >
-            <ShieldCheck className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
-            <span>Simulated Analytics (Dev Preview)</span>
-          </div>
 
           {/* Month Selector Controls */}
           <div className="flex items-center gap-1 bg-muted/60 p-1 rounded-xl border border-border/60">
@@ -285,10 +273,10 @@ export function MonthlyVisitorChart({
               Peak Traffic Day
             </span>
             <span className="text-lg font-black text-foreground font-mono mt-0.5 block">
-              {summary.peakDay.formattedDate}
+              {summary.peakDay.visitors > 0 ? summary.peakDay.formattedDate : "—"}
             </span>
-            <span className="text-[10px] text-emerald-600 font-semibold font-mono">
-              {summary.peakDay.visitors.toLocaleString("en-IN")} visitors
+            <span className="text-[10px] text-muted-foreground font-semibold font-mono">
+              {summary.peakDay.visitors > 0 ? `${summary.peakDay.visitors.toLocaleString("en-IN")} visitors` : "0 visitors"}
             </span>
           </div>
           <div className="h-8 w-8 rounded-lg bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
@@ -304,7 +292,7 @@ export function MonthlyVisitorChart({
             <span className="text-lg font-black text-foreground font-mono mt-0.5 block">
               {summary.totalPageViews.toLocaleString("en-IN")}
             </span>
-            <span className="text-[10px] text-muted-foreground">~3.8 views / patron</span>
+            <span className="text-[10px] text-muted-foreground">{summary.totalVisitors > 0 ? `~${(summary.totalPageViews / summary.totalVisitors).toFixed(1)} views / patron` : "0 views / patron"}</span>
           </div>
           <div className="h-8 w-8 rounded-lg bg-purple-500/10 text-purple-600 flex items-center justify-center">
             <Eye className="h-4 w-4" />
@@ -314,6 +302,18 @@ export function MonthlyVisitorChart({
 
       {/* 3. Responsive SVG Line & Area Chart Container */}
       <div className="p-4 sm:p-6 relative select-none">
+        {summary.totalVisitors === 0 ? (
+          <div className="py-16 text-center text-stone-400">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
+              <BarChart3 className="h-7 w-7 text-muted-foreground" />
+            </div>
+            <p className="text-lg font-medium text-foreground">No traffic data recorded yet</p>
+            <p className="text-sm text-stone-500 mt-1">
+              Visitor traffic and impressions will display here as store visits are recorded.
+            </p>
+          </div>
+        ) : (
+          <>
         <div className="w-full relative aspect-[21/8] min-h-[220px] max-h-[300px]">
           <svg
             ref={svgRef}
@@ -491,8 +491,8 @@ export function MonthlyVisitorChart({
                 </div>
 
                 <div className="pt-1 text-[9px] text-muted-foreground/75 border-t border-border/40 flex items-center justify-between">
-                  <span>Simulated Deterministic</span>
-                  <span className="text-amber-600 font-bold">Offline Preview</span>
+                  <span>Analytics Telemetry</span>
+                  <span className="text-primary font-bold">Recorded Hits</span>
                 </div>
               </div>
             </div>
@@ -510,6 +510,8 @@ export function MonthlyVisitorChart({
             <span>Golden Area indicates visitor density</span>
           </div>
         </div>
+          </>
+        )}
       </div>
     </div>
   );

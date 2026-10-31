@@ -12,36 +12,70 @@ import {
   Menu,
   X,
   Search,
+  ChevronDown,
+  Layers,
 } from "lucide-react";
 import { logoutAction } from "@/app/(auth)/actions";
 import { getCartAction } from "@/app/(public)/cart/actions";
 import { useLocation } from "./location-context";
 import { SearchBar } from "./search-bar";
 import { AnnouncementRibbon } from "./announcement-ribbon";
+import type { Category } from "@/lib/data/homepage";
+import { isUserAdmin } from "@/lib/auth/role-check";
 
 interface HeaderProps {
   user?: {
+    id?: string;
     email?: string;
+    role?: string;
   } | null;
   profile?: {
     full_name?: string | null;
     avatar_url?: string | null;
+    role?: string;
   } | null;
+  categories?: Category[];
 }
 
-export function Header({ user, profile }: HeaderProps) {
+export function Header({ user, profile, categories = [] }: HeaderProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [categoriesDropdownOpen, setCategoriesDropdownOpen] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [cartCount, setCartCount] = useState<number>(0);
+  const [categoryList, setCategoryList] = useState<Category[]>(
+    Array.isArray(categories) ? categories : []
+  );
+
   const mounted = React.useSyncExternalStore(
     () => () => {},
     () => true,
     () => false
   );
 
+  // Fallback API hydration for categories if empty or unpopulated
   React.useEffect(() => {
+    if (categoryList.length === 0) {
+      fetch("/api/categories")
+        .then((res) => res.json())
+        .then((data) => {
+          // Defensive schema parsing: res.data vs res.data.categories vs res.categories
+          const cats = Array.isArray(data)
+            ? data
+            : (Array.isArray(data?.data)
+              ? data.data
+              : (Array.isArray(data?.categories)
+                ? data.categories
+                : []));
+          if (cats.length > 0) {
+            setCategoryList(cats);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [categoryList.length]);
 
+  React.useEffect(() => {
     const refreshCartCount = async () => {
       try {
         const res = await getCartAction();
@@ -80,9 +114,12 @@ export function Header({ user, profile }: HeaderProps) {
   const isForYouActive = pathname === "/";
   const isCategoriesActive = pathname.startsWith("/categories");
 
+  // Strict Role-Based Access Control: Exclusively show admin triggers for role === 'admin' or authorized admin account
+  const isAdmin = isUserAdmin(user, profile);
+
   return (
     <header className="sticky top-0 z-40 w-full bg-[#FFFDF7]/95 backdrop-blur-md shadow-[0_2px_14px_rgba(59,36,22,0.04)] border-b border-[#E8DCC8]/50 transition-all">
-      {/* 2. Text-Only Offer & Discount Announcement Strip Above Website Header */}
+      {/* Announcement Strip */}
       <AnnouncementRibbon />
 
       <div className="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -100,7 +137,7 @@ export function Header({ user, profile }: HeaderProps) {
             </button>
           </div>
 
-          {/* LEFT: Logo / Brand Mark (approx 20-25% width on desktop) */}
+          {/* LEFT: Logo / Brand Mark */}
           <div className="flex items-center shrink-0 md:w-[22%] lg:w-[24%]">
             <Link
               href="/"
@@ -108,7 +145,7 @@ export function Header({ user, profile }: HeaderProps) {
               aria-label="Kanhaiya Collection Home"
             >
               <div className="flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-full bg-gradient-to-br from-[#F8F1E3] to-[#E8DCC8] shadow-xs ring-1 ring-[#C8891A]/30 transition-transform group-hover:scale-105">
-                {/* Sacred Diya / Flame Motif */}
+                {/* Sacred Diya Motifs */}
                 <svg
                   className="h-5 w-5 sm:h-6 sm:w-6 text-[#C8891A]"
                   viewBox="0 0 24 24"
@@ -141,7 +178,7 @@ export function Header({ user, profile }: HeaderProps) {
             </Link>
           </div>
 
-          {/* CENTER: [ For You ] [ Categories ] [ Search Bar ] (Desktop) */}
+          {/* CENTER: [ For You ] [ Categories with Dropdown ] [ Search Bar ] (Desktop) */}
           <div className="hidden md:flex items-center flex-1 justify-center gap-4 lg:gap-6 max-w-2xl">
             {/* Primary Discovery Navigation */}
             <nav className="flex items-center gap-4 lg:gap-6 text-sm shrink-0 font-sans">
@@ -157,17 +194,78 @@ export function Header({ user, profile }: HeaderProps) {
                 For You
               </Link>
 
-              {/* Categories */}
-              <Link
-                href="/categories"
-                className={`py-1 text-sm transition-colors duration-200 ${
-                  isCategoriesActive
-                    ? "font-medium text-[#C8891A]"
-                    : "font-normal text-[#806B57] hover:text-[#3B2416]"
-                }`}
+              {/* Categories with Defensive Dropdown */}
+              <div
+                className="relative"
+                onMouseEnter={() => setCategoriesDropdownOpen(true)}
+                onMouseLeave={() => setCategoriesDropdownOpen(false)}
               >
-                Categories
-              </Link>
+                <Link
+                  href="/categories"
+                  onClick={() => setCategoriesDropdownOpen(false)}
+                  className={`py-1 text-sm inline-flex items-center gap-1 transition-colors duration-200 cursor-pointer ${
+                    isCategoriesActive
+                      ? "font-medium text-[#C8891A]"
+                      : "font-normal text-[#806B57] hover:text-[#3B2416]"
+                  }`}
+                >
+                  <span>Categories</span>
+                  <ChevronDown
+                    className={`h-3.5 w-3.5 transition-transform duration-200 ${
+                      categoriesDropdownOpen ? "rotate-180 text-[#C8891A]" : ""
+                    }`}
+                  />
+                </Link>
+
+                {categoriesDropdownOpen && (
+                  <div className="absolute top-full left-0 mt-2 w-72 bg-[#FFFDF7] border border-[#E8DCC8] rounded-2xl shadow-xl py-2 z-50 animate-in fade-in slide-in-from-top-1 duration-150">
+                    <div className="px-3 py-1.5 border-b border-[#E8DCC8]/60 flex items-center justify-between">
+                      <span className="text-[11px] font-semibold uppercase tracking-wider text-[#C8891A]">
+                        Sacred Collections
+                      </span>
+                      <Link
+                        href="/categories"
+                        onClick={() => setCategoriesDropdownOpen(false)}
+                        className="text-[11px] font-medium text-[#806B57] hover:text-[#3B2416] hover:underline"
+                      >
+                        All Categories
+                      </Link>
+                    </div>
+
+                    <div className="max-h-80 overflow-y-auto py-1">
+                      {categoryList && categoryList.length > 0 ? (
+                        categoryList
+                          .filter((c) => c?.is_active)
+                          .map((cat) => (
+                            <Link
+                              key={cat.id}
+                              href={`/shop?category=${cat.slug}`}
+                              onClick={() => setCategoriesDropdownOpen(false)}
+                              className="flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-[#3B2416] hover:bg-[#F8F1E3] hover:text-[#C8891A] transition-colors"
+                            >
+                              <Layers className="h-3.5 w-3.5 text-[#C8891A] shrink-0" />
+                              <span className="truncate">{cat.name}</span>
+                            </Link>
+                          ))
+                      ) : (
+                        <div className="px-3.5 py-3 text-xs text-[#806B57] text-center">
+                          Exploring sacred categories...
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="p-2 border-t border-[#E8DCC8]/60 bg-[#F8F1E3]/40 rounded-b-2xl">
+                      <Link
+                        href="/categories"
+                        onClick={() => setCategoriesDropdownOpen(false)}
+                        className="block w-full py-1.5 text-center text-xs font-semibold text-[#C8891A] hover:text-[#B37814] transition-colors"
+                      >
+                        Browse All Categories →
+                      </Link>
+                    </div>
+                  </div>
+                )}
+              </div>
             </nav>
 
             {/* Prominent Search Bar with rotating placeholder */}
@@ -176,7 +274,7 @@ export function Header({ user, profile }: HeaderProps) {
             </div>
           </div>
 
-          {/* RIGHT: [ Location ] [ Login / Account ] */}
+          {/* RIGHT: [ Location ] [ Cart ] [ Login / Account ] */}
           <div className="flex items-center justify-end gap-1.5 sm:gap-3 shrink-0">
             {/* Mobile Search Toggle Button */}
             <button
@@ -257,18 +355,21 @@ export function Header({ user, profile }: HeaderProps) {
                       </div>
 
                       <div className="py-1">
-                        <Link
-                          href="/admin"
-                          onClick={() => setUserMenuOpen(false)}
-                          className="flex items-center gap-2 px-4 py-2.5 text-[#3B2416] hover:bg-[#F8F1E3] hover:text-[#C8891A] transition-colors font-medium"
-                        >
-                          <svg className="h-4 w-4 text-[#C8891A]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <rect width="18" height="18" x="3" y="3" rx="2" />
-                            <path d="M3 9h18" />
-                            <path d="M9 21V9" />
-                          </svg>
-                          <span>Admin Panel</span>
-                        </Link>
+                        {/* Admin Panel strictly visible to user.role === 'admin' */}
+                        {isAdmin && (
+                          <Link
+                            href="/admin"
+                            onClick={() => setUserMenuOpen(false)}
+                            className="flex items-center gap-2 px-4 py-2.5 text-[#3B2416] hover:bg-[#F8F1E3] hover:text-[#C8891A] transition-colors font-medium"
+                          >
+                            <svg className="h-4 w-4 text-[#C8891A]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <rect width="18" height="18" x="3" y="3" rx="2" />
+                              <path d="M3 9h18" />
+                              <path d="M9 21V9" />
+                            </svg>
+                            <span>Admin Panel</span>
+                          </Link>
+                        )}
 
                         <Link
                           href="/account"
@@ -284,7 +385,7 @@ export function Header({ user, profile }: HeaderProps) {
                         <form action={logoutAction}>
                           <button
                             type="submit"
-                            className="w-full flex items-center gap-2 px-4 py-2.5 text-red-600 hover:bg-red-50 transition-colors text-left font-medium"
+                            className="w-full flex items-center gap-2 px-4 py-2.5 text-red-600 hover:bg-red-50 transition-colors text-left font-medium cursor-pointer"
                           >
                             <LogOut className="h-4 w-4" />
                             <span>Logout</span>
@@ -293,7 +394,7 @@ export function Header({ user, profile }: HeaderProps) {
                       </div>
                     </>
                   ) : (
-                    /* Unauthenticated Menu Options: Login and Admin Panel */
+                    /* Unauthenticated Menu Options: Login only - Zero visibility of admin panel */
                     <div className="py-1">
                       <Link
                         href="/login"
@@ -302,19 +403,6 @@ export function Header({ user, profile }: HeaderProps) {
                       >
                         <UserIcon className="h-4 w-4 text-[#C8891A]" />
                         <span>Login</span>
-                      </Link>
-
-                      <Link
-                        href="/admin"
-                        onClick={() => setUserMenuOpen(false)}
-                        className="flex items-center gap-2.5 px-4 py-2.5 text-[#3B2416] hover:bg-[#F8F1E3] hover:text-[#C8891A] transition-colors font-medium text-sm"
-                      >
-                        <svg className="h-4 w-4 text-[#C8891A]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <rect width="18" height="18" x="3" y="3" rx="2" />
-                          <path d="M3 9h18" />
-                          <path d="M9 21V9" />
-                        </svg>
-                        <span>Admin Panel</span>
                       </Link>
                     </div>
                   )}
@@ -332,44 +420,69 @@ export function Header({ user, profile }: HeaderProps) {
         )}
       </div>
 
-      {/* MOBILE DRAWER / MENU */}
+      {/* MOBILE FULL DRAWER NAVIGATION */}
       {mobileMenuOpen && (
-        <div className="md:hidden border-t border-[#E8DCC8]/60 bg-[#FFFDF7] px-6 py-6 shadow-xl animate-in slide-in-from-top-2 duration-200">
-          <nav className="flex flex-col space-y-4">
+        <div className="md:hidden border-t border-[#E8DCC8] bg-[#FFFDF7] px-6 py-6 animate-in slide-in-from-top-2 duration-200">
+          <nav className="flex flex-col gap-3 font-sans">
             <Link
               href="/"
               onClick={() => setMobileMenuOpen(false)}
-              className={`text-base py-1.5 transition-colors ${
-                isForYouActive ? "font-semibold text-[#C8891A]" : "font-medium text-[#7C6753] hover:text-[#3B2416]"
-              }`}
+              className="text-base font-medium text-[#3B2416] py-1.5 hover:text-[#C8891A] transition-colors"
             >
-              For You
+              For You (Home)
             </Link>
 
-            <Link
-              href="/categories"
-              onClick={() => setMobileMenuOpen(false)}
-              className={`text-base py-1.5 transition-colors ${
-                isCategoriesActive ? "font-semibold text-[#C8891A]" : "font-medium text-[#7C6753] hover:text-[#3B2416]"
-              }`}
-            >
-              Categories
-            </Link>
+            {/* Mobile Categories Navigation List */}
+            <div className="py-2 border-t border-[#E8DCC8]/40">
+              <div className="flex items-center justify-between py-1.5">
+                <Link
+                  href="/categories"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="text-sm font-semibold uppercase tracking-wider text-[#C8891A]"
+                >
+                  Categories
+                </Link>
+                <Link
+                  href="/categories"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="text-xs text-[#806B57] hover:underline"
+                >
+                  View All
+                </Link>
+              </div>
+              <div className="flex flex-col gap-1 pl-2 pt-1 max-h-48 overflow-y-auto">
+                {categoryList && categoryList.length > 0 ? (
+                  categoryList
+                    .filter((c) => c?.is_active)
+                    .map((cat) => (
+                      <Link
+                        key={cat.id}
+                        href={`/shop?category=${cat.slug}`}
+                        onClick={() => setMobileMenuOpen(false)}
+                        className="flex items-center gap-2 py-1 text-xs font-medium text-[#7C6753] hover:text-[#3B2416]"
+                      >
+                        <span className="h-1.5 w-1.5 rounded-full bg-[#C8891A]/60" />
+                        <span className="truncate">{cat.name}</span>
+                      </Link>
+                    ))
+                ) : (
+                  <Link
+                    href="/categories"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="text-xs text-[#806B57] py-1"
+                  >
+                    Browse Categories
+                  </Link>
+                )}
+              </div>
+            </div>
 
             <Link
-              href="/cart"
+              href="/shop"
               onClick={() => setMobileMenuOpen(false)}
-              className="flex items-center justify-between py-1.5 text-base font-medium text-[#7C6753] hover:text-[#3B2416] transition-colors"
+              className="text-base font-medium text-[#7C6753] hover:text-[#3B2416] py-1.5 transition-colors"
             >
-              <span className="flex items-center gap-2">
-                <ShoppingBag className="h-4 w-4 text-[#C8891A]" />
-                <span>Shopping Bag</span>
-              </span>
-              {mounted && cartCount > 0 && (
-                <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[#C8891A] px-1.5 text-xs font-bold text-white">
-                  {cartCount}
-                </span>
-              )}
+              All Offerings
             </Link>
 
             <Link
@@ -404,18 +517,21 @@ export function Header({ user, profile }: HeaderProps) {
 
               {user ? (
                 <div className="flex flex-col gap-2 pt-2 border-t border-[#E8DCC8]/30">
-                  <Link
-                    href="/admin"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="flex items-center gap-2 text-sm font-semibold text-[#3B2416] py-1"
-                  >
-                    <svg className="h-4 w-4 text-[#C8891A]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <rect width="18" height="18" x="3" y="3" rx="2" />
-                      <path d="M3 9h18" />
-                      <path d="M9 21V9" />
-                    </svg>
-                    <span>Admin Panel</span>
-                  </Link>
+                  {/* Strict Admin check in mobile drawer */}
+                  {isAdmin && (
+                    <Link
+                      href="/admin"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="flex items-center gap-2 text-sm font-semibold text-[#3B2416] py-1"
+                    >
+                      <svg className="h-4 w-4 text-[#C8891A]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <rect width="18" height="18" x="3" y="3" rx="2" />
+                        <path d="M3 9h18" />
+                        <path d="M9 21V9" />
+                      </svg>
+                      <span>Admin Panel</span>
+                    </Link>
+                  )}
                   <Link
                     href="/account"
                     onClick={() => setMobileMenuOpen(false)}
@@ -435,6 +551,7 @@ export function Header({ user, profile }: HeaderProps) {
                   </form>
                 </div>
               ) : (
+                /* Unauthenticated Mobile - Zero visibility of admin panel */
                 <div className="flex flex-col gap-2 pt-2 border-t border-[#E8DCC8]/30">
                   <Link
                     href="/login"
@@ -443,18 +560,6 @@ export function Header({ user, profile }: HeaderProps) {
                   >
                     <UserIcon className="h-4 w-4 text-[#C8891A]" />
                     <span>Login</span>
-                  </Link>
-                  <Link
-                    href="/admin"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="flex items-center gap-2 text-sm font-semibold text-[#3B2416] py-1"
-                  >
-                    <svg className="h-4 w-4 text-[#C8891A]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <rect width="18" height="18" x="3" y="3" rx="2" />
-                      <path d="M3 9h18" />
-                      <path d="M9 21V9" />
-                    </svg>
-                    <span>Admin Panel</span>
                   </Link>
                 </div>
               )}

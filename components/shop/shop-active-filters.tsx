@@ -5,10 +5,10 @@ import { X, Tag, Search, DollarSign, ArrowUpDown } from "lucide-react";
 import type { Category } from "@/lib/data/homepage";
 
 interface ShopActiveFiltersProps {
-  categories: Category[];
+  categories?: Category[];
 }
 
-export function ShopActiveFilters({ categories }: ShopActiveFiltersProps) {
+export function ShopActiveFilters({ categories = [] }: ShopActiveFiltersProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -21,8 +21,9 @@ export function ShopActiveFilters({ categories }: ShopActiveFiltersProps) {
   const festival = searchParams.get("festival");
   const material = searchParams.get("material");
 
+  const safeCategories = Array.isArray(categories) ? categories : [];
   const currentCategory = categorySlug
-    ? categories.find((c) => c.slug === categorySlug)
+    ? safeCategories.find((c) => c && c.slug === categorySlug)
     : null;
 
   const removeFilter = (key: string) => {
