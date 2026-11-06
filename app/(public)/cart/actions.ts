@@ -11,7 +11,7 @@ import {
   type AddToCartInput,
   type UpdateQuantityInput,
 } from "@/lib/data/cart";
-import { FALLBACK_PRODUCT_DETAILS } from "@/lib/data/products";
+import { getProductById } from "@/lib/store";
 
 function safeRevalidate(path: string, type?: "layout" | "page") {
   try {
@@ -76,14 +76,14 @@ export async function addToCartAction(input: AddToCartInput): Promise<{
   try {
     if (!isConfigured || userId.startsWith("guest_") || userId === "demo-user-id") {
       // Local dev / guest fallback
-      const fallbackProd = FALLBACK_PRODUCT_DETAILS.find((p) => p.id === productId);
-      if (!fallbackProd || !fallbackProd.is_active) {
+      const prod = await getProductById(productId);
+      if (!prod || !prod.is_active) {
         return { error: "Product not found or unavailable." };
       }
 
-      let availableStock = fallbackProd.stock_quantity;
+      let availableStock = prod.stock_quantity;
       if (variantId) {
-        const v = fallbackProd.variants.find((vr) => vr.id === variantId);
+        const v = prod.variants?.find((vr: any) => vr.id === variantId);
         if (!v || !v.is_active) {
           return { error: "Selected product variant is unavailable." };
         }
@@ -263,9 +263,9 @@ export async function updateCartQuantityAction(input: UpdateQuantityInput) {
         return { error: "Cart item not found." };
       }
 
-      const prod = FALLBACK_PRODUCT_DETAILS.find((p) => p.id === item.product_id);
+      const prod = await getProductById(item.product_id);
       const v = item.variant_id
-        ? prod?.variants.find((vr) => vr.id === item.variant_id)
+        ? prod?.variants?.find((vr: any) => vr.id === item.variant_id)
         : null;
 
       const availableStock = v ? v.stock_quantity : (prod ? prod.stock_quantity : 0);

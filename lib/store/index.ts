@@ -191,188 +191,7 @@ const INITIAL_STORE_DATA: StoreData = {
       updated_at: new Date(Date.now() - 86400000 * 6).toISOString(),
     },
   ],
-  products: [
-    {
-      id: "prod-1",
-      category_id: "cat-1",
-      name: "Handcrafted Brass Krishna Idol with Flute",
-      slug: "krishna-idol",
-      description: "Intricately detailed pure brass Krishna idol playing the sacred flute with divine ornamentation. Consecrated with holy mantras.",
-      brand: "Kanhaiya Collection",
-      base_price: 3499,
-      compare_at_price: 4299,
-      stock_quantity: 15,
-      sold_count: 142, // High sold_count -> Bestseller!
-      is_active: true,
-      is_featured_top_seller: true,
-      top_seller_display_order: 1,
-      image_url: "/images/preview-murti.jpg",
-      created_at: new Date(Date.now() - 86400000 * 12).toISOString(),
-      updated_at: new Date().toISOString(),
-    },
-    {
-      id: "prod-2",
-      category_id: "cat-2",
-      name: "Artisan Engraved Akhand Diya",
-      slug: "brass-diya",
-      description: "Traditional solid brass akhand diya with steady flame glass chimney and floral engraving. Designed for long ritual burning.",
-      brand: "Kanhaiya Collection",
-      base_price: 899,
-      compare_at_price: 1199,
-      stock_quantity: 45,
-      sold_count: 310, // Top Bestseller!
-      is_active: true,
-      is_featured_top_seller: true,
-      top_seller_display_order: 2,
-      image_url: "/images/hero-flute.jpg",
-      created_at: new Date(Date.now() - 86400000 * 11).toISOString(),
-      updated_at: new Date().toISOString(),
-    },
-    {
-      id: "prod-3",
-      category_id: "cat-2",
-      name: "Royal Brass Puja Thali Set (7 Pieces)",
-      slug: "artisan-puja-thali",
-      description: "Exquisite hand-hammered brass puja thali complete with ghanti bell, aarti diya, kumkum katori, agarbatti stand, and spoon.",
-      brand: "Kanhaiya Collection",
-      base_price: 1899,
-      compare_at_price: 2499,
-      stock_quantity: 20,
-      sold_count: 195, // Top Bestseller!
-      is_active: true,
-      is_featured_top_seller: false,
-      top_seller_display_order: null,
-      image_url: "/images/preview-thali.jpg",
-      created_at: new Date(Date.now() - 86400000 * 10).toISOString(),
-      updated_at: new Date().toISOString(),
-    },
-    {
-      id: "prod-4",
-      category_id: "cat-3",
-      name: "Pure Temple Chandan & Guggul Dhoop",
-      slug: "pure-chandan-dhoop",
-      description: "Slow-burning organic dhoop sticks made with natural Vrindavan sandalwood dust, desi ghee, and holy Ayurvedic herbs.",
-      brand: "Kanhaiya Collection",
-      base_price: 450,
-      compare_at_price: 550,
-      stock_quantity: 80,
-      sold_count: 260, // Top Bestseller!
-      is_active: true,
-      is_featured_top_seller: false,
-      top_seller_display_order: null,
-      image_url: "/images/temple-atmosphere.jpg",
-      created_at: new Date(Date.now() - 86400000 * 9).toISOString(),
-      updated_at: new Date().toISOString(),
-    },
-    {
-      id: "prod-5",
-      category_id: "cat-1",
-      name: "Radha Krishna Panchaloha Sacred Murti",
-      slug: "radha-krishna-murti",
-      description: "Consecrated five-metal sacred couple murti with delicate smiling expressions, peacock feather crown, and lotus pedestal.",
-      brand: "Kanhaiya Collection",
-      base_price: 5999,
-      compare_at_price: 7499,
-      stock_quantity: 8,
-      sold_count: 85,
-      is_active: true,
-      is_featured_top_seller: false,
-      top_seller_display_order: null,
-      image_url: "/images/preview-murti.jpg",
-      created_at: new Date(Date.now() - 86400000 * 8).toISOString(),
-      updated_at: new Date().toISOString(),
-    },
-    {
-      id: "prod-6",
-      category_id: "cat-1",
-      name: "Ashtadhatu Bal Gopal (Laddu Gopal) Seva Murti",
-      slug: "laddu-gopal-murti",
-      description: "Auspicious Bal Gopal idol in crawling posture holding makhan. Ideal for daily seva, bathing, and devotional dressing rituals.",
-      brand: "Kanhaiya Collection",
-      base_price: 1499,
-      compare_at_price: 1899,
-      stock_quantity: 30,
-      sold_count: 175,
-      is_active: true,
-      is_featured_top_seller: false,
-      top_seller_display_order: null,
-      image_url: "/images/preview-murti.jpg",
-      created_at: new Date(Date.now() - 86400000 * 7).toISOString(),
-      updated_at: new Date().toISOString(),
-    },
-    {
-      id: "prod-7",
-      category_id: "cat-5",
-      name: "Vedic Gold-Border Raw Silk Mandir Aasan",
-      slug: "mandir-silk-aasan",
-      description: "Lustrous raw silk altar seat for deities featuring zari embroidery and auspicious lotus motifs. Keeps spiritual energy pure.",
-      brand: "Kanhaiya Collection",
-      base_price: 1199,
-      compare_at_price: 1499,
-      stock_quantity: 25,
-      sold_count: 98,
-      is_active: true,
-      is_featured_top_seller: false,
-      top_seller_display_order: null,
-      image_url: "/images/preview-thali.jpg",
-      created_at: new Date(Date.now() - 86400000 * 6).toISOString(),
-      updated_at: new Date().toISOString(),
-    },
-    {
-      id: "prod-8",
-      category_id: "cat-4",
-      name: "Heavy Temple Brass Hanging Bell with Chain",
-      slug: "temple-brass-bell",
-      description: "Resonant brass ghanta producing deep meditative reverberation. Includes heavy link brass chain for mandir ceiling installation.",
-      brand: "Kanhaiya Collection",
-      base_price: 2799,
-      compare_at_price: 3299,
-      stock_quantity: 12,
-      sold_count: 115,
-      is_active: true,
-      is_featured_top_seller: false,
-      top_seller_display_order: null,
-      image_url: "/images/hero-flute.jpg",
-      created_at: new Date(Date.now() - 86400000 * 4).toISOString(), // Newly Added!
-      updated_at: new Date().toISOString(),
-    },
-    {
-      id: "prod-9",
-      category_id: "cat-3",
-      name: "Natural Loban & Sambrani Cup Dhoop (Box of 24)",
-      slug: "sambrani-cup-dhoop",
-      description: "Purifying herbal charcoal cups filled with natural guggal resin and sambrani. Cleanses negative vibrations and sanctifies air.",
-      brand: "Kanhaiya Collection",
-      base_price: 399,
-      compare_at_price: 499,
-      stock_quantity: 60,
-      sold_count: 180,
-      is_active: true,
-      is_featured_top_seller: false,
-      top_seller_display_order: null,
-      image_url: "/images/temple-atmosphere.jpg",
-      created_at: new Date(Date.now() - 86400000 * 2).toISOString(), // Newly Added!
-      updated_at: new Date().toISOString(),
-    },
-    {
-      id: "prod-10",
-      category_id: "cat-5",
-      name: "Gold Embossed Tanjore Radha Krishna Altar Frame",
-      slug: "radha-krishna-frame",
-      description: "22-karat gold foil foil-work traditional Tanjore devotional altar frame with teakwood border and protective glass cover.",
-      brand: "Kanhaiya Collection",
-      base_price: 2199,
-      compare_at_price: 2799,
-      stock_quantity: 14,
-      sold_count: 72,
-      is_active: true,
-      is_featured_top_seller: false,
-      top_seller_display_order: null,
-      image_url: "/images/preview-murti.jpg",
-      created_at: new Date(Date.now() - 86400000 * 1).toISOString(), // Brand New!
-      updated_at: new Date().toISOString(),
-    },
-  ],
+  products: [],
   festive_offer: {
     enabled: true,
     title: "Deepotsav & Sacred Festive Offerings",
@@ -481,6 +300,48 @@ export async function getAllBanners(): Promise<Banner[]> {
   return store.banners.sort((a, b) => a.display_order - b.display_order);
 }
 
+export function normalizeCategoryRow(row: any): Category {
+  return {
+    id: String(row.id),
+    parent_id: row.parent_id || null,
+    name: row.category_name || row.name || "Sacred Collection",
+    slug: row.slug || String(row.id),
+    description: row.description || "",
+    image_url: row.image_url || getCategoryDefaultImage(row.slug, row.category_name || row.name),
+    display_order: Number(row.display_order) || 0,
+    is_active: Boolean(row.is_active ?? true),
+    show_on_homepage: Boolean(row.show_on_homepage ?? true),
+    created_at: row.created_at || new Date().toISOString(),
+    updated_at: row.updated_at || new Date().toISOString(),
+  };
+}
+
+export function getCategoryDefaultImage(slug?: string, name?: string): string {
+  const s = (slug || name || "").toLowerCase();
+  if (s.includes("poshak") || s.includes("dress") || s.includes("vastra")) {
+    return "/images/preview-murti.jpg";
+  }
+  if (s.includes("sringar") || s.includes("jewelry") || s.includes("ornament") || s.includes("mukut") || s.includes("flute")) {
+    return "/images/hero-flute.jpg";
+  }
+  if (s.includes("mandir") || s.includes("thali") || s.includes("pooja") || s.includes("puja") || s.includes("aasan")) {
+    return "/images/preview-thali.jpg";
+  }
+  if (s.includes("jhula") || s.includes("swing")) {
+    return "/images/hero-flute.jpg";
+  }
+  if (s.includes("singhasan") || s.includes("throne") || s.includes("seat")) {
+    return "/images/preview-murti.jpg";
+  }
+  if (s.includes("toy") || s.includes("gopal")) {
+    return "/images/preview-murti.jpg";
+  }
+  if (s.includes("bandarwaal") || s.includes("toran") || s.includes("decor")) {
+    return "/images/preview-thali.jpg";
+  }
+  return "/images/temple-atmosphere.jpg";
+}
+
 export async function getActiveCategories(): Promise<Category[]> {
   const supabase = await createClient();
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -494,7 +355,7 @@ export async function getActiveCategories(): Promise<Category[]> {
         .order("display_order", { ascending: true });
 
       if (!error && data && data.length > 0) {
-        return data as Category[];
+        return data.map(normalizeCategoryRow);
       }
     } catch {
       // Fallback below
@@ -504,15 +365,95 @@ export async function getActiveCategories(): Promise<Category[]> {
   const store = getLocalStoreData();
   return store.categories
     .filter((c) => c.is_active)
-    .sort((a, b) => a.display_order - b.display_order);
+    .sort((a, b) => a.display_order - b.display_order)
+    .map(normalizeCategoryRow);
 }
 
 export async function getAllCategories(): Promise<Category[]> {
+  const supabase = await createClient();
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+
+  if (supabaseUrl) {
+    try {
+      const { data, error } = await supabase
+        .from("categories")
+        .select("*")
+        .order("display_order", { ascending: true });
+
+      if (!error && data && data.length > 0) {
+        return data.map(normalizeCategoryRow);
+      }
+    } catch {
+      // Fallback below
+    }
+  }
+
   const store = getLocalStoreData();
-  return store.categories.sort((a, b) => a.display_order - b.display_order);
+  return store.categories
+    .sort((a, b) => a.display_order - b.display_order)
+    .map(normalizeCategoryRow);
 }
 
 export async function getAllProducts(): Promise<Product[]> {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+
+  if (supabaseUrl) {
+    try {
+      const supabase = await createClient();
+      const { data, error } = await supabase
+        .from("products")
+        .select(`
+          *,
+          product_images (
+            id,
+            image_url,
+            is_primary,
+            display_order
+          )
+        `)
+        .order("created_at", { ascending: false });
+
+      if (!error && data && data.length > 0) {
+        return data.map((p: any) => {
+          const sortedImgs = p.product_images
+            ? [...p.product_images].sort(
+                (a, b) => (a.display_order || 0) - (b.display_order || 0)
+              )
+            : [];
+          const primaryImg =
+            sortedImgs.find((img) => img.is_primary)?.image_url ||
+            sortedImgs[0]?.image_url ||
+            p.image_url ||
+            null;
+
+          return {
+            id: String(p.id),
+            category_id: p.category_id || null,
+            name: p.product_name || p.name || "Sacred Item",
+            slug: p.slug || String(p.id),
+            description: p.description || null,
+            brand: p.brand || "Kanhaiya Collection",
+            base_price: Number(p.base_price || p.price || 0),
+            compare_at_price: p.compare_at_price || p.mrp ? Number(p.compare_at_price || p.mrp) : null,
+            stock_quantity: Number(p.stock_quantity ?? 0),
+            sold_count: Number(p.sold_count || 0),
+            is_active: Boolean(p.is_active ?? true),
+            is_featured_top_seller: Boolean(p.is_featured_top_seller ?? false),
+            top_seller_display_order: p.top_seller_display_order ?? null,
+            image_url: primaryImg || "",
+            created_at: p.created_at || new Date().toISOString(),
+            updated_at: p.updated_at || new Date().toISOString(),
+            sku: p.sku || null,
+            avg_rating: Number(p.avg_rating || 0),
+            review_count: Number(p.review_count || 0),
+          };
+        });
+      }
+    } catch {
+      // Fallback
+    }
+  }
+
   const store = getLocalStoreData();
   const prods = Array.isArray(store?.products) ? store.products : [];
   return prods.map((p) => {
@@ -522,12 +463,158 @@ export async function getAllProducts(): Promise<Product[]> {
       p.image_url;
     return {
       ...p,
-      image_url: primaryImg || "/images/preview-murti.jpg",
+      image_url: primaryImg || "",
     };
   });
 }
 
+export async function getProductById(id: string): Promise<Product | null> {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+
+  if (supabaseUrl) {
+    try {
+      const supabase = await createClient();
+      const { data, error } = await supabase
+        .from("products")
+        .select(`
+          *,
+          product_images (
+            id,
+            image_url,
+            is_primary,
+            display_order
+          ),
+          product_variants (
+            id,
+            variant_name,
+            sku,
+            price,
+            compare_at_price,
+            stock_quantity,
+            image_url,
+            is_active,
+            attributes
+          )
+        `)
+        .eq("id", id)
+        .maybeSingle();
+
+      if (!error && data) {
+        const d = data as any;
+        const sortedImgs = d.product_images
+          ? [...d.product_images].sort(
+              (a: any, b: any) => (a.display_order || 0) - (b.display_order || 0)
+            )
+          : [];
+        const primaryImg =
+          sortedImgs.find((img: any) => img.is_primary)?.image_url ||
+          sortedImgs[0]?.image_url ||
+          d.image_url ||
+          null;
+
+        return {
+          id: String(d.id),
+          category_id: d.category_id || null,
+          name: d.product_name || d.name || "Sacred Item",
+          slug: d.slug || String(d.id),
+          description: d.description || null,
+          brand: d.brand || "Kanhaiya Collection",
+          base_price: Number(d.base_price || d.price || 0),
+          compare_at_price: d.compare_at_price || d.mrp ? Number(d.compare_at_price || d.mrp) : null,
+          stock_quantity: Number(d.stock_quantity ?? 0),
+          sold_count: Number(d.sold_count || 0),
+          is_active: Boolean(d.is_active ?? true),
+          is_featured_top_seller: Boolean(d.is_featured_top_seller ?? false),
+          top_seller_display_order: d.top_seller_display_order ?? null,
+          image_url: primaryImg || "",
+          created_at: d.created_at || new Date().toISOString(),
+          updated_at: d.updated_at || new Date().toISOString(),
+          sku: d.sku || null,
+          avg_rating: Number(d.avg_rating || 0),
+          review_count: Number(d.review_count || 0),
+          images: sortedImgs,
+          variants: d.product_variants || [],
+        };
+      }
+    } catch {
+      // Fallback
+    }
+  }
+
+  const store = getLocalStoreData();
+  const prods = Array.isArray(store?.products) ? store.products : [];
+  const p = prods.find((p) => p.id === id);
+  if (!p) return null;
+  const primaryImg =
+    p.images?.find((img) => img.is_primary)?.image_url ||
+    p.images?.[0]?.image_url ||
+    p.image_url;
+  return {
+    ...p,
+    image_url: primaryImg || "",
+  };
+}
+
 export async function getProductBySlug(slug: string): Promise<Product | null> {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+
+  if (supabaseUrl) {
+    try {
+      const supabase = await createClient();
+      const { data, error } = await supabase
+        .from("products")
+        .select(`
+          *,
+          product_images (
+            id,
+            image_url,
+            is_primary,
+            display_order
+          )
+        `)
+        .eq("slug", slug)
+        .single();
+
+      if (!error && data) {
+        const d = data as any;
+        const sortedImgs = d.product_images
+          ? [...d.product_images].sort(
+              (a: any, b: any) => (a.display_order || 0) - (b.display_order || 0)
+            )
+          : [];
+        const primaryImg =
+          sortedImgs.find((img: any) => img.is_primary)?.image_url ||
+          sortedImgs[0]?.image_url ||
+          d.image_url ||
+          null;
+
+        return {
+          id: String(d.id),
+          category_id: d.category_id || null,
+          name: d.product_name || d.name || "Sacred Item",
+          slug: d.slug || String(d.id),
+          description: d.description || null,
+          brand: d.brand || "Kanhaiya Collection",
+          base_price: Number(d.base_price || d.price || 0),
+          compare_at_price: d.compare_at_price || d.mrp ? Number(d.compare_at_price || d.mrp) : null,
+          stock_quantity: Number(d.stock_quantity ?? 0),
+          sold_count: Number(d.sold_count || 0),
+          is_active: Boolean(d.is_active ?? true),
+          is_featured_top_seller: Boolean(d.is_featured_top_seller ?? false),
+          top_seller_display_order: d.top_seller_display_order ?? null,
+          image_url: primaryImg || "",
+          created_at: d.created_at || new Date().toISOString(),
+          updated_at: d.updated_at || new Date().toISOString(),
+          sku: d.sku || null,
+          avg_rating: Number(d.avg_rating || 0),
+          review_count: Number(d.review_count || 0),
+        };
+      }
+    } catch {
+      // Fallback
+    }
+  }
+
   const store = getLocalStoreData();
   const prods = Array.isArray(store?.products) ? store.products : [];
   const p = prods.find((p) => p.slug === slug && p.is_active);
@@ -538,7 +625,7 @@ export async function getProductBySlug(slug: string): Promise<Product | null> {
     p.image_url;
   return {
     ...p,
-    image_url: primaryImg || "/images/preview-murti.jpg",
+    image_url: primaryImg || "",
   };
 }
 

@@ -38,8 +38,8 @@ export async function verifyToken(req?: NextRequest | Request | any): Promise<Us
 
       if (!error && user) {
         const { data: profile } = await supabase
-          .from("profiles")
-          .select("role, full_name")
+          .from("users")
+          .select("id, full_name, email, role")
           .eq("id", user.id)
           .single();
 
@@ -141,8 +141,8 @@ export async function verifyAdminCaller(
 
       if (!authError && user) {
         const { data: profile } = await supabase
-          .from("profiles")
-          .select("role")
+          .from("users")
+          .select("id, full_name, email, role")
           .eq("id", user.id)
           .single();
 

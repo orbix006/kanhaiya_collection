@@ -388,6 +388,7 @@ export async function saveProductAction(payload: ProductSavePayload) {
 
     revalidatePath("/admin/products");
     revalidatePath("/shop");
+    revalidatePath("/categories");
     revalidatePath(`/shop/product/${slug}`);
     revalidatePath(`/product/${slug}`);
     revalidatePath("/");
@@ -462,7 +463,9 @@ export async function archiveProductAction(productId: string, shouldArchive: boo
 
     revalidatePath("/admin/products");
     revalidatePath("/shop");
+    revalidatePath("/categories");
     revalidatePath("/");
+    revalidatePath("/shop/product", "layout");
 
     return {
       success: true,
@@ -512,7 +515,9 @@ export async function deleteProductAction(productId: string) {
 
     revalidatePath("/admin/products");
     revalidatePath("/shop");
+    revalidatePath("/categories");
     revalidatePath("/");
+    revalidatePath("/shop/product", "layout");
 
     return {
       success: true,

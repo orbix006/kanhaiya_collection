@@ -93,22 +93,25 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(loginUrl);
     }
 
-    // Role check at middleware edge
-    let dbProfile = null;
+    // Role check at middleware edge from public.users
+    let dbProfile: { role?: string; id?: string } | null = null;
     try {
-      const { data } = await supabase
-        .from("profiles")
-        .select("role")
+      const { data, error: profileErr } = await supabase
+        .from("users")
+        .select("id, role")
         .eq("id", user.id)
         .single();
+      if (profileErr) {
+        console.error("Middleware profile fetch failed:", profileErr);
+      }
       dbProfile = data;
     } catch {
       // AdminLayout will perform authoritative fallback check
     }
 
     const profile = dbProfile;
-    // Enforces strict RBAC: rejects if profile.role !== "admin" unless authorized
-    if (!isUserAdmin(user, profile) || (profile && profile.role !== "admin" && !isUserAdmin(user))) {
+    // Enforces strict RBAC: rejects if role !== "admin"
+    if (!isUserAdmin(user, profile)) {
       const forbiddenUrl = new URL("/403", request.url);
       return NextResponse.redirect(forbiddenUrl);
     }

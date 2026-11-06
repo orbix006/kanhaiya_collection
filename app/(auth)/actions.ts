@@ -160,12 +160,20 @@ export async function loginAction(prevState: any, formData: FormData) {
         return { error: error.message };
       }
 
-      // Comprehensive database and metadata check on user role
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("role")
+      // Fetch authoritative database record from public.users
+      const { data: profile, error: profileError } = await supabase
+        .from("users")
+        .select("id, full_name, email, role")
         .eq("id", data.user.id)
         .single();
+
+      if (profileError) {
+        console.error("Profile fetch failed:", profileError);
+      }
+
+      console.log("Authenticated user ID:", data.user?.id);
+      console.log("Database profile:", profile);
+      console.log("Database role:", profile?.role);
 
       const isAdmin = isUserAdmin(data.user, profile);
 

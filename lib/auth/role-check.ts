@@ -22,6 +22,7 @@ export const ADMIN_WHITELIST_UIDS = [
 
 /**
  * Checks whether an email matches an authorized administrator email (case-insensitive).
+ * Kept for test utility backward compatibility.
  */
 export function isAdminEmail(email?: string | null): boolean {
   if (!email || typeof email !== "string") return false;
@@ -31,6 +32,7 @@ export function isAdminEmail(email?: string | null): boolean {
 
 /**
  * Checks whether a user ID matches an authorized administrator UID.
+ * Kept for test utility backward compatibility.
  */
 export function isAdminUid(uid?: string | null): boolean {
   if (!uid || typeof uid !== "string") return false;
@@ -42,27 +44,20 @@ export interface UserLike {
   id?: string | null;
   email?: string | null;
   role?: string | null;
-  app_metadata?: { role?: string; claims_admin?: boolean; [key: string]: any } | null;
-  user_metadata?: { role?: string; is_admin?: boolean; [key: string]: any } | null;
   [key: string]: any;
 }
 
 export interface ProfileLike {
   id?: string | null;
   role?: string | null;
-  is_admin?: boolean | null;
   [key: string]: any;
 }
 
 /**
  * Authoritatively evaluates whether a user holds administrator privileges.
- * Comprehensively verifies:
- * 1. Admin Email Whitelist (e.g. avaatdesigns.info@gmail.com)
- * 2. Admin UID Whitelist (e.g. 8ccd5c84-1b51-4bed-a3b7-7727387cbaa2)
- * 3. Supabase Auth app_metadata: user?.app_metadata?.role === 'admin'
- * 4. Supabase Auth user_metadata: user?.user_metadata?.role === 'admin'
- * 5. Database Profile Record: profile?.role === 'admin' || profile?.is_admin === true
- * 6. Direct User Role: user?.role === 'admin'
+ * Directly inspects the authoritative database role from public.users:
+ * 1. Checks profile?.role === 'admin' (database users record role)
+ * 2. Checks user?.role === 'admin' (database users record role mapped to user object)
  */
 export function isUserAdmin(
   user?: UserLike | null,
@@ -70,39 +65,12 @@ export function isUserAdmin(
 ): boolean {
   if (!user && !profile) return false;
 
-  // 1. Admin Email Whitelist
-  if (user?.email && isAdminEmail(user.email)) return true;
-  if ((profile as any)?.email && isAdminEmail((profile as any).email)) return true;
-
-  // 2. Admin UID Whitelist
-  if (user?.id && isAdminUid(user.id)) return true;
-  if (profile?.id && isAdminUid(profile.id)) return true;
-
-  // 3. Supabase Auth app_metadata check
-  if (
-    user?.app_metadata?.role === "admin" ||
-    user?.app_metadata?.claims_admin === true
-  ) {
+  // 1. Authoritative Database public.users record role
+  if (profile?.role === "admin") {
     return true;
   }
 
-  // 4. Supabase Auth user_metadata check
-  if (
-    user?.user_metadata?.role === "admin" ||
-    user?.user_metadata?.is_admin === true
-  ) {
-    return true;
-  }
-
-  // 5. Database Profile Table Field Check (role column or is_admin boolean)
-  if (
-    profile?.role === "admin" ||
-    profile?.is_admin === true
-  ) {
-    return true;
-  }
-
-  // 6. Direct User Role Attribute (e.g. local session or hydrated user object)
+  // 2. Direct User role attribute from public.users record / session
   if (user?.role === "admin") {
     return true;
   }
@@ -112,6 +80,7 @@ export function isUserAdmin(
 
 /**
  * Resolves the normalized role string ('admin' | 'user') for a given user & profile.
+ * Defaults strictly to 'user' if role is not 'admin'.
  */
 export function resolveUserRole(
   user?: UserLike | null,
@@ -119,4 +88,5 @@ export function resolveUserRole(
 ): "admin" | "user" {
   return isUserAdmin(user, profile) ? "admin" : "user";
 }
+
 

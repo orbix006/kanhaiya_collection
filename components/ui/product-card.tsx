@@ -77,14 +77,25 @@ export function ProductCard<T extends ProductCardItem>({
       className={`group relative flex flex-col rounded-2xl bg-[#FFFDF7] border border-[#E8DCC8] overflow-hidden transition-all duration-300 hover:shadow-[0_8px_24px_rgba(59,36,22,0.08)] hover:border-[#C8891A]/50 hover:-translate-y-1 ${className}`}
     >
       {/* Product Image Area */}
-      <div className="relative aspect-square w-full overflow-hidden bg-[#F8F1E3]">
-        <Image
-          src={product.image_url || "/images/preview-murti.jpg"}
-          alt={product.name}
-          fill
-          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-          className="object-cover object-center transition-transform duration-500 group-hover:scale-105"
-        />
+      <div className="relative aspect-square w-full overflow-hidden bg-[#F8F1E3] flex items-center justify-center">
+        {product.image_url ? (
+          <Image
+            src={product.image_url}
+            alt={product.name}
+            fill
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+            className="object-cover transition-transform duration-500 group-hover:scale-105"
+          />
+        ) : (
+          <div className="flex flex-col items-center justify-center p-4 text-center text-[#806B57]">
+            <span className="font-serif text-sm font-semibold text-[#3B2416] opacity-75">
+              {product.name}
+            </span>
+            <span className="text-[10px] uppercase tracking-wider text-[#C8891A] font-bold mt-1">
+              Kanhaiya Collection
+            </span>
+          </div>
+        )}
 
         {/* Subtle Discount Badge */}
         {discountPercent ? (

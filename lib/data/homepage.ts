@@ -293,7 +293,18 @@ export async function getHomepageCategories(): Promise<Category[]> {
       const { loadMockCategories } = await import("@/lib/mock-data/admin-store");
       const loaded = loadMockCategories();
       if (loaded && loaded.length > 0) {
-        return (loaded as unknown as Category[])
+        return (loaded as unknown as any[])
+          .map((c) => ({
+            id: String(c.id),
+            parent_id: c.parent_id || null,
+            name: c.category_name || c.name || "Collection",
+            slug: c.slug || String(c.id),
+            description: c.description || null,
+            image_url: c.image_url || null,
+            display_order: Number(c.display_order) || 0,
+            is_active: Boolean(c.is_active ?? true),
+            show_on_homepage: Boolean(c.show_on_homepage ?? true),
+          }))
           .filter((c) => c.is_active && c.show_on_homepage && c.parent_id === null)
           .sort((a, b) => a.display_order - b.display_order);
       }
@@ -308,13 +319,22 @@ export async function getHomepageCategories(): Promise<Category[]> {
       .from("categories")
       .select("*")
       .eq("is_active", true)
-      .eq("show_on_homepage", true)
       .order("display_order", { ascending: true });
 
     if (error || !data || data.length === 0) {
       return FALLBACK_CATEGORIES.filter((c) => c.is_active && c.show_on_homepage && c.parent_id === null);
     }
-    return data as Category[];
+    return data.map((c: any) => ({
+      id: String(c.id),
+      parent_id: c.parent_id || null,
+      name: c.category_name || c.name || "Collection",
+      slug: c.slug || String(c.id),
+      description: c.description || null,
+      image_url: c.image_url || null,
+      display_order: Number(c.display_order) || 0,
+      is_active: Boolean(c.is_active ?? true),
+      show_on_homepage: Boolean(c.show_on_homepage ?? true),
+    })).filter((c) => c.is_active && (c.show_on_homepage || c.parent_id === null) && c.parent_id === null);
   } catch {
     return FALLBACK_CATEGORIES.filter((c) => c.is_active && c.show_on_homepage && c.parent_id === null);
   }
@@ -326,7 +346,18 @@ export async function getAllActiveCategories(): Promise<Category[]> {
       const { loadMockCategories } = await import("@/lib/mock-data/admin-store");
       const loaded = loadMockCategories();
       if (loaded && loaded.length > 0) {
-        return (loaded as unknown as Category[])
+        return (loaded as unknown as any[])
+          .map((c) => ({
+            id: String(c.id),
+            parent_id: c.parent_id || null,
+            name: c.category_name || c.name || "Collection",
+            slug: c.slug || String(c.id),
+            description: c.description || null,
+            image_url: c.image_url || null,
+            display_order: Number(c.display_order) || 0,
+            is_active: Boolean(c.is_active ?? true),
+            show_on_homepage: Boolean(c.show_on_homepage ?? true),
+          }))
           .filter((c) => c.is_active)
           .sort((a, b) => a.display_order - b.display_order);
       }
@@ -346,7 +377,17 @@ export async function getAllActiveCategories(): Promise<Category[]> {
     if (error || !data || data.length === 0) {
       return FALLBACK_CATEGORIES.filter((c) => c.is_active);
     }
-    return data as Category[];
+    return data.map((c: any) => ({
+      id: String(c.id),
+      parent_id: c.parent_id || null,
+      name: c.category_name || c.name || "Collection",
+      slug: c.slug || String(c.id),
+      description: c.description || null,
+      image_url: c.image_url || null,
+      display_order: Number(c.display_order) || 0,
+      is_active: Boolean(c.is_active ?? true),
+      show_on_homepage: Boolean(c.show_on_homepage ?? true),
+    }));
   } catch {
     return FALLBACK_CATEGORIES.filter((c) => c.is_active);
   }

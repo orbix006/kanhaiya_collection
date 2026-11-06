@@ -171,13 +171,14 @@ export function ShopSidebar({
         <div
           className={`group flex items-center justify-between py-1.5 px-2 rounded-xl text-xs font-medium transition-all ${
             isSelected
-              ? "bg-primary text-primary-foreground shadow-2xs font-semibold"
+              ? "bg-primary text-primary-foreground shadow-2xs font-bold"
               : isChildSelected
               ? "text-primary font-semibold bg-primary/10"
-              : "text-foreground/80 hover:bg-muted/70 hover:text-foreground"
+              : "text-foreground/85 hover:bg-muted/70 hover:text-foreground"
           }`}
           style={{ paddingLeft: `${node.level * 16 + 8}px` }}
         >
+          {/* Main category text navigates */}
           <button
             type="button"
             onClick={() => handleCategorySelect(node.slug)}
@@ -187,18 +188,23 @@ export function ShopSidebar({
             <span className="truncate">{node.name}</span>
           </button>
 
+          {/* Chevron ONLY toggles collapse/expand - does not navigate */}
           {hasChildren && (
             <button
               type="button"
-              onClick={(e) => toggleCategoryCollapse(node.id, e)}
-              className="p-1 rounded-md hover:bg-background/20 text-current transition-colors"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                toggleCategoryCollapse(node.id, e);
+              }}
+              className="p-1 rounded-md hover:bg-background/40 text-current transition-colors cursor-pointer shrink-0 ml-1"
               aria-label={isCollapsed ? `Expand ${node.name}` : `Collapse ${node.name}`}
             >
-              {isCollapsed ? (
-                <ChevronRight className="h-3.5 w-3.5" />
-              ) : (
-                <ChevronDown className="h-3.5 w-3.5" />
-              )}
+              <ChevronDown
+                className={`h-3.5 w-3.5 transition-transform duration-200 ${
+                  isCollapsed ? "-rotate-90 opacity-70" : "rotate-0 text-primary"
+                }`}
+              />
             </button>
           )}
         </div>
@@ -239,33 +245,31 @@ export function ShopSidebar({
           <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
             Categories
           </span>
-          {currentCategorySlug && (
-            <button
-              type="button"
-              onClick={() => handleCategorySelect(null)}
-              className="text-[11px] font-medium text-primary hover:underline"
-            >
-              View All
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => router.push("/categories")}
+            className="text-[11px] font-medium text-primary hover:underline cursor-pointer"
+          >
+            All Categories →
+          </button>
         </div>
 
-        <div className="flex flex-col space-y-0.5">
-          {/* All Categories Option */}
+        <div className="flex flex-col space-y-0.5 max-h-96 overflow-y-auto pr-1">
+          {/* All Categories Option (Direct link to main categories directory) */}
           <button
             type="button"
             onClick={() => handleCategorySelect(null)}
             className={`flex items-center gap-2 py-1.5 px-2 rounded-xl text-xs transition-colors cursor-pointer text-left ${
               !currentCategorySlug
                 ? "bg-primary text-primary-foreground font-bold shadow-2xs"
-                : "text-foreground/80 hover:bg-muted/70 hover:text-foreground font-medium"
+                : "text-foreground/85 hover:bg-muted/70 hover:text-foreground font-medium"
             }`}
           >
             <Sparkles className="h-3.5 w-3.5 shrink-0 opacity-70" />
-            <span>All Categories</span>
+            <span>All Offerings</span>
           </button>
 
-          {/* Render category tree */}
+          {/* Render category tree with clean hierarchical text list */}
           {Array.isArray(tree) && tree.map((rootNode) => renderCategoryNode(rootNode))}
         </div>
       </div>
@@ -304,10 +308,10 @@ export function ShopSidebar({
               festival: event.target.value || null,
             })
           }
-          className="h-9 rounded-xl border border-border/80 bg-card px-3 text-xs text-foreground focus:border-primary focus:outline-hidden"
+          className="h-9 rounded-xl border border-border bg-card px-3 text-xs text-foreground focus:border-primary focus:outline-hidden"
         >
           {FESTIVAL_OPTIONS.map((opt) => (
-            <option key={opt.label} value={opt.value}>
+            <option key={opt.label} value={opt.value} className="bg-card text-foreground">
               {opt.label}
             </option>
           ))}
@@ -327,10 +331,10 @@ export function ShopSidebar({
               material: event.target.value || null,
             })
           }
-          className="h-9 rounded-xl border border-border/80 bg-card px-3 text-xs text-foreground focus:border-primary focus:outline-hidden"
+          className="h-9 rounded-xl border border-border bg-card px-3 text-xs text-foreground focus:border-primary focus:outline-hidden"
         >
           {MATERIAL_OPTIONS.map((opt) => (
-            <option key={opt.label} value={opt.value}>
+            <option key={opt.label} value={opt.value} className="bg-card text-foreground">
               {opt.label}
             </option>
           ))}
@@ -341,7 +345,7 @@ export function ShopSidebar({
       <div className="flex flex-col gap-3 pt-4 border-t border-border/60">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-            <DollarSign className="h-3.5 w-3.5" />
+            <DollarSign className="h-3.5 w-3.5 text-primary" />
             <span>Price (₹)</span>
           </div>
           {(minPriceParam || maxPriceParam) && (
@@ -368,7 +372,7 @@ export function ShopSidebar({
                 className={`py-1.5 px-2 rounded-xl text-[11px] font-medium border text-center transition-all cursor-pointer truncate ${
                   isPresetActive
                     ? "bg-primary text-primary-foreground border-primary font-bold shadow-2xs"
-                    : "border-border/70 bg-card text-foreground/80 hover:bg-muted hover:border-border"
+                    : "border-border bg-card text-foreground/80 hover:bg-muted hover:border-border"
                 }`}
               >
                 {preset.label}
@@ -420,7 +424,7 @@ export function ShopSidebar({
                 min="0"
                 value={minPriceInput}
                 onChange={(e) => setMinPriceInput(e.target.value)}
-                className="w-full h-9 pl-6 pr-2 rounded-xl border border-border/80 bg-muted/40 text-xs text-foreground focus:border-primary focus:bg-background focus:outline-hidden"
+                className="w-full h-9 pl-6 pr-2 rounded-xl border border-border bg-card text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:bg-background focus:outline-hidden"
               />
             </div>
             <span className="text-xs text-muted-foreground font-semibold">–</span>
@@ -434,7 +438,7 @@ export function ShopSidebar({
                 min="0"
                 value={maxPriceInput}
                 onChange={(e) => setMaxPriceInput(e.target.value)}
-                className="w-full h-9 pl-6 pr-2 rounded-xl border border-border/80 bg-muted/40 text-xs text-foreground focus:border-primary focus:bg-background focus:outline-hidden"
+                className="w-full h-9 pl-6 pr-2 rounded-xl border border-border bg-card text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:bg-background focus:outline-hidden"
               />
             </div>
           </div>

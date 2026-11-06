@@ -18,7 +18,7 @@ export async function updateProfileAction(prevState: any, formData: FormData) {
   }
 
   const { error } = await supabase
-    .from("profiles")
+    .from("users")
     .update({
       full_name: fullName,
       phone: phone,

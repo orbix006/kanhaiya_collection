@@ -110,8 +110,8 @@ export function SearchBar({ isMobile = false, onNavigate }: SearchBarProps) {
       <div
         className={`relative flex items-center w-full h-10 px-3.5 rounded-full border transition-all duration-200 ${
           isFocused
-            ? "border-[#C8891A] bg-[#FFFDF7] ring-2 ring-[#C8891A]/15 shadow-sm"
-            : "border-[#E8DCC8] bg-[#F8F1E3]/55 hover:bg-[#F8F1E3] hover:border-[#C8891A]/40"
+            ? "border-[#C8891A] bg-white ring-2 ring-[#C8891A]/15 shadow-sm"
+            : "border-[#E8DCC8] bg-white hover:bg-[#FFFDF7] hover:border-[#C8891A]/40 shadow-2xs"
         }`}
       >
         <Search className="h-4 w-4 text-[#806B57] shrink-0" aria-hidden="true" />
@@ -130,7 +130,7 @@ export function SearchBar({ isMobile = false, onNavigate }: SearchBarProps) {
           {/* Animated Rotating Placeholder overlay when input is empty */}
           {!query && (
             <span
-              className={`pointer-events-none absolute left-0 text-xs sm:text-sm text-[#806B57]/75 font-normal transition-all duration-250 ${
+              className={`pointer-events-none absolute left-0 text-xs sm:text-sm text-[#806B57]/80 font-normal transition-all duration-250 ${
                 isFading ? "opacity-0 -translate-y-1.5" : "opacity-100 translate-y-0"
               }`}
             >
@@ -154,7 +154,7 @@ export function SearchBar({ isMobile = false, onNavigate }: SearchBarProps) {
 
       {/* Live Search Results Dropdown */}
       {showDropdown && (
-        <div className="absolute top-full left-0 right-0 mt-2 z-50 bg-[#FFFDF7] border border-[#E8DCC8] rounded-2xl shadow-xl overflow-hidden p-3 animate-in fade-in-50 slide-in-from-top-1 duration-150 max-h-[75vh] overflow-y-auto font-sans">
+        <div className="absolute top-full left-0 right-0 mt-2 z-50 bg-white border border-[#E8DCC8] rounded-2xl shadow-xl overflow-hidden p-3 animate-in fade-in-50 slide-in-from-top-1 duration-150 max-h-[75vh] overflow-y-auto font-sans">
           {hasResults ? (
             <div className="space-y-4">
               {/* Category Search Results */}

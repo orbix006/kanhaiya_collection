@@ -32,46 +32,30 @@ export default async function AdminLayout({
         redirect("/login?redirect=/admin");
       }
 
-      const { data: dbProfile } = await supabase
-        .from("profiles")
-        .select("role, full_name, avatar_url")
+      // Query authoritative database record from public.users
+      const { data: dbProfile, error: profileError } = await supabase
+        .from("users")
+        .select("id, full_name, email, role, avatar_url")
         .eq("id", user.id)
         .single();
+
+      if (profileError) {
+        console.error("Profile fetch failed:", profileError);
+      }
+
+      console.log("Authenticated user ID:", user?.id);
+      console.log("Database profile:", dbProfile);
+      console.log("Database role:", dbProfile?.role);
 
       const profileData = dbProfile;
       const isAdmin = isUserAdmin(user, profileData);
 
-      // Enforce strict RBAC: redirect non-admins (profileData.role !== "admin")
-      if (!isAdmin || (profileData && profileData.role !== "admin" && !isAdmin)) {
+      // Enforce strict RBAC: allow access only if role === 'admin'
+      if (!isAdmin) {
         redirect("/403");
       }
 
-      // Auto-sync profile to admin role if authorized by metadata/whitelist but DB hasn't been updated
-      if (isAdmin && dbProfile?.role !== "admin") {
-        try {
-          await supabase.from("profiles").upsert(
-            {
-              id: user.id,
-              role: "admin",
-              full_name:
-                dbProfile?.full_name ||
-                user.user_metadata?.full_name ||
-                user.email ||
-                "Administrator",
-              avatar_url:
-                dbProfile?.avatar_url ||
-                user.user_metadata?.avatar_url ||
-                null,
-              updated_at: new Date().toISOString(),
-            },
-            { onConflict: "id" }
-          );
-        } catch {
-          // Non-fatal if RLS blocks anon/session updates; access is already granted via isAdmin
-        }
-      }
-
-      userEmail = user.email || "";
+      userEmail = dbProfile?.email || user.email || "";
       profile = {
         full_name:
           dbProfile?.full_name ||

@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
 import { getLocalSession } from "@/lib/auth/local-auth";
 import { loadMockProducts } from "@/lib/mock-data/admin-store";
+import { getProductById } from "@/lib/store";
 
 /**
  * Resolves the active user ID for cart operations across Supabase auth,
@@ -198,22 +199,22 @@ export async function getUserCart(
     const detailedItems: CartItemWithDetails[] = [];
 
     for (const item of rawItems) {
-      const mockProducts = loadMockProducts();
-      const fallbackProd = mockProducts.find((p) => p.id === item.product_id);
-      if (!fallbackProd) continue;
+      const prod = await getProductById(item.product_id);
+      if (!prod) continue;
 
-      const fallbackVariant = item.variant_id
-        ? fallbackProd.variants.find((v) => v.id === item.variant_id) || null
+      const variant = item.variant_id
+        ? prod.variants?.find((v: any) => v.id === item.variant_id) || null
         : null;
 
-      const unitPrice = fallbackVariant?.price ?? fallbackProd.base_price;
-      const availableStock = fallbackVariant
-        ? fallbackVariant.stock_quantity
-        : fallbackProd.stock_quantity;
+      const unitPrice = variant?.price ?? prod.base_price;
+      const availableStock = variant
+        ? variant.stock_quantity
+        : prod.stock_quantity;
 
       const primaryImage =
-        fallbackProd.images.find((img) => img.is_primary)?.image_url ||
-        fallbackProd.images[0]?.image_url ||
+        prod.images?.find((img: any) => img.is_primary)?.image_url ||
+        prod.images?.[0]?.image_url ||
+        prod.image_url ||
         null;
 
       detailedItems.push({
@@ -224,23 +225,23 @@ export async function getUserCart(
         quantity: item.quantity,
         added_at: item.added_at,
         product: {
-          id: fallbackProd.id,
-          name: fallbackProd.name,
-          slug: fallbackProd.slug,
-          base_price: fallbackProd.base_price,
-          compare_at_price: fallbackProd.compare_at_price,
-          stock_quantity: fallbackProd.stock_quantity,
-          is_active: fallbackProd.is_active,
+          id: prod.id,
+          name: prod.name,
+          slug: prod.slug,
+          base_price: prod.base_price,
+          compare_at_price: prod.compare_at_price || null,
+          stock_quantity: prod.stock_quantity,
+          is_active: prod.is_active,
           primary_image: primaryImage,
         },
-        variant: fallbackVariant
+        variant: variant
           ? {
-              id: fallbackVariant.id,
-              variant_name: fallbackVariant.variant_name,
-              price: fallbackVariant.price,
-              compare_at_price: fallbackVariant.compare_at_price,
-              stock_quantity: fallbackVariant.stock_quantity,
-              is_active: fallbackVariant.is_active,
+              id: variant.id,
+              variant_name: variant.variant_name,
+              price: variant.price,
+              compare_at_price: variant.compare_at_price,
+              stock_quantity: variant.stock_quantity,
+              is_active: variant.is_active,
             }
           : null,
         unit_price: unitPrice,

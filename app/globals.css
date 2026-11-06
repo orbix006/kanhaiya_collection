@@ -22,27 +22,28 @@
   --ring: #C8891A;
 }
 
+/* Force light theme across entire website as requested - no dark mode overrides */
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #120D08;
-    --foreground: #F8F1E3;
-    --card: #1A130D;
-    --card-foreground: #F8F1E3;
-    --popover: #1A130D;
-    --popover-foreground: #F8F1E3;
-    --primary: #E09E2B;
-    --primary-foreground: #120D08;
-    --secondary: #241A12;
-    --secondary-foreground: #F8F1E3;
-    --muted: #241A12;
-    --muted-foreground: #B59F89;
-    --accent: #2D2015;
-    --accent-foreground: #F8F1E3;
-    --destructive: #EF4444;
+    --background: #FFFDF7;
+    --foreground: #3B2416;
+    --card: #FFFFFF;
+    --card-foreground: #3B2416;
+    --popover: #FFFFFF;
+    --popover-foreground: #3B2416;
+    --primary: #C8891A;
+    --primary-foreground: #FFFFFF;
+    --secondary: #FFF8EC;
+    --secondary-foreground: #3B2416;
+    --muted: #FFF8EC;
+    --muted-foreground: #806B57;
+    --accent: #F4E8D3;
+    --accent-foreground: #3B2416;
+    --destructive: #B91C1C;
     --destructive-foreground: #FFFFFF;
-    --border: #38291D;
-    --input: #38291D;
-    --ring: #E09E2B;
+    --border: #E8DCC8;
+    --input: #E8DCC8;
+    --ring: #C8891A;
   }
 }
 

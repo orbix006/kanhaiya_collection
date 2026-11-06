@@ -27,6 +27,14 @@ export const metadata: Metadata = {
   },
   description:
     "Curated Sanatana Dharma-inspired e-commerce for pure idols, authentic puja essentials, temple brassware, and handcrafted spiritual living.",
+  icons: {
+    icon: [
+      { url: "/favicon.png", type: "image/png" },
+      { url: "/favicon.ico" },
+    ],
+    apple: "/logo.png",
+    shortcut: "/favicon.png",
+  },
   keywords: [
     "puja essentials",
     "brass idols",

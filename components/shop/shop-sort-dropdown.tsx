@@ -47,10 +47,10 @@ export function ShopSortDropdown({ currentSort = "featured" }: ShopSortDropdownP
         id="shop-sort-select"
         value={currentSort}
         onChange={(e) => handleSortChange(e.target.value)}
-        className="h-10 px-3 rounded-xl border border-border/80 bg-card text-xs font-semibold text-foreground focus:border-primary focus:outline-hidden focus:ring-1 focus:ring-primary shadow-2xs transition-colors cursor-pointer"
+        className="h-10 px-3 rounded-xl border border-border bg-card text-xs font-semibold text-foreground focus:border-primary focus:outline-hidden focus:ring-1 focus:ring-primary shadow-2xs transition-colors cursor-pointer"
       >
         {SORT_OPTIONS.map((opt) => (
-          <option key={opt.value} value={opt.value}>
+          <option key={opt.value} value={opt.value} className="bg-card text-foreground">
             {opt.label}
           </option>
         ))}

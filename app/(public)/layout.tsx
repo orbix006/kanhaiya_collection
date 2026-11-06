@@ -25,14 +25,27 @@ export default async function PublicLayout({
       } = await supabase.auth.getUser();
 
       if (supabaseUser) {
-        const { data: profileData } = await supabase
-          .from("profiles")
-          .select("full_name, avatar_url, role")
+        // Query authoritative database record from public.users
+        const { data: profileData, error: profileError } = await supabase
+          .from("users")
+          .select("id, full_name, email, role")
           .eq("id", supabaseUser.id)
           .single();
 
-        const role = resolveUserRole(supabaseUser, profileData);
-        user = { id: supabaseUser.id, email: supabaseUser.email, role };
+        if (profileError) {
+          console.error("Profile fetch failed:", profileError);
+        }
+
+        console.log("Authenticated user ID:", supabaseUser?.id);
+        console.log("Database profile:", profileData);
+        console.log("Database role:", profileData?.role);
+
+        const role = profileData?.role || "user";
+        user = {
+          id: supabaseUser.id,
+          email: profileData?.email || supabaseUser.email,
+          role,
+        };
         profile = {
           full_name:
             profileData?.full_name ||
@@ -40,13 +53,14 @@ export default async function PublicLayout({
             supabaseUser.email ||
             "Account",
           avatar_url:
-            profileData?.avatar_url ||
+            (profileData as any)?.avatar_url ||
             supabaseUser.user_metadata?.avatar_url ||
             null,
           role,
         };
       }
-    } catch {
+    } catch (err) {
+      console.error("PublicLayout auth retrieval error:", err);
       user = null;
       profile = null;
     }
