@@ -1,6 +1,8 @@
 @import "tailwindcss";
 
 :root {
+  --font-sans: "Manrope", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+  --font-serif: "Cormorant Garamond", Garamond, Georgia, "Times New Roman", serif;
   --background: #FFFDF7;
   --foreground: #3B2416;
   --card: #FFFFFF;
