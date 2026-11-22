@@ -21,39 +21,19 @@ export function FestiveOfferSection({
   products: initialProducts,
   categories,
 }: FestiveOfferSectionProps) {
-  // Client state synced with mock store
   const [campaigns, setCampaigns] = useState<FestiveCampaign[]>(() => {
-    if (initialCampaigns && initialCampaigns.length > 0) {
-      return initialCampaigns;
-    }
-    if (typeof window !== "undefined") {
-      try {
-        const stored = loadMockFestiveCampaigns();
-        if (stored && stored.length > 0) return stored;
-      } catch {}
-    }
-    return [];
+    return initialCampaigns && initialCampaigns.length > 0 ? initialCampaigns : [];
   });
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Sync real-time updates when admin saves campaigns
   useEffect(() => {
-    const handleSync = () => {
-      try {
-        const stored = loadMockFestiveCampaigns();
-        if (stored && stored.length > 0) {
-          setCampaigns(stored);
-        }
-      } catch {}
-    };
-
-    handleSync();
-    window.addEventListener("catalog_updated", handleSync);
-    return () => window.removeEventListener("catalog_updated", handleSync);
-  }, []);
+    if (initialCampaigns) {
+      setCampaigns(initialCampaigns);
+    }
+  }, [initialCampaigns]);
 
   // Filter only active campaigns in display order
   const activeCampaigns = useMemo(() => {

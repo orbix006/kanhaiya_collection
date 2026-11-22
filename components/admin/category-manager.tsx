@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import {
   FolderTree,
   Plus,
@@ -47,11 +48,21 @@ export function CategoryManager({
   initialCategories,
   initialProducts = [],
 }: CategoryManagerProps) {
+  const router = useRouter();
   const [categories, setCategories] = useState<Category[]>(initialCategories);
   const [products, setProducts] = useState<any[]>(initialProducts);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
   const [levelFilter, setLevelFilter] = useState<"all" | "roots" | "subcategories">("all");
+
+  // Keep state synchronized whenever server props change (e.g. after router.refresh() or action revalidation)
+  useEffect(() => {
+    setCategories(initialCategories);
+  }, [initialCategories]);
+
+  useEffect(() => {
+    setProducts(initialProducts);
+  }, [initialProducts]);
 
   // Expand / collapse state
   const [collapsedIds, setCollapsedIds] = useState<Record<string, boolean>>({});
@@ -69,15 +80,9 @@ export function CategoryManager({
     message: string;
   } | null>(null);
 
-  // Sync state from MockStore (both on mount and on catalog_updated events)
+  // Sync state from server props
   const syncFromStore = useCallback(() => {
-    const store = loadMockStore();
-    if (store.categories && store.categories.length > 0) {
-      setCategories(store.categories as unknown as Category[]);
-    }
-    if (store.products && store.products.length > 0) {
-      setProducts(store.products);
-    }
+    // Initial categories and products passed from server component are authoritative
   }, []);
 
   useEffect(() => {
@@ -300,7 +305,14 @@ export function CategoryManager({
 
   // Success handler for create/edit
   const handleSaveSuccess = (saved: Category) => {
-    syncFromStore();
+    setCategories((prev) => {
+      const exists = prev.some((c) => c.id === saved.id);
+      if (exists) {
+        return prev.map((c) => (c.id === saved.id ? saved : c));
+      }
+      return [...prev, saved];
+    });
+    router.refresh();
     setNotification({
       type: "success",
       message: `Category '${saved.name}' saved and synchronized with storefront catalog.`,
@@ -308,8 +320,15 @@ export function CategoryManager({
   };
 
   // Success handler for delete
-  const handleDeleteSuccess = () => {
-    syncFromStore();
+  const handleDeleteSuccess = (deletedId?: string) => {
+    if (deletedId) {
+      setCategories((prev) => {
+        const descendantIds = getDescendantCategoryIds(deletedId, prev);
+        const removed = new Set([deletedId, ...descendantIds]);
+        return prev.filter((c) => !removed.has(c.id));
+      });
+    }
+    router.refresh();
     setNotification({
       type: "success",
       message: `Category and all descendant subcategories successfully removed.`,

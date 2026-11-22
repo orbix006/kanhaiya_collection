@@ -36,6 +36,7 @@ import {
   reorderMockTestimonials,
 } from "@/lib/mock-data/admin-store";
 import type { Testimonial } from "@/lib/data/cms";
+import { ImageUploader } from "@/components/ui/image-uploader";
 
 interface TestimonialsManagerProps {
   initialTestimonials: Testimonial[];
@@ -601,17 +602,18 @@ export function TestimonialsManager({
                 />
               </div>
 
-              {/* Avatar URL */}
+              {/* Avatar File Upload */}
               <div className="space-y-1.5">
                 <label className="font-bold text-foreground">
-                  Avatar Image URL (Optional)
+                  Avatar Photo (Optional)
                 </label>
-                <input
-                  type="text"
-                  placeholder="https://images.unsplash.com/... or /avatars/..."
-                  value={avatarUrl}
-                  onChange={(e) => setAvatarUrl(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background focus:outline-hidden focus:ring-2 focus:ring-primary/20 text-xs"
+                <ImageUploader
+                  bucket="avatars"
+                  folderPath="testimonials"
+                  aspectRatio="square"
+                  currentImageUrl={avatarUrl}
+                  onUploadComplete={(url) => setAvatarUrl(url)}
+                  label=""
                 />
               </div>
 

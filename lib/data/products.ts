@@ -298,7 +298,8 @@ export async function getShopProducts(params: ShopFilterParams): Promise<ShopQue
     if (activeCategory) {
       const childCategoryIds = getDescendantCategoryIds(activeCategory.id, allCategories);
       const targetCategoryIds = [activeCategory.id, ...childCategoryIds];
-      dbQuery = dbQuery.in("category_id", targetCategoryIds);
+      const idList = targetCategoryIds.join(",");
+      dbQuery = dbQuery.or(`category_id.in.(${idList}),subcategory_id.in.(${idList})`);
     }
 
     // 2. Trigram-friendly name search (schema index: idx_products_name_trgm on products using gin (name gin_trgm_ops))
@@ -423,162 +424,19 @@ export async function getShopProducts(params: ShopFilterParams): Promise<ShopQue
       };
     }
   } catch {
-    // Graceful fallback to offline catalog below
+    // Return empty on Supabase error
   }
 
-  // Robust shared mock catalog filtering (admin-store synchronization)
-  let sourceProducts: ProductDetail[] = [];
-  try {
-    const { loadMockProducts } = await import("@/lib/mock-data/admin-store");
-    const loaded = loadMockProducts();
-    if (loaded && Array.isArray(loaded)) {
-      sourceProducts = loaded as unknown as ProductDetail[];
-    } else {
-      sourceProducts = [];
-    }
-  } catch {
-    sourceProducts = [];
-  }
-
-  let filtered = [...sourceProducts].filter((p) => p.is_active);
-
-  // Category filtering with descendant expansion
-  if (activeCategory) {
-    const descendantIds = getDescendantCategoryIds(activeCategory.id, allCategories);
-    const targetCategoryIds = [activeCategory.id, ...descendantIds];
-    filtered = filtered.filter(
-      (p) =>
-        (p.category_id && targetCategoryIds.includes(p.category_id)) ||
-        p.slug.includes(activeCategory.slug)
-    );
-  }
-
-  // Trigram / text search matching
-  if (searchQuery && searchQuery.trim()) {
-    const term = searchQuery.trim().toLowerCase();
-    const matchingCategory = !activeCategory
-      ? allCategories.find((category) =>
-          (category.name + " " + category.slug).toLowerCase().includes(term)
-        )
-      : null;
-
-    if (matchingCategory) {
-      const descendants = getDescendantCategoryIds(matchingCategory.id, allCategories);
-      const categoryIds = new Set([matchingCategory.id, ...descendants]);
-      filtered = filtered.filter((product) => product.category_id && categoryIds.has(product.category_id));
-    } else {
-      filtered = filtered.filter(
-        (p) =>
-          p.name.toLowerCase().includes(term) ||
-          (p.sku && p.sku.toLowerCase().includes(term)) ||
-          (p.brand && p.brand.toLowerCase().includes(term)) ||
-          (p.description && p.description.toLowerCase().includes(term))
-      );
-    }
-  }
-
-  // Price filtering
-  if (minPrice !== undefined && !isNaN(minPrice) && minPrice > 0) {
-    filtered = filtered.filter((p) => p.base_price >= minPrice);
-  }
-  if (maxPrice !== undefined && !isNaN(maxPrice) && maxPrice > 0) {
-    filtered = filtered.filter((p) => p.base_price <= maxPrice);
-  }
-
-  if (availability === "in-stock") {
-    filtered = filtered.filter((p) => p.stock_quantity > 0);
-  } else if (availability === "out-of-stock") {
-    filtered = filtered.filter((p) => p.stock_quantity <= 0);
-  }
-
-  // Festival filtering
-  if (festival && festival.trim()) {
-    const festLower = festival.trim().toLowerCase();
-    filtered = filtered.filter((p) => {
-      const desc = (p.description || "").toLowerCase();
-      const name = (p.name || "").toLowerCase();
-      const hasVariantAttr = p.variants?.some((v) => {
-        const attrs = v.attributes || {};
-        return Object.values(attrs).some((val) => String(val).toLowerCase().includes(festLower));
-      });
-      return desc.includes(festLower) || name.includes(festLower) || Boolean(hasVariantAttr);
-    });
-  }
-
-  // Material filtering
-  if (material && material.trim()) {
-    const matLower = material.trim().toLowerCase();
-    filtered = filtered.filter((p) => {
-      const desc = (p.description || "").toLowerCase();
-      const name = (p.name || "").toLowerCase();
-      const hasVariantAttr = p.variants?.some((v) => {
-        const attrs = v.attributes || {};
-        return Object.values(attrs).some((val) => String(val).toLowerCase().includes(matLower));
-      });
-      return desc.includes(matLower) || name.includes(matLower) || Boolean(hasVariantAttr);
-    });
-  }
-
-  // Sorting
-  switch (sort) {
-    case "price_asc":
-      filtered.sort((a, b) => a.base_price - b.base_price);
-      break;
-    case "price_desc":
-      filtered.sort((a, b) => b.base_price - a.base_price);
-      break;
-    case "newest":
-      filtered.sort(
-        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      );
-      break;
-    case "top_rated":
-      filtered.sort((a, b) => b.avg_rating - a.avg_rating || b.review_count - a.review_count);
-      break;
-    case "featured":
-    default:
-      filtered.sort((a, b) => {
-        if (a.is_featured_top_seller && !b.is_featured_top_seller) return -1;
-        if (!a.is_featured_top_seller && b.is_featured_top_seller) return 1;
-        return b.sold_count - a.sold_count;
-      });
-      break;
-  }
-
-  const totalCount = filtered.length;
-  const paginated = filtered.slice(offset, offset + pageSize);
-
-  const productItems: ProductItem[] = paginated.map((p) => {
-    const primaryImg =
-      p.images.find((img) => img.is_primary)?.image_url ||
-      p.images[0]?.image_url ||
-      null;
-
-    return {
-      id: p.id,
-      name: p.name,
-      slug: p.slug,
-      brand: p.brand,
-      base_price: p.base_price,
-      compare_at_price: p.compare_at_price,
-      avg_rating: p.avg_rating,
-      review_count: p.review_count,
-      stock_quantity: p.stock_quantity,
-      image_url: primaryImg,
-      is_featured_top_seller: p.is_featured_top_seller,
-      category_id: p.category_id,
-    };
-  });
-
+  // Database-only: do not fallback to mock catalog
   return {
-    products: productItems,
-    totalCount,
+    products: [],
+    totalCount: 0,
     page: validPage,
     pageSize,
-    totalPages: Math.ceil(totalCount / pageSize) || 1,
+    totalPages: 0,
     activeCategory,
-    minPriceAvailable: 1500,
-    maxPriceAvailable: 15000,
+    minPriceAvailable: 0,
+    maxPriceAvailable: 0,
   };
 }
 
@@ -694,36 +552,11 @@ export async function getProductBySlug(slug: string): Promise<ProductDetail | nu
       };
     }
   } catch {
-    // Fallback to local catalog below
+    // Return null on failure
   }
 
-  // Offline / shared mock store lookup
-  let sourceProducts: ProductDetail[] = [];
-  try {
-    const { loadMockProducts } = await import("@/lib/mock-data/admin-store");
-    const loaded = loadMockProducts();
-    if (loaded && Array.isArray(loaded)) {
-      sourceProducts = loaded as unknown as ProductDetail[];
-    } else {
-      sourceProducts = [];
-    }
-  } catch {
-    sourceProducts = [];
-  }
-
-  const fallback = sourceProducts.find(
-    (p) => p.slug === slug && p.is_active
-  );
-
-  if (!fallback) return null;
-
-  const allCategories = await getAllActiveCategories();
-  const cat = allCategories.find((c) => c.id === fallback.category_id) || null;
-
-  return {
-    ...fallback,
-    category: cat,
-  };
+  // Database-only: strictly no mock store fallback
+  return null;
 }
 
 /**
@@ -738,7 +571,7 @@ export async function recordProductView(
 
   try {
     const supabase = await createClient();
-    await supabase.from("product_views").upsert(
+    await (supabase.from("product_views") as any).upsert(
       {
         user_id: userId,
         product_id: productId,
@@ -943,10 +776,10 @@ export async function checkUserReviewEligibility(
       )
       .eq("user_id", userId)
       .eq("order_items.product_id", productId)
-      .in("status", ["confirmed", "processing", "shipped", "delivered"]);
+      .in("status", ["in_progress", "delivered"] as any);
 
     if (qualifyingOrders && qualifyingOrders.length > 0) {
-      const qualifyingItem = qualifyingOrders[0].order_items?.[0];
+      const qualifyingItem = (qualifyingOrders[0].order_items as any)?.[0];
       return {
         canReview: true,
         alreadyReviewed: false,
@@ -974,7 +807,7 @@ export async function checkUserReviewEligibility(
       .eq("payment_status", "paid");
 
     if (paidOrders && paidOrders.length > 0) {
-      const qualifyingItem = paidOrders[0].order_items?.[0];
+      const qualifyingItem = (paidOrders[0].order_items as any)?.[0];
       return {
         canReview: true,
         alreadyReviewed: false,

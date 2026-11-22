@@ -268,50 +268,28 @@ export async function getHomepageSections(): Promise<HomepageSection[]> {
 
 export async function getActiveBanners(): Promise<Banner[]> {
   if (!isSupabaseConfigured()) {
-    return FALLBACK_BANNERS.filter((b) => b.is_active);
+    return [];
   }
   try {
     const supabase = await createClient();
     const { data, error } = await supabase
-      .from("banners")
+      .from("hero_banners")
       .select("id, image_url, title, link_url, display_order, is_active")
       .eq("is_active", true)
       .order("display_order", { ascending: true });
 
-    if (error || !data || data.length === 0) {
-      return FALLBACK_BANNERS.filter((b) => b.is_active);
+    if (error || !data) {
+      return [];
     }
-    return data as Banner[];
+    return data as unknown as Banner[];
   } catch {
-    return FALLBACK_BANNERS.filter((b) => b.is_active);
+    return [];
   }
 }
 
 export async function getHomepageCategories(): Promise<Category[]> {
   if (!isSupabaseConfigured()) {
-    try {
-      const { loadMockCategories } = await import("@/lib/mock-data/admin-store");
-      const loaded = loadMockCategories();
-      if (loaded && loaded.length > 0) {
-        return (loaded as unknown as any[])
-          .map((c) => ({
-            id: String(c.id),
-            parent_id: c.parent_id || null,
-            name: c.category_name || c.name || "Collection",
-            slug: c.slug || String(c.id),
-            description: c.description || null,
-            image_url: c.image_url || null,
-            display_order: Number(c.display_order) || 0,
-            is_active: Boolean(c.is_active ?? true),
-            show_on_homepage: Boolean(c.show_on_homepage ?? true),
-          }))
-          .filter((c) => c.is_active && c.show_on_homepage && c.parent_id === null)
-          .sort((a, b) => a.display_order - b.display_order);
-      }
-    } catch {
-      // Fallback below
-    }
-    return FALLBACK_CATEGORIES.filter((c) => c.is_active && c.show_on_homepage && c.parent_id === null);
+    return [];
   }
   try {
     const supabase = await createClient();
@@ -319,52 +297,30 @@ export async function getHomepageCategories(): Promise<Category[]> {
       .from("categories")
       .select("*")
       .eq("is_active", true)
-      .order("display_order", { ascending: true });
+      .order("sort_order", { ascending: true });
 
-    if (error || !data || data.length === 0) {
-      return FALLBACK_CATEGORIES.filter((c) => c.is_active && c.show_on_homepage && c.parent_id === null);
+    if (error || !data) {
+      return [];
     }
     return data.map((c: any) => ({
       id: String(c.id),
       parent_id: c.parent_id || null,
-      name: c.category_name || c.name || "Collection",
+      name: c.name || "Collection",
       slug: c.slug || String(c.id),
       description: c.description || null,
-      image_url: c.image_url || null,
-      display_order: Number(c.display_order) || 0,
+      image_url: c.thumbnail_url || c.image_url || null,
+      display_order: Number(c.sort_order ?? c.display_order ?? 0),
       is_active: Boolean(c.is_active ?? true),
-      show_on_homepage: Boolean(c.show_on_homepage ?? true),
-    })).filter((c) => c.is_active && (c.show_on_homepage || c.parent_id === null) && c.parent_id === null);
+      show_on_homepage: Boolean(c.is_visible ?? c.show_on_homepage ?? true),
+    })).filter((c) => c.is_active && c.show_on_homepage && c.parent_id === null);
   } catch {
-    return FALLBACK_CATEGORIES.filter((c) => c.is_active && c.show_on_homepage && c.parent_id === null);
+    return [];
   }
 }
 
 export async function getAllActiveCategories(): Promise<Category[]> {
   if (!isSupabaseConfigured()) {
-    try {
-      const { loadMockCategories } = await import("@/lib/mock-data/admin-store");
-      const loaded = loadMockCategories();
-      if (loaded && loaded.length > 0) {
-        return (loaded as unknown as any[])
-          .map((c) => ({
-            id: String(c.id),
-            parent_id: c.parent_id || null,
-            name: c.category_name || c.name || "Collection",
-            slug: c.slug || String(c.id),
-            description: c.description || null,
-            image_url: c.image_url || null,
-            display_order: Number(c.display_order) || 0,
-            is_active: Boolean(c.is_active ?? true),
-            show_on_homepage: Boolean(c.show_on_homepage ?? true),
-          }))
-          .filter((c) => c.is_active)
-          .sort((a, b) => a.display_order - b.display_order);
-      }
-    } catch {
-      // Fallback below
-    }
-    return FALLBACK_CATEGORIES.filter((c) => c.is_active);
+    return [];
   }
   try {
     const supabase = await createClient();
@@ -372,24 +328,24 @@ export async function getAllActiveCategories(): Promise<Category[]> {
       .from("categories")
       .select("*")
       .eq("is_active", true)
-      .order("display_order", { ascending: true });
+      .order("sort_order", { ascending: true });
 
-    if (error || !data || data.length === 0) {
-      return FALLBACK_CATEGORIES.filter((c) => c.is_active);
+    if (error || !data) {
+      return [];
     }
     return data.map((c: any) => ({
       id: String(c.id),
       parent_id: c.parent_id || null,
-      name: c.category_name || c.name || "Collection",
+      name: c.name || "Collection",
       slug: c.slug || String(c.id),
       description: c.description || null,
-      image_url: c.image_url || null,
-      display_order: Number(c.display_order) || 0,
+      image_url: c.thumbnail_url || c.image_url || null,
+      display_order: Number(c.sort_order ?? c.display_order ?? 0),
       is_active: Boolean(c.is_active ?? true),
-      show_on_homepage: Boolean(c.show_on_homepage ?? true),
+      show_on_homepage: Boolean(c.is_visible ?? c.show_on_homepage ?? true),
     }));
   } catch {
-    return FALLBACK_CATEGORIES.filter((c) => c.is_active);
+    return [];
   }
 }
 
@@ -458,16 +414,6 @@ export async function getContinueBrowsingProducts(userId?: string | null): Promi
 
 export async function getTopSellers(): Promise<ProductItem[]> {
   if (!isSupabaseConfigured()) {
-    try {
-      const { loadMockProducts } = await import("@/lib/mock-data/admin-store");
-      const loaded = loadMockProducts();
-      if (loaded && loaded.length > 0) {
-        return (loaded as unknown as ProductItem[])
-          .filter((p) => p.is_featured_top_seller)
-          .concat((loaded as unknown as ProductItem[]).filter((p) => !p.is_featured_top_seller))
-          .slice(0, 8);
-      }
-    } catch {}
     return [];
   }
   try {
@@ -478,16 +424,6 @@ export async function getTopSellers(): Promise<ProductItem[]> {
       .limit(8);
 
     if (error || !topSellers || topSellers.length === 0) {
-      try {
-        const { loadMockProducts } = await import("@/lib/mock-data/admin-store");
-        const loaded = loadMockProducts();
-        if (loaded && loaded.length > 0) {
-          return (loaded as unknown as ProductItem[])
-            .filter((p) => p.is_featured_top_seller)
-            .concat((loaded as unknown as ProductItem[]).filter((p) => !p.is_featured_top_seller))
-            .slice(0, 8);
-        }
-      } catch {}
       return [];
     }
 
@@ -519,16 +455,6 @@ export async function getTopSellers(): Promise<ProductItem[]> {
       };
     });
   } catch {
-    try {
-      const { loadMockProducts } = await import("@/lib/mock-data/admin-store");
-      const loaded = loadMockProducts();
-      if (loaded && loaded.length > 0) {
-        return (loaded as unknown as ProductItem[])
-          .filter((p) => p.is_featured_top_seller)
-          .concat((loaded as unknown as ProductItem[]).filter((p) => !p.is_featured_top_seller))
-          .slice(0, 8);
-      }
-    } catch {}
     return [];
   }
 }
@@ -550,7 +476,7 @@ export async function getCategoryProductSections(): Promise<CategoryProductSecti
       .eq("is_active", true)
       .order("display_order", { ascending: true });
 
-    const categoriesList = allCategories && allCategories.length > 0 ? (allCategories as Category[]) : FALLBACK_CATEGORIES;
+    const categoriesList = allCategories && allCategories.length > 0 ? (allCategories as unknown as Category[]) : FALLBACK_CATEGORIES;
     const homepageCategories = categoriesList.filter((c) => c.show_on_homepage && (c.parent_id === null || !categoriesList.some(p => p.id === c.parent_id && p.show_on_homepage)));
 
     // Fetch products

@@ -79,12 +79,19 @@ export interface Faq {
 
 export type PolicyType = "terms" | "privacy" | "cancellation" | "refund" | "shipping" | "return";
 
-export type DatabasePolicyType = "privacy" | "terms" | "shipping" | "return";
+export type DatabasePolicyType =
+  | "terms_of_service"
+  | "privacy_policy"
+  | "shipping_delivery"
+  | "return_refund"
+  | "cancellation";
+
 export const SUPPORTED_DB_POLICY_TYPES: readonly DatabasePolicyType[] = [
-  "privacy",
-  "terms",
-  "shipping",
-  "return",
+  "terms_of_service",
+  "privacy_policy",
+  "shipping_delivery",
+  "return_refund",
+  "cancellation",
 ] as const;
 
 export function isSupportedDatabasePolicyType(type: string): type is DatabasePolicyType {
@@ -92,18 +99,50 @@ export function isSupportedDatabasePolicyType(type: string): type is DatabasePol
 }
 
 /**
- * Maps an application policy type to its corresponding database enum value if supported,
- * or returns null if the policy type is not present in the database enum (e.g. cancellation).
- * 'refund' is mapped to 'return' as both represent the canonical Return & Refund policy.
+ * Maps an application policy type to its corresponding Supabase enum value:
+ * terms -> terms_of_service
+ * privacy -> privacy_policy
+ * shipping -> shipping_delivery
+ * return / refund -> return_refund
+ * cancellation -> cancellation
  */
-export function mapPolicyTypeToDatabase(type: PolicyType): DatabasePolicyType | null {
-  if (type === "refund" || type === "return") {
-    return "return";
+export function mapPolicyTypeToDatabase(type: PolicyType | string): DatabasePolicyType | null {
+  if (type === "refund" || type === "return" || type === "return_refund") {
+    return "return_refund";
   }
-  if (isSupportedDatabasePolicyType(type)) {
-    return type;
+  if (type === "terms" || type === "terms_of_service") {
+    return "terms_of_service";
+  }
+  if (type === "privacy" || type === "privacy_policy") {
+    return "privacy_policy";
+  }
+  if (type === "shipping" || type === "shipping_delivery") {
+    return "shipping_delivery";
+  }
+  if (type === "cancellation") {
+    return "cancellation";
   }
   return null;
+}
+
+/**
+ * Maps a database policy type enum back to canonical frontend policy type
+ */
+export function mapDatabaseToPolicyType(dbType: DatabasePolicyType | string): PolicyType {
+  switch (dbType) {
+    case "terms_of_service":
+      return "terms";
+    case "privacy_policy":
+      return "privacy";
+    case "shipping_delivery":
+      return "shipping";
+    case "return_refund":
+      return "return";
+    case "cancellation":
+      return "cancellation";
+    default:
+      return (dbType as PolicyType) || "terms";
+  }
 }
 
 export interface SitePolicy {
@@ -149,7 +188,11 @@ export interface Lead {
   phone: string | null;
   source: string | null;
   message: string | null;
-  status: "new" | "contacted" | "converted" | "closed";
+  status: "unread" | "read" | "responded" | "new" | "contacted" | "converted" | "closed";
+  is_read?: boolean;
+  received_at?: string;
+  responded_at?: string | null;
+  responded_by?: string | null;
   created_at: string;
   updated_at?: string;
 }
@@ -566,15 +609,15 @@ export async function getBannersAdmin(): Promise<Banner[]> {
     }
     const supabase = await createClient();
     const { data, error } = await supabase
-      .from("banners")
+      .from("hero_banners")
       .select("*")
       .order("display_order", { ascending: true });
 
-    if (error || !data || data.length === 0) {
+    if (error || !data) {
       const { loadMockBanners } = await import("@/lib/mock-data/admin-store");
       return loadMockBanners();
     }
-    return data as Banner[];
+    return data as unknown as Banner[];
   } catch {
     const { loadMockBanners } = await import("@/lib/mock-data/admin-store");
     return loadMockBanners();
@@ -706,6 +749,19 @@ export async function getPublicFaqs(): Promise<Faq[]> {
 }
 
 export async function getSitePoliciesAdmin(): Promise<SitePolicy[]> {
+  const defaultOrder: Record<string, number> = {
+    terms_of_service: 1,
+    privacy_policy: 2,
+    shipping_delivery: 3,
+    return_refund: 4,
+    cancellation: 5,
+    terms: 1,
+    privacy: 2,
+    shipping: 3,
+    return: 4,
+    refund: 4,
+  };
+
   if (!isSupabaseConfigured()) {
     const { loadMockPolicies } = await import("@/lib/mock-data/admin-store");
     return loadMockPolicies().map((p, idx) => ({
@@ -727,10 +783,30 @@ export async function getSitePoliciesAdmin(): Promise<SitePolicy[]> {
         display_order: idx + 1,
       })) as SitePolicy[];
     }
-    const policies = (data as Array<SitePolicy & { display_order?: number }>).map((p) => ({
-      ...p,
-      display_order: p.display_order ?? FALLBACK_POLICIES[p.type as PolicyType]?.display_order ?? 0,
-    })) as SitePolicy[];
+
+    const policies: SitePolicy[] = data.map((p: any) => {
+      const canonicalType = mapDatabaseToPolicyType(p.policy_type || p.type);
+      return {
+        id: p.id || `policy-${p.policy_type || canonicalType}`,
+        type: canonicalType,
+        title: p.title || FALLBACK_POLICIES[canonicalType]?.title || "Policy",
+        content: p.content && p.content.trim().length > 0 ? p.content : (FALLBACK_POLICIES[canonicalType]?.content || ""),
+        display_order: defaultOrder[p.policy_type] || defaultOrder[canonicalType] || 1,
+        updated_at: p.updated_at,
+      };
+    });
+
+    // Ensure all 5 policies are present even if some haven't been seeded yet
+    const presentTypes = new Set(policies.map((p) => p.type));
+    const allTypes: PolicyType[] = ["terms", "privacy", "shipping", "return", "cancellation"];
+    for (const t of allTypes) {
+      if (!presentTypes.has(t)) {
+        policies.push({
+          ...FALLBACK_POLICIES[t],
+          display_order: defaultOrder[t] || 99,
+        });
+      }
+    }
 
     return policies.sort((a, b) => a.display_order - b.display_order);
   } catch {
@@ -749,8 +825,6 @@ export async function getPublicPolicies(): Promise<SitePolicy[]> {
 export async function getPublicPolicy(type: PolicyType): Promise<SitePolicy> {
   const dbType = mapPolicyTypeToDatabase(type);
 
-  // If Supabase is unconfigured or the policy type is not in the database enum (e.g. cancellation),
-  // safely retrieve from the in-memory/mock store or fallback policies without DB enum crashes.
   if (!isSupabaseConfigured() || !dbType) {
     const { getMockPolicyByType } = await import("@/lib/mock-data/admin-store");
     const found = getMockPolicyByType(type);
@@ -765,7 +839,7 @@ export async function getPublicPolicy(type: PolicyType): Promise<SitePolicy> {
     const { data, error } = await supabase
       .from("site_policies")
       .select("*")
-      .eq("type", dbType)
+      .eq("policy_type", dbType)
       .maybeSingle();
 
     if (error || !data) {
@@ -774,7 +848,16 @@ export async function getPublicPolicy(type: PolicyType): Promise<SitePolicy> {
       if (found) return { ...found, display_order: 1 } as SitePolicy;
       return FALLBACK_POLICIES[type] || FALLBACK_POLICIES.return;
     }
-    return data as SitePolicy;
+
+    const canonicalType = mapDatabaseToPolicyType(data.policy_type || type);
+    return {
+      id: data.id || `policy-${data.policy_type || type}`,
+      type: canonicalType,
+      title: data.title || FALLBACK_POLICIES[canonicalType]?.title || "Policy",
+      content: data.content && data.content.trim().length > 0 ? data.content : (FALLBACK_POLICIES[canonicalType]?.content || ""),
+      display_order: 1,
+      updated_at: data.updated_at,
+    };
   } catch {
     const { getMockPolicyByType } = await import("@/lib/mock-data/admin-store");
     const found = getMockPolicyByType(type);
@@ -844,13 +927,28 @@ export async function getLeadsAdmin(): Promise<Lead[]> {
     const { data, error } = await supabase
       .from("leads")
       .select("*")
-      .order("created_at", { ascending: false });
+      .order("received_at", { ascending: false });
 
     if (error || !data || data.length === 0) {
       const { loadMockLeads } = await import("@/lib/mock-data/admin-store");
       return loadMockLeads() as Lead[];
     }
-    return data as Lead[];
+
+    return data.map((l: any) => ({
+      id: l.id,
+      name: l.name,
+      email: l.email,
+      phone: l.phone,
+      source: l.source || "Contact Form",
+      message: l.message,
+      status: l.status,
+      is_read: l.status !== "unread",
+      received_at: l.received_at || l.created_at,
+      responded_at: l.responded_at,
+      responded_by: l.responded_by,
+      created_at: l.received_at || l.created_at || new Date().toISOString(),
+      updated_at: l.updated_at || l.received_at || new Date().toISOString(),
+    })) as Lead[];
   } catch {
     const { loadMockLeads } = await import("@/lib/mock-data/admin-store");
     return loadMockLeads() as Lead[];
@@ -867,21 +965,100 @@ export async function getResponseNotesAdmin() {
 // -----------------------------------------------------------------------------
 
 export async function getAnnouncementsAdmin(): Promise<Announcement[]> {
+  try {
+    if (isSupabaseConfigured()) {
+      const supabase = await createClient();
+      const { data, error } = await supabase
+        .from("announcements")
+        .select("*")
+        .order("display_order", { ascending: true });
+      if (!error && data) {
+        return data as Announcement[];
+      }
+    }
+  } catch {}
   const { loadMockAnnouncements } = await import("@/lib/mock-data/admin-store");
   return loadMockAnnouncements() as Announcement[];
 }
 
 export async function getActiveAnnouncements(): Promise<Announcement[]> {
+  try {
+    if (isSupabaseConfigured()) {
+      const supabase = await createClient();
+      const { data, error } = await supabase
+        .from("announcements")
+        .select("*")
+        .eq("is_active", true)
+        .order("display_order", { ascending: true });
+      if (!error && data && data.length > 0) {
+        return data as Announcement[];
+      }
+    }
+  } catch {}
   const { loadMockAnnouncements } = await import("@/lib/mock-data/admin-store");
   return loadMockAnnouncements().filter((a) => a.is_active) as Announcement[];
 }
 
 export async function getFestiveCampaignsAdmin(): Promise<FestiveCampaign[]> {
-  const { loadMockFestiveCampaigns } = await import("@/lib/mock-data/admin-store");
-  return loadMockFestiveCampaigns() as FestiveCampaign[];
+  try {
+    if (isSupabaseConfigured()) {
+      const supabase = await createClient();
+      const { data, error } = await supabase
+        .from("festive_campaigns")
+        .select(`
+          *,
+          products:festive_campaign_products(product_id)
+        `)
+        .order("display_order", { ascending: true });
+      if (!error && data) {
+        return data.map((c: any) => ({
+          ...c,
+          product_ids: (c.products || []).map((p: any) => p.product_id),
+        })) as FestiveCampaign[];
+      }
+    }
+  } catch {}
+  return [];
 }
 
 export async function getActiveFestiveCampaigns(): Promise<FestiveCampaign[]> {
-  const { loadMockFestiveCampaigns } = await import("@/lib/mock-data/admin-store");
-  return loadMockFestiveCampaigns().filter((c) => c.is_active) as FestiveCampaign[];
+  try {
+    if (isSupabaseConfigured()) {
+      const supabase = await createClient();
+      // Try schema-defined get_active_campaigns RPC if available
+      const { data: rpcData, error: rpcError } = await (supabase.rpc as any)("get_active_campaigns");
+      if (!rpcError && rpcData && Array.isArray(rpcData)) {
+        return rpcData.map((c: any) => ({
+          ...c,
+          product_ids: Array.isArray(c.product_ids) ? c.product_ids : [],
+        })) as FestiveCampaign[];
+      }
+
+      // Direct table query fallback adhering to starts_at and ends_at
+      const now = new Date().toISOString();
+      const { data, error } = await supabase
+        .from("festive_campaigns")
+        .select(`
+          *,
+          products:festive_campaign_products(product_id)
+        `)
+        .eq("is_active", true)
+        .order("display_order", { ascending: true });
+
+      if (!error && data && data.length > 0) {
+        const eligible = data.filter((c: any) => {
+          if (c.deleted_at) return false;
+          if (c.starts_at && new Date(c.starts_at).toISOString() > now) return false;
+          if (c.ends_at && new Date(c.ends_at).toISOString() < now) return false;
+          return true;
+        });
+
+        return eligible.map((c: any) => ({
+          ...c,
+          product_ids: (c.products || []).map((p: any) => p.product_id),
+        })) as FestiveCampaign[];
+      }
+    }
+  } catch {}
+  return [];
 }

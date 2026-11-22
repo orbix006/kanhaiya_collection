@@ -26,6 +26,7 @@ export function CategoryDeleteModal({
 }: CategoryDeleteModalProps) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [reassignTargetId, setReassignTargetId] = useState<string>("");
 
   if (!isOpen || !category) return null;
 
@@ -33,6 +34,11 @@ export function CategoryDeleteModal({
   const descendantIds = getDescendantCategoryIds(category.id, allCategories);
   const descendantCategories = allCategories.filter((c) =>
     descendantIds.includes(c.id)
+  );
+
+  // Eligible categories for reassigning products (excluding category and its descendants)
+  const eligibleReassignCategories = allCategories.filter(
+    (c) => c.id !== category.id && !descendantIds.includes(c.id)
   );
 
   // Calculate products affected
@@ -46,20 +52,30 @@ export function CategoryDeleteModal({
     setIsDeleting(true);
     setErrorMessage(null);
 
-    // 1. Delete from Mock Store with cascade handling
-    const localRes = deleteCategoryFromStore(category.id);
-    if (!localRes.success) {
+    // If there are products linked, require target reassignment category selection
+    if (totalAffectedProducts.length > 0 && !reassignTargetId) {
       setIsDeleting(false);
-      setErrorMessage(localRes.error || "Failed to delete category.");
+      setErrorMessage("Please select a target category to reassign existing products before deletion.");
       return;
     }
 
-    // 2. Call server action for Next.js cache revalidation
     try {
-      await deleteCategoryAction(category.id);
-    } catch {
-      // Offline fallback
+      const serverRes = await deleteCategoryAction(category.id, {
+        reassignTargetId: reassignTargetId || null,
+      });
+      if (serverRes.error) {
+        setIsDeleting(false);
+        setErrorMessage(serverRes.error);
+        return;
+      }
+    } catch (err: any) {
+      setIsDeleting(false);
+      setErrorMessage(err.message || "Failed to delete category.");
+      return;
     }
+
+    // Backend confirmed deletion & reassignment: update local store
+    deleteCategoryFromStore(category.id);
 
     setIsDeleting(false);
     onSuccess(category.id);
@@ -138,9 +154,9 @@ export function CategoryDeleteModal({
             </p>
           )}
 
-          {/* Product Warning Notice */}
+          {/* Product Warning Notice & Safe Reassignment Selector */}
           {totalAffectedProducts.length > 0 ? (
-            <div className="rounded-2xl border border-border bg-card p-4 space-y-2">
+            <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4 space-y-3">
               <div className="flex items-center gap-2 text-foreground font-semibold text-xs">
                 <Package className="h-4 w-4 text-primary" />
                 <span>
@@ -148,12 +164,29 @@ export function CategoryDeleteModal({
                 </span>
               </div>
               <p className="text-[11px] text-muted-foreground leading-relaxed">
-                <strong>Product Survival Rule:</strong> In accordance with the schema (<code className="font-mono text-[10px]">category_id ON DELETE SET NULL</code>), these products will <strong>not</strong> be deleted. Their category association will be cleared to uncategorized.
+                <strong>Orphan Prevention:</strong> To avoid orphaned items, select a safe destination category to reassign these products before completing deletion.
               </p>
-              {directProducts.length > 0 && (
-                <p className="text-[10px] text-muted-foreground/80">
-                  • {directProducts.length} directly in this category
-                  {descendantCategories.length > 0 && ` • ${totalAffectedProducts.length - directProducts.length} in descendant subcategories`}
+              {eligibleReassignCategories.length > 0 ? (
+                <div className="space-y-1.5 pt-1">
+                  <label className="text-[11px] font-semibold text-foreground">
+                    Reassign Products To <span className="text-destructive">*</span>
+                  </label>
+                  <select
+                    value={reassignTargetId}
+                    onChange={(e) => setReassignTargetId(e.target.value)}
+                    className="w-full rounded-xl border border-input bg-background px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-primary"
+                  >
+                    <option value="">-- Choose destination category --</option>
+                    {eligibleReassignCategories.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {getCategoryPathLabel(c.id, allCategories)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <p className="text-[11px] text-destructive">
+                  No other categories are available for reassignment. Please create another category first.
                 </p>
               )}
             </div>

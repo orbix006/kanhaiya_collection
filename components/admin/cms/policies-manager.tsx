@@ -19,6 +19,13 @@ import {
   Save,
   Check,
   Info,
+  Heading,
+  Bold,
+  Italic,
+  List,
+  ListOrdered,
+  Link as LinkIcon,
+  CornerDownLeft,
 } from "lucide-react";
 import { savePolicyAction } from "@/app/(admin)/admin/cms/actions";
 import type { SitePolicy, PolicyType } from "@/lib/data/cms";
@@ -213,6 +220,15 @@ export function PoliciesManager({ initialPolicies }: PoliciesManagerProps) {
     text: string;
     type: "success" | "error";
   } | null>(null);
+  const [pendingTabSwitch, setPendingTabSwitch] = useState<PolicyType | null>(null);
+
+  // Check if current form is dirty (unsaved changes compared to loaded policy)
+  const isDirty = useMemo(() => {
+    const cur = policies.find((p) => p.type === activeType);
+    const origTitle = cur?.title || "";
+    const origContent = cur?.draft_content || cur?.content || "";
+    return title !== origTitle || content !== origContent;
+  }, [policies, activeType, title, content]);
 
   // Auto-clear toast
   useEffect(() => {
@@ -222,7 +238,7 @@ export function PoliciesManager({ initialPolicies }: PoliciesManagerProps) {
     }
   }, [toastMessage]);
 
-  const handleSelectTab = (type: PolicyType) => {
+  const switchTabDirectly = (type: PolicyType) => {
     setActiveType(type);
     const current = policies.find((p) => p.type === type);
     if (current) {
@@ -234,6 +250,39 @@ export function PoliciesManager({ initialPolicies }: PoliciesManagerProps) {
       setContent("");
     }
     setFormError(null);
+    setPendingTabSwitch(null);
+  };
+
+  const handleSelectTab = (type: PolicyType) => {
+    if (type === activeType) return;
+    if (isDirty) {
+      setPendingTabSwitch(type);
+      return;
+    }
+    switchTabDirectly(type);
+  };
+
+  // Markdown formatting helpers
+  const applyMarkdownFormat = (prefix: string, suffix = "", defaultText = "text") => {
+    const textarea = document.getElementById("policy-textarea") as HTMLTextAreaElement | null;
+    if (!textarea) {
+      setContent((prev) => `${prev}\n${prefix}${defaultText}${suffix}`);
+      return;
+    }
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const selected = content.slice(start, end);
+    const insertion = selected || defaultText;
+    const replacement = `${prefix}${insertion}${suffix}`;
+    const nextContent = content.slice(0, start) + replacement + content.slice(end);
+
+    setContent(nextContent);
+
+    setTimeout(() => {
+      textarea.focus();
+      textarea.setSelectionRange(start + prefix.length, start + prefix.length + insertion.length);
+    }, 10);
   };
 
   const activePolicyData = useMemo(() => {
@@ -538,15 +587,79 @@ export function PoliciesManager({ initialPolicies }: PoliciesManagerProps) {
             {/* Editor Pane */}
             {(viewMode === "split" || viewMode === "edit") && (
               <div className="space-y-2 flex flex-col">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <label className="text-xs font-bold text-foreground">
-                    Markdown Content & Clauses <span className="text-destructive">*</span>
+                    Markdown Content &amp; Clauses <span className="text-destructive">*</span>
                   </label>
                   <span className="text-[11px] text-muted-foreground">
-                    Headings (###), bullet points (-), bold (**text**)
+                    Structured formatting toolbar
                   </span>
                 </div>
+
+                {/* Rich Markdown Toolbar */}
+                <div className="flex flex-wrap items-center gap-1 p-1.5 rounded-xl border border-border/80 bg-muted/30">
+                  <button
+                    type="button"
+                    onClick={() => applyMarkdownFormat("### ", "\n", "Section Heading")}
+                    className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-background border border-transparent hover:border-border/60 transition-colors cursor-pointer text-xs flex items-center gap-1 font-semibold"
+                    title="Add Heading (###)"
+                  >
+                    <Heading className="h-3.5 w-3.5 text-primary" />
+                    <span className="text-[11px]">H3</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => applyMarkdownFormat("**", "**", "bold text")}
+                    className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-background border border-transparent hover:border-border/60 transition-colors cursor-pointer"
+                    title="Bold (**text**)"
+                  >
+                    <Bold className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => applyMarkdownFormat("*", "*", "italic text")}
+                    className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-background border border-transparent hover:border-border/60 transition-colors cursor-pointer"
+                    title="Italic (*text*)"
+                  >
+                    <Italic className="h-3.5 w-3.5" />
+                  </button>
+                  <div className="h-4 w-px bg-border/80 mx-1" />
+                  <button
+                    type="button"
+                    onClick={() => applyMarkdownFormat("- ", "\n", "List item")}
+                    className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-background border border-transparent hover:border-border/60 transition-colors cursor-pointer"
+                    title="Bullet List (- item)"
+                  >
+                    <List className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => applyMarkdownFormat("1. ", "\n", "Numbered item")}
+                    className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-background border border-transparent hover:border-border/60 transition-colors cursor-pointer"
+                    title="Numbered List (1. item)"
+                  >
+                    <ListOrdered className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => applyMarkdownFormat("[", "](https://example.com)", "link text")}
+                    className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-background border border-transparent hover:border-border/60 transition-colors cursor-pointer"
+                    title="Insert Link [text](url)"
+                  >
+                    <LinkIcon className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => applyMarkdownFormat("\n\n", "", "")}
+                    className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-background border border-transparent hover:border-border/60 transition-colors cursor-pointer"
+                    title="Line Break / Paragraph"
+                  >
+                    <CornerDownLeft className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+
                 <textarea
+                  id="policy-textarea"
                   rows={viewMode === "split" ? 18 : 22}
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
@@ -686,10 +799,58 @@ export function PoliciesManager({ initialPolicies }: PoliciesManagerProps) {
             Compliance &amp; Governance Notice
           </p>
           <p className="leading-relaxed">
-            These policy documents are managed within the local development architecture and represent internal terms for handcrafted artisan e-commerce. They do not constitute formal legal advice or statutory guarantees. Ensure all terms are verified by qualified legal counsel prior to formal production operations.
+            These policy documents are managed within the official database architecture and represent live terms for handcrafted artisan e-commerce. Saving updates publishes them immediately to their corresponding customer-facing storefront URLs.
           </p>
         </div>
       </div>
+
+      {/* Unsaved Changes Confirmation Modal */}
+      {pendingTabSwitch && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in-50 duration-150"
+          onClick={() => setPendingTabSwitch(null)}
+        >
+          <div
+            className="w-full max-w-md bg-card border border-border rounded-2xl p-5 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3 text-amber-600 dark:text-amber-400">
+              <div className="h-10 w-10 rounded-xl bg-amber-500/10 flex items-center justify-center">
+                <AlertCircle className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="font-extrabold text-foreground text-sm">
+                  Unsaved Changes Detected
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  You have unsaved edits in {activeMeta.label}.
+                </p>
+              </div>
+            </div>
+
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Switching to another policy will discard any unpublished modifications you made to this policy. Are you sure you want to proceed without saving?
+            </p>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setPendingTabSwitch(null)}
+                className="px-3.5 py-2 rounded-xl border border-border bg-card hover:bg-muted text-xs font-semibold text-foreground cursor-pointer"
+              >
+                Keep Editing
+              </button>
+              <button
+                type="button"
+                onClick={() => switchTabDirectly(pendingTabSwitch)}
+                className="px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold transition-colors cursor-pointer"
+              >
+                Discard &amp; Switch
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

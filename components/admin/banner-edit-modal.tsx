@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import Image from "next/image";
 import { Banner } from "@/lib/store";
 import { X, ArrowRight, Laptop, Smartphone } from "lucide-react";
+import { ImageUploader } from "@/components/ui/image-uploader";
 
 interface BannerEditModalProps {
   banner: Banner | null;
@@ -137,63 +138,36 @@ export function BannerEditModal({
               </div>
             </div>
 
-            {/* Desktop Image URL */}
+            {/* Desktop Image File Upload */}
             <div className="space-y-1">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-semibold text-[#806B57] uppercase tracking-wider">
-                  Desktop Image URL <span className="text-red-500">*</span>
-                </label>
-                <div className="flex gap-1">
-                  <button
-                    type="button"
-                    onClick={() => setImageUrl("/images/janmashtami-campaign.jpg")}
-                    className="text-[10px] text-[#C8891A] hover:underline"
-                  >
-                    Janmashtami
-                  </button>
-                  <span className="text-[10px] text-[#806B57]">•</span>
-                  <button
-                    type="button"
-                    onClick={() => setImageUrl("/images/diwali-campaign.jpg")}
-                    className="text-[10px] text-[#C8891A] hover:underline"
-                  >
-                    Diwali
-                  </button>
-                </div>
-              </div>
-              <input
-                name="image_url"
-                type="text"
-                required
-                value={imageUrl}
-                onChange={(e) => setImageUrl(e.target.value)}
-                placeholder="/images/janmashtami-campaign.jpg"
-                className="w-full h-10 px-3.5 rounded-xl border border-[#E8DCC8] bg-[#FFFDF7] text-sm text-[#3B2416] focus:outline-none focus:ring-2 focus:ring-[#C8891A]/30"
+              <label className="text-xs font-semibold text-[#806B57] uppercase tracking-wider block">
+                Desktop Banner Photo <span className="text-red-500">*</span>
+              </label>
+              <ImageUploader
+                bucket="hero-banners"
+                folderPath="desktop"
+                aspectRatio="banner"
+                currentImageUrl={imageUrl}
+                onUploadComplete={(url) => setImageUrl(url)}
+                label=""
               />
+              <input type="hidden" name="image_url" value={imageUrl} />
             </div>
 
-            {/* Mobile Image URL */}
+            {/* Mobile Image File Upload */}
             <div className="space-y-1">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-semibold text-[#806B57] uppercase tracking-wider">
-                  Mobile Image URL (Optional)
-                </label>
-                <button
-                  type="button"
-                  onClick={() => setMobileImageUrl("/images/janmashtami-mobile.jpg")}
-                  className="text-[10px] text-[#C8891A] hover:underline"
-                >
-                  Use Mobile Sample
-                </button>
-              </div>
-              <input
-                name="mobile_image_url"
-                type="text"
-                value={mobileImageUrl}
-                onChange={(e) => setMobileImageUrl(e.target.value)}
-                placeholder="/images/janmashtami-mobile.jpg (falls back to desktop)"
-                className="w-full h-10 px-3.5 rounded-xl border border-[#E8DCC8] bg-[#FFFDF7] text-sm text-[#3B2416] focus:outline-none focus:ring-2 focus:ring-[#C8891A]/30"
+              <label className="text-xs font-semibold text-[#806B57] uppercase tracking-wider block">
+                Mobile Banner Photo (Optional)
+              </label>
+              <ImageUploader
+                bucket="hero-banners"
+                folderPath="mobile"
+                aspectRatio="banner"
+                currentImageUrl={mobileImageUrl}
+                onUploadComplete={(url) => setMobileImageUrl(url)}
+                label=""
               />
+              <input type="hidden" name="mobile_image_url" value={mobileImageUrl} />
             </div>
 
             {/* Order & Status */}

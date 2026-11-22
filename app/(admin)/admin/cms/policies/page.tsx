@@ -20,13 +20,13 @@ export default async function AdminPoliciesPage() {
             Site Policies & Governance
           </h1>
           <p className="text-xs sm:text-sm text-muted-foreground mt-1 max-w-2xl">
-            Edit content for the 4 required customer policy documents: Terms of Service, Privacy Policy, Cancellation Policy, and Refund Policy.
+            Edit and manage content for all 5 official website policy documents: Terms of Service, Privacy Policy, Shipping & Delivery, Return & Refund Policy, and Cancellation Policy.
           </p>
         </div>
 
         <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/60 px-3 py-1.5 rounded-xl border border-border">
           <ShieldCheck className="h-4 w-4 text-primary" />
-          <span>4 policy documents</span>
+          <span>5 policy documents</span>
         </div>
       </div>
 

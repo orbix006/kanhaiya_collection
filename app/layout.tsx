@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { VisitorTracker } from "@/components/analytics/visitor-tracker";
 import "./globals.css";
 
 const siteUrl =
@@ -59,6 +60,7 @@ export default function RootLayout({
       className="h-full antialiased"
     >
       <body className="min-h-full flex flex-col font-sans bg-background text-foreground font-normal">
+        <VisitorTracker />
         {children}
       </body>
     </html>

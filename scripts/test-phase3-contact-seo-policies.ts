@@ -150,23 +150,24 @@ async function runPhase3Tests() {
     console.log("\n--- Section 3: Policy Types & Database Enum Safety ---");
 
     assert(
-      SUPPORTED_DB_POLICY_TYPES.length === 4 &&
-      SUPPORTED_DB_POLICY_TYPES.includes("privacy") &&
-      SUPPORTED_DB_POLICY_TYPES.includes("terms") &&
-      SUPPORTED_DB_POLICY_TYPES.includes("shipping") &&
-      SUPPORTED_DB_POLICY_TYPES.includes("return"),
-      "Database policy enum accurately reflects postgres schema ('privacy','terms','shipping','return')"
+      SUPPORTED_DB_POLICY_TYPES.length === 5 &&
+      SUPPORTED_DB_POLICY_TYPES.includes("privacy_policy") &&
+      SUPPORTED_DB_POLICY_TYPES.includes("terms_of_service") &&
+      SUPPORTED_DB_POLICY_TYPES.includes("shipping_delivery") &&
+      SUPPORTED_DB_POLICY_TYPES.includes("return_refund") &&
+      SUPPORTED_DB_POLICY_TYPES.includes("cancellation"),
+      "Database policy enum accurately reflects 5 policies in postgres schema ('terms_of_service','privacy_policy','shipping_delivery','return_refund','cancellation')"
     );
 
-    assert(mapPolicyTypeToDatabase("privacy") === "privacy", "mapPolicyTypeToDatabase('privacy') maps to 'privacy'");
-    assert(mapPolicyTypeToDatabase("terms") === "terms", "mapPolicyTypeToDatabase('terms') maps to 'terms'");
-    assert(mapPolicyTypeToDatabase("shipping") === "shipping", "mapPolicyTypeToDatabase('shipping') maps to 'shipping'");
-    assert(mapPolicyTypeToDatabase("return") === "return", "mapPolicyTypeToDatabase('return') maps to 'return'");
-    assert(mapPolicyTypeToDatabase("refund") === "return", "mapPolicyTypeToDatabase('refund') maps to canonical 'return'");
-    assert(mapPolicyTypeToDatabase("cancellation") === null, "mapPolicyTypeToDatabase('cancellation') returns null (safe unsupported enum)");
+    assert(mapPolicyTypeToDatabase("privacy") === "privacy_policy", "mapPolicyTypeToDatabase('privacy') maps to 'privacy_policy'");
+    assert(mapPolicyTypeToDatabase("terms") === "terms_of_service", "mapPolicyTypeToDatabase('terms') maps to 'terms_of_service'");
+    assert(mapPolicyTypeToDatabase("shipping") === "shipping_delivery", "mapPolicyTypeToDatabase('shipping') maps to 'shipping_delivery'");
+    assert(mapPolicyTypeToDatabase("return") === "return_refund", "mapPolicyTypeToDatabase('return') maps to 'return_refund'");
+    assert(mapPolicyTypeToDatabase("refund") === "return_refund", "mapPolicyTypeToDatabase('refund') maps to canonical 'return_refund'");
+    assert(mapPolicyTypeToDatabase("cancellation") === "cancellation", "mapPolicyTypeToDatabase('cancellation') maps to 'cancellation'");
 
-    assert(isSupportedDatabasePolicyType("return") === true, "isSupportedDatabasePolicyType('return') is true");
-    assert(isSupportedDatabasePolicyType("cancellation") === false, "isSupportedDatabasePolicyType('cancellation') is false");
+    assert(isSupportedDatabasePolicyType("return_refund") === true, "isSupportedDatabasePolicyType('return_refund') is true");
+    assert(isSupportedDatabasePolicyType("cancellation") === true, "isSupportedDatabasePolicyType('cancellation') is true");
 
     // Test getPublicPolicy for all types
     const typesToTest: PolicyType[] = ["terms", "privacy", "shipping", "return", "refund", "cancellation"];

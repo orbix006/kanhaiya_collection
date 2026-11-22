@@ -25,9 +25,9 @@ export default async function PublicLayout({
       } = await supabase.auth.getUser();
 
       if (supabaseUser) {
-        // Query authoritative database record from public.users
+        // Query authoritative database record from public.profiles
         const { data: profileData, error: profileError } = await supabase
-          .from("users")
+          .from("profiles")
           .select("id, full_name, email, role")
           .eq("id", supabaseUser.id)
           .single();

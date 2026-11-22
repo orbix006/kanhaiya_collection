@@ -76,17 +76,14 @@ export function AnnouncementsManager({ initialAnnouncements = [] }: Announcement
   };
 
   const refreshFromStore = () => {
-    try {
-      const stored = loadMockAnnouncements();
-      if (stored && stored.length > 0) {
-        setAnnouncements(stored);
-      }
-    } catch {}
+    // Initial announcements from server props are authoritative
   };
 
   useEffect(() => {
-    refreshFromStore();
-  }, []);
+    if (initialAnnouncements) {
+      setAnnouncements(initialAnnouncements);
+    }
+  }, [initialAnnouncements]);
 
   const activeAnnouncements = useMemo(() => {
     return announcements
@@ -192,20 +189,25 @@ export function AnnouncementsManager({ initialAnnouncements = [] }: Announcement
     };
 
     try {
-      // 1. Direct local mock store save
-      saveMockAnnouncement(payload);
-
-      // 2. Server action sync
+      // 1. Server action sync to Supabase announcements table
       const res = await saveAnnouncementAction(payload);
       if (res.error) {
         setFormError(res.error);
-      } else {
-        refreshFromStore();
-        showToast(activeItem ? "Announcement updated successfully." : "New announcement created.");
-        setModalOpen(false);
+        return;
       }
-    } catch {
-      setFormError("Failed to save announcement. Please check form inputs.");
+
+      // 2. Synchronize local store only on confirmed save
+      const savedAnnouncement = res.announcement || payload;
+      saveMockAnnouncement({
+        ...payload,
+        id: (savedAnnouncement as any).id || payload.id,
+      });
+
+      refreshFromStore();
+      showToast(activeItem ? "Announcement updated successfully." : "New announcement created.");
+      setModalOpen(false);
+    } catch (err: any) {
+      setFormError(err.message || "Failed to save announcement. Please check form inputs.");
     } finally {
       setIsSubmitting(false);
     }
@@ -228,22 +230,28 @@ export function AnnouncementsManager({ initialAnnouncements = [] }: Announcement
     }
   };
 
+  const [isDeleting, setIsDeleting] = useState(false);
+
   // Delete with confirmation
   const handleDelete = async () => {
     if (!itemToDelete) return;
+    setIsDeleting(true);
     try {
-      deleteMockAnnouncement(itemToDelete.id);
       const res = await deleteAnnouncementAction(itemToDelete.id);
       if (res.error) {
         showToast(res.error, "error");
+        setIsDeleting(false);
       } else {
+        deleteMockAnnouncement(itemToDelete.id);
         refreshFromStore();
         showToast("Announcement removed successfully.");
+        setIsDeleting(false);
         setDeleteModalOpen(false);
         setItemToDelete(null);
       }
-    } catch {
-      showToast("Failed to delete announcement.", "error");
+    } catch (err: any) {
+      setIsDeleting(false);
+      showToast(err.message || "Failed to delete announcement.", "error");
     }
   };
 
@@ -558,10 +566,20 @@ export function AnnouncementsManager({ initialAnnouncements = [] }: Announcement
             ))}
           </div>
         ) : (
-          <div className="p-12 text-center text-muted-foreground">
-            <Megaphone className="h-8 w-8 mx-auto mb-2 opacity-50" />
-            <p className="text-sm font-semibold">No announcements configured yet.</p>
-            <p className="text-xs mt-1">Click "Add Announcement" above to create your first top ribbon message.</p>
+          <div className="p-12 text-center text-muted-foreground flex flex-col items-center justify-center">
+            <Megaphone className="h-10 w-10 mx-auto mb-3 text-muted-foreground/50" />
+            <h4 className="text-base font-bold text-foreground">No announcements yet</h4>
+            <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
+              Announcements you create will appear in the storefront announcement bar.
+            </p>
+            <button
+              type="button"
+              onClick={openCreateModal}
+              className="mt-4 px-4 py-2 rounded-xl bg-primary text-primary-foreground font-bold text-xs hover:bg-primary/90 transition-colors shadow-xs cursor-pointer inline-flex items-center gap-1.5"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              <span>Add Announcement</span>
+            </button>
           </div>
         )}
       </div>
@@ -717,16 +735,18 @@ export function AnnouncementsManager({ initialAnnouncements = [] }: Announcement
               <button
                 type="button"
                 onClick={() => setDeleteModalOpen(false)}
-                className="px-4 py-2.5 rounded-xl border border-border text-xs font-semibold hover:bg-muted cursor-pointer"
+                disabled={isDeleting}
+                className="px-4 py-2.5 rounded-xl border border-border text-xs font-semibold hover:bg-muted disabled:opacity-50 cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={handleDelete}
-                className="px-5 py-2.5 rounded-xl bg-destructive text-destructive-foreground font-bold text-xs shadow-xs hover:bg-destructive/90 cursor-pointer"
+                disabled={isDeleting}
+                className="px-5 py-2.5 rounded-xl bg-destructive text-destructive-foreground font-bold text-xs shadow-xs hover:bg-destructive/90 disabled:opacity-50 cursor-pointer"
               >
-                Confirm Delete
+                {isDeleting ? "Deleting..." : "Confirm Delete"}
               </button>
             </div>
           </div>

@@ -203,24 +203,24 @@ export async function getOrderById(
 
   return {
     id: order.id,
-    user_id: order.user_id,
+    user_id: order.user_id || "",
     order_number: order.order_number,
     status: order.status as OrderStatus,
     payment_status: order.payment_status as PaymentStatus,
     payment_method: order.payment_method,
-    razorpay_order_id: order.razorpay_order_id,
-    razorpay_payment_id: order.razorpay_payment_id,
-    razorpay_signature: order.razorpay_signature,
+    razorpay_order_id: (order as any).razorpay_order_id || null,
+    razorpay_payment_id: (order as any).razorpay_payment_id || null,
+    razorpay_signature: (order as any).razorpay_signature || null,
     subtotal: Number(order.subtotal),
-    discount: Number(order.discount),
-    shipping_fee: Number(order.shipping_fee),
-    tax: Number(order.tax),
+    discount: Number((order as any).discount_total || (order as any).discount || 0),
+    shipping_fee: Number(order.shipping_fee || 0),
+    tax: Number((order as any).tax_total || (order as any).tax || 0),
     total: Number(order.total),
     shipping_address: order.shipping_address as unknown as AddressSnapshot,
-    billing_address: order.billing_address as unknown as AddressSnapshot | null,
-    placed_at: order.placed_at,
+    billing_address: ((order as any).billing_address || order.shipping_address) as unknown as AddressSnapshot | null,
+    placed_at: (order as any).created_at || (order as any).placed_at,
     updated_at: order.updated_at,
-    items: (order.order_items || []).map((it: any) => ({
+    items: ((order as any).order_items || []).map((it: any) => ({
       id: it.id,
       order_id: it.order_id,
       product_id: it.product_id,
@@ -320,6 +320,7 @@ export async function getAdminOrders(
       status,
       payment_status,
       payment_method,
+      is_read,
       razorpay_order_id,
       razorpay_payment_id,
       razorpay_signature,
@@ -348,7 +349,7 @@ export async function getAdminOrders(
     .order("placed_at", { ascending: false });
 
   if (filterParams?.status && filterParams.status !== "all") {
-    query = query.eq("status", filterParams.status);
+    query = query.eq("status", filterParams.status as any);
   }
 
   if (filterParams?.paymentStatus && filterParams.paymentStatus !== "all") {
@@ -394,6 +395,7 @@ export async function getAdminOrders(
       shipping_fee: Number(o.shipping_fee),
       tax: Number(o.tax),
       total: Number(o.total),
+      is_read: Boolean(o.is_read),
       shipping_address: o.shipping_address as unknown as AddressSnapshot,
       billing_address: o.billing_address as unknown as AddressSnapshot | null,
       placed_at: o.placed_at,
@@ -441,7 +443,7 @@ export async function getAdminOrders(
   // Calculate status counts
   const { data: allStatuses } = await supabase
     .from("orders")
-    .select("status, total");
+    .select("status, is_read, total");
 
   let pendingCount = 0;
   let confirmedCount = 0;
@@ -452,20 +454,64 @@ export async function getAdminOrders(
   let refundedCount = 0;
   let totalRevenue = 0;
 
-  if (allStatuses) {
-    for (const row of allStatuses) {
-      if (row.status === "pending") pendingCount++;
-      else if (row.status === "confirmed") confirmedCount++;
-      else if (row.status === "processing") processingCount++;
-      else if (row.status === "shipped") shippedCount++;
-      else if (row.status === "delivered") deliveredCount++;
-      else if (row.status === "cancelled") cancelledCount++;
-      else if (row.status === "refunded") refundedCount++;
+  // Exact KPIs as required:
+  // 1. Total Orders: Count all orders received
+  // 2. New Orders: is_read = false
+  // 3. Delivered Orders: status = 'delivered'
+  // 4. In Progress Orders: is_read = true AND status not in ('delivered', 'cancelled')
+  let kpiTotalOrders = 0;
+  let kpiNewOrders = 0;
+  let kpiDeliveredOrders = 0;
+  let kpiInProgressOrders = 0;
 
-      if (row.status !== "cancelled" && row.status !== "refunded") {
-        totalRevenue += Number(row.total || 0);
+  if (allStatuses) {
+    kpiTotalOrders = allStatuses.length;
+    for (const row of allStatuses) {
+      const isRead = Boolean(row.is_read);
+      if (!isRead) {
+        kpiNewOrders++;
+      }
+      if (row.status === "delivered") {
+        kpiDeliveredOrders++;
+        deliveredCount++;
+        shippedCount++;
+      } else if (row.status === "pending") {
+        pendingCount++;
+        if (isRead) {
+          kpiInProgressOrders++;
+        }
+      } else if (row.status === "in_progress") {
+        confirmedCount++;
+        processingCount++;
+        if (isRead) {
+          kpiInProgressOrders++;
+        }
+      } else if (row.status === "cancelled") {
+        cancelledCount++;
+      } else {
+        if (isRead && row.status !== "refunded") {
+          kpiInProgressOrders++;
+        }
+      }
+
+      if (row.status !== "cancelled") {
+        totalRevenue += Number((row as any).total || 0);
       }
     }
+  }
+
+  // Also query admin_order_stats if available for ultimate database consistency
+  try {
+    const { data: rpcStats } = await supabase.rpc("admin_order_stats" as any);
+    if (rpcStats && typeof rpcStats === "object") {
+      const s = rpcStats as any;
+      if (typeof s.total_orders === "number") kpiTotalOrders = s.total_orders;
+      if (typeof s.new_orders === "number") kpiNewOrders = s.new_orders;
+      if (typeof s.delivered_orders === "number") kpiDeliveredOrders = s.delivered_orders;
+      if (typeof s.in_progress === "number") kpiInProgressOrders = s.in_progress;
+    }
+  } catch {
+    // If RPC unavailable or permissions check, fallback values from table scan are already computed
   }
 
   return {
@@ -479,6 +525,12 @@ export async function getAdminOrders(
     cancelledCount,
     refundedCount,
     totalRevenue,
+    kpis: {
+      totalOrders: kpiTotalOrders,
+      newOrders: kpiNewOrders,
+      deliveredOrders: kpiDeliveredOrders,
+      inProgressOrders: kpiInProgressOrders,
+    },
   };
 }
 
@@ -545,22 +597,22 @@ export async function getAdminOrderById(orderId: string): Promise<OrderDetails |
 
   return {
     id: order.id,
-    user_id: order.user_id,
+    user_id: order.user_id || "",
     order_number: order.order_number,
     status: order.status as OrderStatus,
     payment_status: order.payment_status as PaymentStatus,
     payment_method: order.payment_method,
-    razorpay_order_id: order.razorpay_order_id,
-    razorpay_payment_id: order.razorpay_payment_id,
-    razorpay_signature: order.razorpay_signature,
+    razorpay_order_id: (order as any).razorpay_order_id || null,
+    razorpay_payment_id: (order as any).razorpay_payment_id || null,
+    razorpay_signature: (order as any).razorpay_signature || null,
     subtotal: Number(order.subtotal),
-    discount: Number(order.discount),
-    shipping_fee: Number(order.shipping_fee),
-    tax: Number(order.tax),
+    discount: Number((order as any).discount_total || (order as any).discount || 0),
+    shipping_fee: Number(order.shipping_fee || 0),
+    tax: Number((order as any).tax_total || (order as any).tax || 0),
     total: Number(order.total),
     shipping_address: order.shipping_address as unknown as AddressSnapshot,
-    billing_address: order.billing_address as unknown as AddressSnapshot | null,
-    placed_at: order.placed_at,
+    billing_address: ((order as any).billing_address || order.shipping_address) as unknown as AddressSnapshot | null,
+    placed_at: (order as any).created_at || (order as any).placed_at,
     updated_at: order.updated_at,
     customer: rawProfile
       ? {
@@ -571,7 +623,7 @@ export async function getAdminOrderById(orderId: string): Promise<OrderDetails |
           avatar_url: rawProfile.avatar_url,
         }
       : null,
-    items: (order.order_items || []).map((it: any) => ({
+    items: ((order as any).order_items || []).map((it: any) => ({
       id: it.id,
       order_id: it.order_id,
       product_id: it.product_id,
@@ -682,40 +734,44 @@ export async function trackPublicOrder(
   const emailMatches = shippingEmail && shippingEmail === contact.trim().toLowerCase();
 
   if (!phoneMatches && !emailMatches) {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("phone")
-      .eq("id", order.user_id)
-      .maybeSingle();
+    if (order.user_id) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("phone")
+        .eq("id", order.user_id)
+        .maybeSingle();
 
-    const profilePhone = (profile?.phone || "").replace(/[\s\-\(\)\+]/g, "");
-    const profilePhoneMatches = profilePhone && (profilePhone.endsWith(cleanContact) || cleanContact.endsWith(profilePhone));
+      const profilePhone = (profile?.phone || "").replace(/[\s\-\(\)\+]/g, "");
+      const profilePhoneMatches = profilePhone && (profilePhone.endsWith(cleanContact) || cleanContact.endsWith(profilePhone));
 
-    if (!profilePhoneMatches) {
+      if (!profilePhoneMatches) {
+        return null;
+      }
+    } else {
       return null;
     }
   }
 
   return {
     id: order.id,
-    user_id: order.user_id,
+    user_id: order.user_id || "",
     order_number: order.order_number,
     status: order.status as OrderStatus,
     payment_status: order.payment_status as PaymentStatus,
     payment_method: order.payment_method,
-    razorpay_order_id: order.razorpay_order_id,
-    razorpay_payment_id: order.razorpay_payment_id,
-    razorpay_signature: order.razorpay_signature,
+    razorpay_order_id: (order as any).razorpay_order_id || null,
+    razorpay_payment_id: (order as any).razorpay_payment_id || null,
+    razorpay_signature: (order as any).razorpay_signature || null,
     subtotal: Number(order.subtotal),
-    discount: Number(order.discount),
-    shipping_fee: Number(order.shipping_fee),
-    tax: Number(order.tax),
+    discount: Number((order as any).discount_total || (order as any).discount || 0),
+    shipping_fee: Number(order.shipping_fee || 0),
+    tax: Number((order as any).tax_total || (order as any).tax || 0),
     total: Number(order.total),
     shipping_address: order.shipping_address as unknown as AddressSnapshot,
-    billing_address: order.billing_address as unknown as AddressSnapshot | null,
-    placed_at: order.placed_at,
+    billing_address: ((order as any).billing_address || order.shipping_address) as unknown as AddressSnapshot | null,
+    placed_at: (order as any).created_at || (order as any).placed_at,
     updated_at: order.updated_at,
-    items: (order.order_items || []).map((it: any) => ({
+    items: ((order as any).order_items || []).map((it: any) => ({
       id: it.id,
       order_id: it.order_id,
       product_id: it.product_id,

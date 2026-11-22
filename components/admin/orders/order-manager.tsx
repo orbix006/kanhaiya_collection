@@ -39,7 +39,7 @@ import type {
   AdminOrderListResult,
 } from "@/lib/data/order-types";
 import { getOrderKPIs } from "@/lib/mock-data/admin-store";
-import { updateOrderStatusAction } from "@/app/(admin)/admin/orders/actions";
+import { updateOrderStatusAction, markOrderAsReadAction } from "@/app/(admin)/admin/orders/actions";
 import { ConfirmationDialog } from "@/components/admin/confirmation-dialog";
 
 interface OrderManagerProps {
@@ -128,13 +128,14 @@ const PAYMENT_STATUS_CONFIG: Record<
   },
 };
 
-export function OrderManager({ initialOrders }: OrderManagerProps) {
-  // Orders State (initialized safely and hydrated from localStorage)
+export function OrderManager({ initialOrders, stats }: OrderManagerProps) {
+  // Orders State (initialized safely from server props)
   const [orders, setOrders] = useState<OrderDetails[]>(initialOrders);
 
   // Search & Filter States
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [readFilter, setReadFilter] = useState<"all" | "read" | "unread">("all");
   const [paymentStatusFilter, setPaymentStatusFilter] = useState<string>("all");
   const [dateRangeFilter, setDateRangeFilter] = useState<"all" | "today" | "7d" | "30d">("all");
   const [sortBy, setSortBy] = useState<"date_desc" | "date_asc" | "amount_desc" | "amount_asc" | "order_asc">("date_desc");
@@ -150,6 +151,7 @@ export function OrderManager({ initialOrders }: OrderManagerProps) {
   // Administrative Notes input state for drawer
   const [orderNoteInput, setOrderNoteInput] = useState<string>("");
   const [isSavingNote, setIsSavingNote] = useState<boolean>(false);
+  const [isMarkingRead, setIsMarkingRead] = useState<string | null>(null);
 
   // Feedback Banner & Confirmation Dialogs
   const [actionFeedback, setActionFeedback] = useState<{
@@ -183,10 +185,63 @@ export function OrderManager({ initialOrders }: OrderManagerProps) {
     }
   }, [selectedDrawerOrder]);
 
-  // Four KPI Cards (Phase 2 Requirement A)
+  // Four KPI Cards (Strict requirement calculation matching database rules):
+  // 1. Total Orders: Count all orders received
+  // 2. New Orders: is_read = false
+  // 3. Delivered Orders: status = 'delivered'
+  // 4. In Progress Orders: is_read = true AND status not in ('delivered', 'cancelled')
   const kpis = useMemo(() => {
-    return getOrderKPIs(orders);
-  }, [orders]);
+    if (stats?.kpis) {
+      return stats.kpis;
+    }
+    const totalOrders = orders.length;
+    const newOrders = orders.filter((o) => o.is_read === false).length;
+    const deliveredOrders = orders.filter((o) => o.status === "delivered").length;
+    const inProgressOrders = orders.filter(
+      (o) => o.is_read !== false && o.status !== "delivered" && o.status !== "cancelled" && o.status !== "refunded"
+    ).length;
+
+    return {
+      totalOrders,
+      newOrders,
+      deliveredOrders,
+      inProgressOrders,
+    };
+  }, [orders, stats]);
+
+  // Handler to mark an order as read without changing customer-facing status
+  const handleMarkAsRead = async (orderId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setIsMarkingRead(orderId);
+    try {
+      const res = await markOrderAsReadAction(orderId);
+      if (res.success) {
+        setOrders((prev) =>
+          prev.map((o) => (o.id === orderId ? { ...o, is_read: true } : o))
+        );
+        if (selectedDrawerOrder?.id === orderId) {
+          setSelectedDrawerOrder((prev) => (prev ? { ...prev, is_read: true } : null));
+        }
+        setActionFeedback({
+          type: "success",
+          message: "Order marked as read.",
+        });
+      } else {
+        setActionFeedback({
+          type: "error",
+          message: res.error || "Failed to mark order as read.",
+        });
+      }
+    } catch (err: any) {
+      setActionFeedback({
+        type: "error",
+        message: err.message || "An unexpected error occurred.",
+      });
+    } finally {
+      setIsMarkingRead(null);
+      setTimeout(() => setActionFeedback(null), 4000);
+    }
+  };
 
   // Copy order ID helper
   const handleCopyOrderId = (id: string, e?: React.MouseEvent) => {
@@ -199,11 +254,21 @@ export function OrderManager({ initialOrders }: OrderManagerProps) {
   // Filtered and Sorted Orders
   const filteredOrders = useMemo(() => {
     const result = orders.filter((order) => {
+      // Read / Unread Filter
+      if (readFilter === "unread" && order.is_read !== false) {
+        return false;
+      }
+      if (readFilter === "read" && order.is_read === false) {
+        return false;
+      }
+
       // Status filter
       if (statusFilter === "in_progress") {
-        if (order.status !== "confirmed" && order.status !== "processing" && order.status !== "shipped") {
+        if (order.status === "delivered" || order.status === "cancelled" || order.status === "refunded" || order.is_read === false) {
           return false;
         }
+      } else if (statusFilter === "new") {
+        if (order.is_read !== false) return false;
       } else if (statusFilter === "pending") {
         if (order.status !== "pending") return false;
       } else if (statusFilter !== "all" && order.status !== statusFilter) {
@@ -271,12 +336,12 @@ export function OrderManager({ initialOrders }: OrderManagerProps) {
     });
 
     return result;
-  }, [orders, statusFilter, paymentStatusFilter, dateRangeFilter, searchTerm, sortBy]);
+  }, [orders, statusFilter, readFilter, paymentStatusFilter, dateRangeFilter, searchTerm, sortBy]);
 
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, statusFilter, paymentStatusFilter, dateRangeFilter, sortBy]);
+  }, [searchTerm, statusFilter, readFilter, paymentStatusFilter, dateRangeFilter, sortBy]);
 
   // Pagination calculations (50 per page default)
   const totalPages = Math.max(1, Math.ceil(filteredOrders.length / pageSize));
@@ -415,10 +480,11 @@ export function OrderManager({ initialOrders }: OrderManagerProps) {
           <div
             onClick={() => {
               setStatusFilter("all");
+              setReadFilter("all");
               setPaymentStatusFilter("all");
             }}
             className={`cursor-pointer rounded-2xl border ${
-              statusFilter === "all"
+              statusFilter === "all" && readFilter === "all"
                 ? "border-primary/60 bg-primary/5 ring-1 ring-primary/40"
                 : "border-border/80 bg-card hover:border-border"
             } p-5 shadow-xs transition-all`}
@@ -441,11 +507,14 @@ export function OrderManager({ initialOrders }: OrderManagerProps) {
             </div>
           </div>
 
-          {/* Card 2: New Orders */}
+          {/* Card 2: New Orders (is_read = false) */}
           <div
-            onClick={() => setStatusFilter("pending")}
+            onClick={() => {
+              setStatusFilter("all");
+              setReadFilter("unread");
+            }}
             className={`cursor-pointer rounded-2xl border ${
-              statusFilter === "pending"
+              readFilter === "unread"
                 ? "border-amber-500 bg-amber-500/10 ring-1 ring-amber-500/40"
                 : kpis.newOrders > 0
                 ? "border-amber-500/40 bg-amber-500/5 hover:border-amber-500/60"
@@ -465,14 +534,17 @@ export function OrderManager({ initialOrders }: OrderManagerProps) {
                 {kpis.newOrders}
               </div>
               <p className="text-[11px] text-muted-foreground mt-0.5">
-                Pending initial admin decision
+                Unread orders (is_read = false)
               </p>
             </div>
           </div>
 
           {/* Card 3: Delivered Orders */}
           <div
-            onClick={() => setStatusFilter("delivered")}
+            onClick={() => {
+              setStatusFilter("delivered");
+              setReadFilter("all");
+            }}
             className={`cursor-pointer rounded-2xl border ${
               statusFilter === "delivered"
                 ? "border-emerald-500 bg-emerald-500/10 ring-1 ring-emerald-500/40"
@@ -499,7 +571,10 @@ export function OrderManager({ initialOrders }: OrderManagerProps) {
 
           {/* Card 4: In Progress Orders */}
           <div
-            onClick={() => setStatusFilter("in_progress")}
+            onClick={() => {
+              setStatusFilter("in_progress");
+              setReadFilter("read");
+            }}
             className={`cursor-pointer rounded-2xl border ${
               statusFilter === "in_progress"
                 ? "border-indigo-500 bg-indigo-500/10 ring-1 ring-indigo-500/40"
@@ -519,7 +594,7 @@ export function OrderManager({ initialOrders }: OrderManagerProps) {
                 {kpis.inProgressOrders}
               </div>
               <p className="text-[11px] text-muted-foreground mt-0.5">
-                Confirmed, packaging or in transit
+                Read and active (excluding delivered/cancelled)
               </p>
             </div>
           </div>
@@ -560,14 +635,23 @@ export function OrderManager({ initialOrders }: OrderManagerProps) {
               className="rounded-xl border border-border bg-background px-3 py-2 text-xs font-semibold text-foreground focus:outline-none shadow-2xs"
             >
               <option value="all">All Order Statuses</option>
-              <option value="pending">New Orders (Pending)</option>
-              <option value="in_progress">In Progress (Active)</option>
-              <option value="confirmed">Confirmed</option>
-              <option value="processing">Processing</option>
-              <option value="shipped">Shipped</option>
+              <option value="pending">Pending</option>
+              <option value="in_progress">In Progress</option>
               <option value="delivered">Delivered</option>
               <option value="cancelled">Cancelled</option>
               <option value="refunded">Refunded</option>
+            </select>
+
+            {/* Read / Unread Filter */}
+            <select
+              value={readFilter}
+              onChange={(e) => setReadFilter(e.target.value as any)}
+              aria-label="Filter by read state"
+              className="rounded-xl border border-border bg-background px-3 py-2 text-xs font-semibold text-foreground focus:outline-none shadow-2xs"
+            >
+              <option value="all">All Read Statuses</option>
+              <option value="unread">Unread / New</option>
+              <option value="read">Read</option>
             </select>
 
             {/* Payment Filter Dropdown */}
@@ -739,6 +823,9 @@ export function OrderManager({ initialOrders }: OrderManagerProps) {
                       {/* 1. Order Number */}
                       <td className="py-3 px-3">
                         <div className="flex items-center gap-1.5">
+                          {order.is_read === false && (
+                            <span className="h-2 w-2 rounded-full bg-amber-500 shrink-0" title="Unread Order" />
+                          )}
                           <span className="font-mono font-bold text-foreground text-xs group-hover:text-primary transition-colors truncate">
                             {order.order_number}
                           </span>
@@ -822,6 +909,20 @@ export function OrderManager({ initialOrders }: OrderManagerProps) {
                       {/* 8. Compact Action Icons (Tooltips + Direct Action Affordances) */}
                       <td className="py-3 px-3 text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-1">
+                          {/* Mark as read button if unread */}
+                          {order.is_read === false && (
+                            <button
+                              type="button"
+                              disabled={isMarkingRead === order.id}
+                              onClick={(e) => handleMarkAsRead(order.id, e)}
+                              className="p-1.5 rounded-lg border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 transition-colors shadow-2xs"
+                              title="Mark as Read"
+                              aria-label="Mark as Read"
+                            >
+                              <ShieldCheck className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+
                           {/* Approve Action: Only for pending orders */}
                           {order.status === "pending" && (
                             <button
@@ -1014,19 +1115,40 @@ export function OrderManager({ initialOrders }: OrderManagerProps) {
                   >
                     {STATUS_CONFIG[selectedDrawerOrder.status]?.label || selectedDrawerOrder.status}
                   </span>
+                  {selectedDrawerOrder.is_read === false ? (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-600 border border-amber-500/30">
+                      Unread
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-muted text-muted-foreground border border-border">
+                      Read
+                    </span>
+                  )}
                 </div>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   Placed on {new Date(selectedDrawerOrder.placed_at).toLocaleString("en-IN")}
                 </p>
               </div>
 
-              <button
-                onClick={() => setSelectedDrawerOrder(null)}
-                className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
-                title="Close Drawer"
-              >
-                <X className="h-5 w-5" />
-              </button>
+              <div className="flex items-center gap-1.5">
+                {selectedDrawerOrder.is_read === false && (
+                  <button
+                    disabled={isMarkingRead === selectedDrawerOrder.id}
+                    onClick={() => handleMarkAsRead(selectedDrawerOrder.id)}
+                    className="px-2.5 py-1.5 rounded-xl border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 text-xs font-semibold flex items-center gap-1 transition-colors"
+                  >
+                    <ShieldCheck className="h-3.5 w-3.5" />
+                    <span>Mark as Read</span>
+                  </button>
+                )}
+                <button
+                  onClick={() => setSelectedDrawerOrder(null)}
+                  className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+                  title="Close Drawer"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
             </div>
 
             {/* Drawer Content */}

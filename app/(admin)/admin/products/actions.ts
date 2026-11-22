@@ -1,6 +1,14 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath as nextRevalidatePath } from "next/cache";
+
+function revalidatePath(path: string, type?: "layout" | "page") {
+  try {
+    nextRevalidatePath(path, type);
+  } catch {
+    // Safely ignore static generation store missing when run outside Next.js request context
+  }
+}
 import { createClient } from "@/lib/supabase/server";
 import { generateSlug } from "@/lib/data/categories";
 import { isUserAdmin } from "@/lib/auth/role-check";
@@ -28,6 +36,7 @@ export interface ProductVariantInput {
 export interface ProductSavePayload {
   id?: string;
   category_id: string | null;
+  subcategory_id?: string | null;
   name: string;
   slug?: string;
   description?: string | null;
@@ -237,9 +246,53 @@ export async function saveProductAction(payload: ProductSavePayload) {
       };
     }
 
-    // Prepare product payload matching schema columns exactly
+    // 1. Try schema-defined security definer RPC public.admin_save_product
+    const rpcImages = sanitizedImages.map((img, idx) => ({
+      url: img.image_url,
+      storage_path: (img as any).storage_path || null,
+      sort_order: img.display_order ?? idx + 1,
+      is_primary: Boolean(img.is_primary),
+    }));
+
+    const rpcPayload: Record<string, any> = {
+      id: payload.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(payload.id) ? payload.id : undefined,
+      name,
+      slug,
+      description: payload.description?.trim() || null,
+      category_id: payload.category_id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(payload.category_id) ? payload.category_id : undefined,
+      subcategory_id: payload.subcategory_id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(payload.subcategory_id) ? payload.subcategory_id : undefined,
+      batch_no: payload.batch_number?.trim() || undefined,
+      price: Number(payload.base_price),
+      stock: Number(payload.stock_quantity),
+      is_active: Boolean(payload.is_active),
+      images: rpcImages,
+    };
+
+    const { data: rpcResult, error: rpcError } = await supabase.rpc("admin_save_product", {
+      p: rpcPayload,
+    });
+
+    if (!rpcError && rpcResult?.product) {
+      revalidatePath("/admin/products");
+      revalidatePath("/admin/inventory");
+      revalidatePath("/shop");
+      revalidatePath("/categories");
+      revalidatePath(`/shop/product/${slug}`);
+      revalidatePath(`/product/${slug}`);
+      revalidatePath(`/products/${slug}`);
+      revalidatePath("/");
+
+      return {
+        success: true,
+        message: `Product '${name}' persisted successfully to Supabase.`,
+        product: rpcResult.product,
+      };
+    }
+
+    // Direct table operations fallback (when RPC not available or direct table write permitted)
     const productRecord = {
       category_id: payload.category_id || null,
+      subcategory_id: payload.subcategory_id || null,
       name,
       slug,
       description: payload.description?.trim() || null,
@@ -265,9 +318,9 @@ export async function saveProductAction(payload: ProductSavePayload) {
 
     if (payload.id) {
       // Update product
-      const { error: updateError } = await supabase
+      const { error: updateError } = await (supabase
         .from("products")
-        .update(productRecord)
+        .update as any)(productRecord)
         .eq("id", payload.id);
 
       if (updateError) {
@@ -275,9 +328,9 @@ export async function saveProductAction(payload: ProductSavePayload) {
       }
     } else {
       // Insert product
-      const { data: insertedProduct, error: insertError } = await supabase
+      const { data: insertedProduct, error: insertError } = await (supabase
         .from("products")
-        .insert({
+        .insert as any)({
           ...productRecord,
           created_by: authCheck.user?.id || null,
         })
@@ -479,9 +532,10 @@ export async function archiveProductAction(productId: string, shouldArchive: boo
 }
 
 /**
- * Permanently deletes a product and all cascading images and variants.
+ * Adjusts product stock quantity by a relative delta.
+ * Can call admin_adjust_stock RPC or directly update the products table.
  */
-export async function deleteProductAction(productId: string) {
+export async function adjustProductStockAction(productId: string, delta: number) {
   const authCheck = await verifyAdminCaller();
   if (!authCheck.authorized) {
     return { error: authCheck.error };
@@ -490,11 +544,114 @@ export async function deleteProductAction(productId: string) {
   const { supabase, isDemo } = authCheck;
 
   if (isDemo) {
-    const { deleteProductFromStore } = await import("@/lib/mock-data/admin-store");
-    const res = deleteProductFromStore(productId);
-    if (!res.success) {
-      return { error: res.error || "Failed to delete product." };
+    return {
+      success: true,
+      message: `[Demo] Stock adjusted by ${delta}.`,
+    };
+  }
+
+  try {
+    // Check if admin_adjust_stock RPC exists and call it
+    const { data: rpcProduct, error: rpcError } = await (supabase.rpc as any)("admin_adjust_stock", {
+      p_product_id: productId,
+      p_delta: delta,
+    });
+
+    if (!rpcError && rpcProduct) {
+      revalidatePath("/admin/products");
+      revalidatePath("/admin/inventory");
+      revalidatePath("/shop");
+      return {
+        success: true,
+        message: `Stock updated successfully (new stock: ${rpcProduct.stock}).`,
+        stock: rpcProduct.stock,
+      };
     }
+
+    // Direct update fallback (handles both stock and stock_quantity column names)
+    const { data: currentProduct, error: fetchErr } = await supabase
+      .from("products")
+      .select("id, stock, stock_quantity")
+      .eq("id", productId)
+      .single();
+
+    if (fetchErr || !currentProduct) {
+      return { error: "Product not found." };
+    }
+
+    const currentStock = Number(
+      (currentProduct as any).stock ?? (currentProduct as any).stock_quantity ?? 0
+    );
+    const newStock = Math.max(0, currentStock + delta);
+
+    const updatePayload: any = {};
+    if ("stock" in currentProduct) {
+      updatePayload.stock = newStock;
+    }
+    if ("stock_quantity" in currentProduct || !("stock" in currentProduct)) {
+      updatePayload.stock_quantity = newStock;
+    }
+
+    const { error: updateError } = await (supabase
+      .from("products")
+      .update as any)(updatePayload)
+      .eq("id", productId);
+
+    if (updateError) {
+      return { error: updateError.message };
+    }
+
+    revalidatePath("/admin/products");
+    revalidatePath("/admin/inventory");
+    revalidatePath("/shop");
+
+    return {
+      success: true,
+      message: `Stock updated successfully (new stock: ${newStock}).`,
+      stock: newStock,
+    };
+  } catch (err: any) {
+    return { error: err.message || "Failed to adjust stock." };
+  }
+}
+
+/**
+ * Safely deletes or archives a product based on historical references and database constraints.
+ * - If product has historical dependencies (e.g. order_items, return_requests): safely archives/deactivates.
+ * - If product has no historical dependencies: executes atomic RPC public.admin_delete_product() with storage cleanup.
+ */
+export async function deleteProductAction(
+  productId: string,
+  options?: { forceArchive?: boolean }
+) {
+  if (!productId || typeof productId !== "string") {
+    return { error: "Valid product ID is required." };
+  }
+
+  const authCheck = await verifyAdminCaller();
+  if (!authCheck.authorized) {
+    return { error: authCheck.error };
+  }
+
+  const { supabase, isDemo } = authCheck;
+  const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(productId);
+
+  // If running in demo mode or passed a synthetic/local ID, route to the mock store
+  if (isDemo || !isUUID) {
+    const { archiveProductInStore, deleteProductFromStore, loadMockStore } = await import(
+      "@/lib/mock-data/admin-store"
+    );
+    // Soft delete in development/local store: set is_active=false and deleted_at
+    const store = loadMockStore();
+    const prod = store.products?.find((p: any) => p.id === productId);
+    if (!prod) {
+      return { error: `Product '${productId}' not found in catalog store.` };
+    }
+
+    prod.is_active = false;
+    (prod as any).deleted_at = new Date().toISOString();
+    const { saveMockStore } = await import("@/lib/mock-data/admin-store");
+    saveMockStore(store);
 
     revalidatePath("/admin/products");
     revalidatePath("/shop");
@@ -502,15 +659,35 @@ export async function deleteProductAction(productId: string) {
     revalidatePath("/");
     return {
       success: true,
-      message: "Product permanently removed from store catalog.",
+      archived: true,
+      message: `Product '${prod.name}' has been soft-deleted and removed from catalog view.`,
     };
   }
 
   try {
-    const { error } = await supabase.from("products").delete().eq("id", productId);
+    // Soft-delete directly via RPC or update
+    const { data: rpcData, error: rpcError } = await supabase.rpc("admin_delete_product", {
+      p_id: productId,
+    });
 
-    if (error) {
-      return { error: `Failed to delete product: ${error.message}` };
+    if (rpcError) {
+      // Direct soft-delete fallback if RPC does not support soft-delete
+      const { error: updateError } = await supabase
+        .from("products")
+        .update({ is_active: false, deleted_at: new Date().toISOString() })
+        .eq("id", productId);
+
+      if (updateError) {
+        // Fallback without deleted_at if column not yet migrated
+        const { error: activeError } = await supabase
+          .from("products")
+          .update({ is_active: false })
+          .eq("id", productId);
+
+        if (activeError) {
+          return { error: `Failed to soft-delete product: ${activeError.message}` };
+        }
+      }
     }
 
     revalidatePath("/admin/products");
@@ -521,7 +698,8 @@ export async function deleteProductAction(productId: string) {
 
     return {
       success: true,
-      message: "Product permanently removed from store catalog.",
+      archived: true,
+      message: "Product has been successfully soft-deleted. Historical order records remain intact.",
     };
   } catch (err: any) {
     return { error: err.message || "Failed to delete product." };

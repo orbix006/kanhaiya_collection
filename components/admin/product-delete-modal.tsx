@@ -40,43 +40,50 @@ export function ProductDeleteModal({
     setIsProcessing(true);
     setErrorMessage(null);
 
-    // 1. Persist archive state in mock store
-    archiveProductInStore(product.id, true);
-
-    // 2. Server action for cache revalidation
     try {
-      await archiveProductAction(product.id, true);
-    } catch {
-      // Offline fallback
+      const res = await archiveProductAction(product.id, true);
+      if (res.error) {
+        setIsProcessing(false);
+        setErrorMessage(res.error);
+        return;
+      }
+      archiveProductInStore(product.id, true);
+      setIsProcessing(false);
+      onSuccess(product.id, "archive");
+      onClose();
+    } catch (err: any) {
+      setIsProcessing(false);
+      setErrorMessage(err.message || "Failed to archive product.");
     }
-
-    setIsProcessing(false);
-    onSuccess(product.id, "archive");
-    onClose();
   };
 
   const handleDelete = async () => {
     setIsProcessing(true);
     setErrorMessage(null);
 
-    // 1. Persist deletion in mock store
-    const localRes = deleteProductFromStore(product.id);
-    if (!localRes.success) {
-      setIsProcessing(false);
-      setErrorMessage(localRes.error || "Failed to delete product.");
-      return;
-    }
-
-    // 2. Server action for cache revalidation
     try {
-      await deleteProductAction(product.id);
-    } catch {
-      // Offline fallback
-    }
+      const res = await deleteProductAction(product.id);
+      if (res.error) {
+        setIsProcessing(false);
+        setErrorMessage(res.error);
+        return;
+      }
 
-    setIsProcessing(false);
-    onSuccess(product.id, "delete");
-    onClose();
+      // Backend confirmed deletion or archival
+      if (res.archived) {
+        archiveProductInStore(product.id, true);
+        setIsProcessing(false);
+        onSuccess(product.id, "archive");
+      } else {
+        deleteProductFromStore(product.id);
+        setIsProcessing(false);
+        onSuccess(product.id, "delete");
+      }
+      onClose();
+    } catch (err: any) {
+      setIsProcessing(false);
+      setErrorMessage(err.message || "Failed to delete product.");
+    }
   };
 
 

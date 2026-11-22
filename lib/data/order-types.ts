@@ -72,6 +72,7 @@ export interface OrderDetails {
   customer?: OrderCustomerInfo | null;
   can_cancel: boolean;
   notes?: string | null;
+  is_read?: boolean;
   admin_action_taken?: boolean;
   action_history?: OrderActionLog[];
   stock_decremented?: boolean;
@@ -97,6 +98,12 @@ export interface AdminOrderListResult {
   cancelledCount: number;
   refundedCount: number;
   totalRevenue: number;
+  kpis?: {
+    totalOrders: number;
+    newOrders: number;
+    deliveredOrders: number;
+    inProgressOrders: number;
+  };
 }
 
 /**

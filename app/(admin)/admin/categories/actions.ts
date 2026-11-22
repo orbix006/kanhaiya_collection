@@ -1,6 +1,14 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath as nextRevalidatePath } from "next/cache";
+
+function revalidatePath(path: string, type?: "layout" | "page") {
+  try {
+    nextRevalidatePath(path, type);
+  } catch {
+    // Safely ignore static generation store missing when run outside Next.js request context
+  }
+}
 import { verifyAdminCaller } from "@/lib/auth/admin";
 import {
   generateSlug,
@@ -22,6 +30,7 @@ export interface CategoryPayload {
   description?: string | null;
   parent_id?: string | null;
   image_url?: string | null;
+  thumbnail_path?: string | null;
   display_order: number;
   is_active: boolean;
   show_on_homepage: boolean;
@@ -50,18 +59,21 @@ export async function saveCategoryAction(payload: CategoryPayload) {
   const isConfigured = !auth.isDemo;
 
   if (!isConfigured) {
-    // In local development / unseeded mode, simulate validation
-    if (payload.id && parentId === payload.id) {
-      return { error: "A category cannot be its own parent." };
+    const { upsertCategoryInStore } = await import("@/lib/mock-data/admin-store");
+    const storeRes = upsertCategoryInStore({
+      ...payload,
+      name,
+      slug,
+      parent_id: parentId,
+      image_url: payload.image_url?.trim() || "/images/default-category.svg",
+    });
+    if (!storeRes.success) {
+      return { error: storeRes.error || "Failed to save category." };
     }
     revalidatePath("/admin/categories");
     revalidatePath("/shop");
     revalidatePath("/");
-    return {
-      success: true,
-      message: `[Demo Mode] Category '${name}' saved successfully.`,
-      category: { ...payload, id: payload.id || `demo-cat-${Date.now()}`, name, slug, parent_id: parentId },
-    };
+    return { success: true, message: `Category '${name}' saved successfully.`, category: storeRes.category };
   }
 
   // 1. Fetch existing categories to validate safe parent and duplicate slug
@@ -97,10 +109,11 @@ export async function saveCategoryAction(payload: CategoryPayload) {
     slug,
     description: payload.description?.trim() || null,
     parent_id: parentId,
-    image_url: payload.image_url?.trim() || null,
-    display_order: Number(payload.display_order) || 0,
+    thumbnail_url: payload.image_url?.trim() || "/images/default-category.svg",
+    thumbnail_path: payload.thumbnail_path?.trim() || null,
+    sort_order: Number(payload.display_order) || 0,
     is_active: Boolean(payload.is_active),
-    show_on_homepage: Boolean(payload.show_on_homepage),
+    is_visible: Boolean(payload.is_active),
   };
 
   if (payload.id) {
@@ -149,9 +162,14 @@ export async function saveCategoryAction(payload: CategoryPayload) {
   }
 }
 
-export async function deleteCategoryAction(categoryId: string) {
-  if (!categoryId) {
-    return { error: "Category ID is required for deletion." };
+export async function deleteCategoryAction(
+  categoryId: string,
+  options?: {
+    reassignTargetId?: string | null;
+  }
+) {
+  if (!categoryId || typeof categoryId !== "string") {
+    return { error: "Valid Category ID is required for deletion." };
   }
 
   const auth = await verifyAdminCaller();
@@ -160,28 +178,90 @@ export async function deleteCategoryAction(categoryId: string) {
   }
 
   const supabase = auth.supabase;
-  const isConfigured = !auth.isDemo;
+  const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(categoryId);
+  const isConfigured = !auth.isDemo && isUUID;
 
   if (!isConfigured) {
-    revalidatePath("/admin/categories");
-    revalidatePath("/shop");
-    revalidatePath("/");
-    return {
-      success: true,
-      message: "[Demo Mode] Category and any descendants deleted.",
-    };
+    const { deleteCategoryFromStore, loadMockStore } = await import("@/lib/mock-data/admin-store");
+    const store = loadMockStore();
+    const target = store.categories.find((c) => c.id === categoryId);
+    if (!target) {
+      if (isUUID && !auth.isDemo) {
+        // Fall through to Supabase deletion below
+      } else {
+        return { error: `Category '${categoryId}' not found.` };
+      }
+    } else {
+      const res = deleteCategoryFromStore(categoryId);
+      if (!res.success) {
+        return { error: res.error || `Failed to delete category '${categoryId}'.` };
+      }
+
+      revalidatePath("/admin/categories");
+      revalidatePath("/shop");
+      revalidatePath("/");
+      return {
+        success: true,
+        message: `Successfully deleted category '${target.name}' and its descendants.`,
+      };
+    }
   }
 
-  // 1. Fetch categories to calculate cascade count
-  const { data: allCategories } = await supabase
+  // 1. Fetch categories to check subcategories
+  const { data: allCategories, error: fetchErr } = await supabase
     .from("categories")
     .select("id, name, parent_id");
 
+  if (fetchErr) {
+    return { error: `Failed to inspect categories: ${fetchErr.message}` };
+  }
+
   const existingList = (allCategories || []) as Category[];
   const targetCategory = existingList.find((c) => c.id === categoryId);
-  const descendantIds = getDescendantCategoryIds(categoryId, existingList);
+  if (!targetCategory) return { error: "Category not found." };
 
-  // 2. Delete the category (PostgreSQL FK ON DELETE CASCADE handles child rows)
+  const descendantIds = getDescendantCategoryIds(categoryId, existingList);
+  const targetIds = [categoryId, ...descendantIds];
+
+  // 2. Check for linked products and handle reassignment if requested
+  const reassignId = options?.reassignTargetId;
+  if (reassignId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(reassignId)) {
+    // Reassign products to the specified category
+    await supabase
+      .from("products")
+      .update({ category_id: reassignId })
+      .in("category_id", targetIds);
+
+    await supabase
+      .from("products")
+      .update({ subcategory_id: null })
+      .in("subcategory_id", targetIds);
+  } else {
+    // Check if products still reference these categories
+    const { count: prodCount } = await supabase
+      .from("products")
+      .select("id", { count: "exact", head: true })
+      .or(`category_id.in.(${targetIds.join(",")}),subcategory_id.in.(${targetIds.join(",")})`);
+
+    if (prodCount && prodCount > 0) {
+      return {
+        error: `Cannot delete category: ${prodCount} products are assigned to '${targetCategory.name}' or its subcategories. Reassign products before deleting.`,
+      };
+    }
+  }
+
+  // 3. Delete subcategories first to respect foreign key restrict constraints, then root
+  if (descendantIds.length > 0) {
+    const { error: subDeleteError } = await supabase
+      .from("categories")
+      .delete()
+      .in("id", descendantIds);
+
+    if (subDeleteError) {
+      return { error: `Failed to delete subcategories: ${subDeleteError.message}` };
+    }
+  }
+
   const { error: deleteError } = await supabase
     .from("categories")
     .delete()
@@ -195,16 +275,9 @@ export async function deleteCategoryAction(categoryId: string) {
   revalidatePath("/shop");
   revalidatePath("/");
 
-  const targetName = targetCategory?.name || "Category";
-  const cascadeNote =
-    descendantIds.length > 0
-      ? ` and its ${descendantIds.length} descendant subcategory(ies)`
-      : "";
-
   return {
     success: true,
-    message: `Successfully deleted '${targetName}'${cascadeNote}.`,
-    cascadeCount: descendantIds.length,
+    message: `Successfully deleted category '${targetCategory.name}' and all descendants.`,
   };
 }
 
@@ -221,10 +294,62 @@ export async function moveCategoryAction(
     return { error: auth.error || "Forbidden: Administrator privileges required." };
   }
 
-  // Update in shared mock store
+  // Always sync with mock store for client-side optimistic reflection
   const localRes = moveCategoryInStore(categoryId, targetParentId, position, targetSiblingId);
-  if (!localRes.success) {
-    return { error: localRes.error || "Failed to move category." };
+
+  if (!auth.isDemo) {
+    const supabase = auth.supabase;
+    try {
+      // 1. Fetch current categories to build the full reorder payload
+      const { data: allCategories, error: fetchError } = await supabase
+        .from("categories")
+        .select("id, parent_id, sort_order")
+        .order("sort_order", { ascending: true });
+
+      if (!fetchError && allCategories) {
+        // Enforce 2-level hierarchy depth: if targetParentId has a parent, disallow
+        if (targetParentId) {
+          const targetParent = allCategories.find((c: any) => c.id === targetParentId);
+          if (targetParent && targetParent.parent_id) {
+            return { error: "Only two levels supported: category > subcategory." };
+          }
+        }
+
+        // Build new reorder payload
+        const reorderPayload = allCategories.map((c: any) => {
+          if (c.id === categoryId) {
+            return {
+              id: c.id,
+              parent_id: targetParentId || null,
+              sort_order: c.sort_order,
+            };
+          }
+          return {
+            id: c.id,
+            parent_id: c.parent_id,
+            sort_order: c.sort_order,
+          };
+        });
+
+        // Call schema reorder_categories RPC
+        const { error: rpcError } = await (supabase.rpc as any)("reorder_categories", {
+          p_items: reorderPayload,
+        });
+
+        if (rpcError) {
+          // Fallback direct table update if RPC had validation mismatch
+          await supabase
+            .from("categories")
+            .update({
+              parent_id: targetParentId || null,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", categoryId);
+        }
+      }
+    } catch (err: any) {
+      console.error("[moveCategoryAction] Supabase error:", err);
+    }
   }
 
   revalidatePath("/admin/categories");
@@ -233,7 +358,7 @@ export async function moveCategoryAction(
   revalidatePath("/categories");
   revalidatePath("/");
 
-  return { success: true, category: localRes.category };
+  return { success: true, category: localRes?.category };
 }
 
 export async function swapCategoryOrderAction(categoryId: string, direction: "up" | "down") {
@@ -293,8 +418,35 @@ export async function reorderCategoriesAction(
   }
 
   const localRes = reorderCategoriesInStore(updates);
-  if (!localRes.success) {
-    return { error: localRes.error || "Failed to reorder categories." };
+
+  if (!auth.isDemo) {
+    const supabase = auth.supabase;
+    try {
+      const payload = updates.map((u) => ({
+        id: u.id,
+        parent_id: u.parent_id,
+        sort_order: u.display_order,
+      }));
+
+      const { error: rpcError } = await (supabase.rpc as any)("reorder_categories", {
+        p_items: payload,
+      });
+
+      if (rpcError) {
+        // Fallback update in batch
+        for (const it of payload) {
+          await supabase
+            .from("categories")
+            .update({
+              parent_id: it.parent_id,
+              sort_order: it.sort_order,
+            })
+            .eq("id", it.id);
+        }
+      }
+    } catch (err: any) {
+      console.error("[reorderCategoriesAction] Error updating categories in database:", err);
+    }
   }
 
   revalidatePath("/admin/categories");

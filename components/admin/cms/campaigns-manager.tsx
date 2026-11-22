@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import type { FestiveCampaign } from "@/lib/data/cms";
 import type { Product } from "@/lib/store";
+import { ImageUploader } from "@/components/ui/image-uploader";
 import {
   loadMockFestiveCampaigns,
   saveMockFestiveCampaign,
@@ -93,21 +94,17 @@ export function CampaignsManager({ initialCampaigns = [], products: initialProdu
   };
 
   const refreshFromStore = () => {
-    try {
-      const stored = loadMockFestiveCampaigns();
-      if (stored && stored.length > 0) {
-        setCampaigns(stored);
-      }
-      const p = loadMockProducts();
-      if (p && p.length > 0) {
-        setAllProducts(p as any);
-      }
-    } catch {}
+    // Initial campaigns and products from server props are authoritative
   };
 
   useEffect(() => {
-    refreshFromStore();
-  }, []);
+    if (initialCampaigns) {
+      setCampaigns(initialCampaigns);
+    }
+    if (initialProducts) {
+      setAllProducts(initialProducts);
+    }
+  }, [initialCampaigns, initialProducts]);
 
   const activeCampaigns = useMemo(() => {
     return campaigns
@@ -257,20 +254,25 @@ export function CampaignsManager({ initialCampaigns = [], products: initialProdu
     };
 
     try {
-      // 1. Direct local mock store save
-      saveMockFestiveCampaign(payload);
-
-      // 2. Server action sync
+      // 1. Server action sync to Supabase festive_campaigns & festive_campaign_products
       const res = await saveFestiveCampaignAction(payload);
       if (res.error) {
         setFormError(res.error);
-      } else {
-        refreshFromStore();
-        showToast(activeItem ? "Campaign updated successfully." : "New festive campaign created.");
-        setModalOpen(false);
+        return;
       }
-    } catch {
-      setFormError("Failed to save campaign. Please check your form inputs.");
+
+      // 2. Synchronize local store only on confirmed save
+      const savedCampaign = res.campaign || payload;
+      saveMockFestiveCampaign({
+        ...payload,
+        id: (savedCampaign as any).id || payload.id,
+      });
+
+      refreshFromStore();
+      showToast(activeItem ? "Campaign updated successfully." : "New festive campaign created.");
+      setModalOpen(false);
+    } catch (err: any) {
+      setFormError(err.message || "Failed to save campaign. Please check your form inputs.");
     } finally {
       setIsSubmitting(false);
     }
@@ -293,22 +295,28 @@ export function CampaignsManager({ initialCampaigns = [], products: initialProdu
     }
   };
 
+  const [isDeleting, setIsDeleting] = useState(false);
+
   // Delete campaign with confirmation (does NOT delete catalog products)
   const handleDelete = async () => {
     if (!itemToDelete) return;
+    setIsDeleting(true);
     try {
-      deleteMockFestiveCampaign(itemToDelete.id);
       const res = await deleteFestiveCampaignAction(itemToDelete.id);
       if (res.error) {
         showToast(res.error, "error");
+        setIsDeleting(false);
       } else {
+        deleteMockFestiveCampaign(itemToDelete.id);
         refreshFromStore();
-        showToast("Campaign deleted successfully. Linked catalog products remain intact.");
+        showToast(res.message || "Campaign deleted successfully. Linked catalog products remain intact.");
+        setIsDeleting(false);
         setDeleteModalOpen(false);
         setItemToDelete(null);
       }
-    } catch {
-      showToast("Failed to delete campaign.", "error");
+    } catch (err: any) {
+      setIsDeleting(false);
+      showToast(err.message || "Failed to delete campaign.", "error");
     }
   };
 
@@ -771,10 +779,20 @@ export function CampaignsManager({ initialCampaigns = [], products: initialProdu
             ))}
           </div>
         ) : (
-          <div className="p-12 text-center text-muted-foreground">
-            <Flame className="h-8 w-8 mx-auto mb-2 opacity-50" />
-            <p className="text-sm font-semibold">No festive campaigns configured yet.</p>
-            <p className="text-xs mt-1">Click "New Festive Campaign" to create your first seasonal promotional offer.</p>
+          <div className="p-12 text-center text-muted-foreground flex flex-col items-center justify-center">
+            <Flame className="h-10 w-10 mx-auto mb-3 text-muted-foreground/50" />
+            <h4 className="text-base font-bold text-foreground">No campaigns yet</h4>
+            <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
+              Create your first seasonal promotional offer to showcase discounts on your storefront.
+            </p>
+            <button
+              type="button"
+              onClick={openCreateModal}
+              className="mt-4 px-4 py-2 rounded-xl bg-primary text-primary-foreground font-bold text-xs hover:bg-primary/90 transition-colors shadow-xs cursor-pointer inline-flex items-center gap-1.5"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              <span>Add Campaign</span>
+            </button>
           </div>
         )}
       </div>
@@ -837,20 +855,21 @@ export function CampaignsManager({ initialCampaigns = [], products: initialProdu
                 />
               </div>
 
-              {/* Optional Banner Image URL */}
+              {/* Festive Campaign Banner Upload */}
               <div className="space-y-1.5">
                 <label className="font-bold text-foreground flex items-center justify-between">
-                  <span>Banner Image URL (Optional)</span>
+                  <span>Banner Image (Optional)</span>
                   <span className="text-[11px] font-normal text-muted-foreground">
-                    Leave blank to render clean devotional text card
+                    Upload banner image from device or leave blank for devotional card
                   </span>
                 </label>
-                <input
-                  type="text"
-                  placeholder="https://images.unsplash.com/... or /banners/..."
-                  value={formImageUrl}
-                  onChange={(e) => setFormImageUrl(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background focus:outline-hidden focus:ring-2 focus:ring-primary/20 text-xs"
+                <ImageUploader
+                  bucket="campaign-banners"
+                  folderPath="campaigns"
+                  aspectRatio="banner"
+                  currentImageUrl={formImageUrl}
+                  onUploadComplete={(url) => setFormImageUrl(url)}
+                  label=""
                 />
               </div>
 
@@ -1096,16 +1115,18 @@ export function CampaignsManager({ initialCampaigns = [], products: initialProdu
               <button
                 type="button"
                 onClick={() => setDeleteModalOpen(false)}
-                className="px-4 py-2.5 rounded-xl border border-border text-xs font-semibold hover:bg-muted cursor-pointer"
+                disabled={isDeleting}
+                className="px-4 py-2.5 rounded-xl border border-border text-xs font-semibold hover:bg-muted disabled:opacity-50 cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={handleDelete}
-                className="px-5 py-2.5 rounded-xl bg-destructive text-destructive-foreground font-bold text-xs shadow-xs hover:bg-destructive/90 cursor-pointer"
+                disabled={isDeleting}
+                className="px-5 py-2.5 rounded-xl bg-destructive text-destructive-foreground font-bold text-xs shadow-xs hover:bg-destructive/90 disabled:opacity-50 cursor-pointer"
               >
-                Confirm Delete
+                {isDeleting ? "Deleting..." : "Confirm Delete"}
               </button>
             </div>
           </div>

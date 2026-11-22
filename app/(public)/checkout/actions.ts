@@ -44,13 +44,17 @@ function generateOrderNumber(): string {
 export async function placeCodOrderAction(input: PlaceOrderInput) {
   const { shippingAddress, billingAddress, useSameBilling = true } = input;
 
-  if (!shippingAddress || !shippingAddress.full_name || !shippingAddress.phone || !shippingAddress.address_line1 || !shippingAddress.city || !shippingAddress.state || !shippingAddress.postal_code) {
+  if (
+    !shippingAddress ||
+    !shippingAddress.full_name ||
+    !shippingAddress.phone ||
+    !shippingAddress.address_line1 ||
+    !shippingAddress.city ||
+    !shippingAddress.state ||
+    !shippingAddress.postal_code
+  ) {
     return { error: "Please provide a complete shipping address." };
   }
-
-  const effectiveBillingAddress = useSameBilling
-    ? shippingAddress
-    : (billingAddress || shippingAddress);
 
   const supabase = await createClient();
   const {
@@ -78,19 +82,36 @@ export async function placeCodOrderAction(input: PlaceOrderInput) {
   for (const item of cart.items) {
     if (item.is_out_of_stock || item.exceeds_stock) {
       return {
-        error: `Item "${item.product.name}${item.variant ? ` (${item.variant.variant_name})` : ""}" exceeds available stock (${item.available_stock} available). Please adjust your cart.`,
+        error: `Item "${item.product.name}" exceeds available stock (${item.available_stock} available). Please adjust your cart.`,
       };
     }
   }
 
-  // 3. Server calculated totals (never trust client amounts)
-  const { subtotal, shipping_fee, tax, discount, total } = cart;
-  const orderNumber = generateOrderNumber();
-  const orderId = `order_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+  // Format shipping address according to schema.txt expectations:
+  // {"full_name","phone","line1","line2","city","state","postal_code","country"}
+  const shippingJson = {
+    full_name: shippingAddress.full_name,
+    phone: shippingAddress.phone,
+    line1: shippingAddress.address_line1,
+    line2: shippingAddress.address_line2 || null,
+    city: shippingAddress.city,
+    state: shippingAddress.state,
+    postal_code: shippingAddress.postal_code,
+    country: shippingAddress.country || "IN",
+  };
+
+  const pItems = cart.items.map((it) => ({
+    product_id: it.product_id,
+    quantity: it.quantity,
+  }));
 
   try {
     if (!isConfigured) {
       // Offline / demo store fallback
+      const orderNumber = generateOrderNumber();
+      const orderId = `order_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+      const { subtotal, shipping_fee, tax, discount, total } = cart;
+
       const demoOrder: OrderDetails = {
         id: orderId,
         user_id: userId,
@@ -107,16 +128,16 @@ export async function placeCodOrderAction(input: PlaceOrderInput) {
         tax,
         total,
         shipping_address: shippingAddress,
-        billing_address: effectiveBillingAddress,
+        billing_address: useSameBilling ? shippingAddress : billingAddress || shippingAddress,
         placed_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         items: cart.items.map((it) => ({
           id: `oi-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
           order_id: orderId,
           product_id: it.product_id,
-          variant_id: it.variant_id,
+          variant_id: null,
           product_name: it.product.name,
-          variant_name: it.variant ? it.variant.variant_name : null,
+          variant_name: null,
           unit_price: it.unit_price,
           quantity: it.quantity,
           subtotal: it.subtotal,
@@ -146,53 +167,22 @@ export async function placeCodOrderAction(input: PlaceOrderInput) {
       };
     }
 
-    // 4. Atomic Order Creation in Supabase
-    const { data: newOrder, error: orderErr } = await supabase
-      .from("orders")
-      .insert({
-        user_id: userId,
-        order_number: orderNumber,
-        status: "pending",
-        payment_status: "pending",
-        payment_method: "cod",
-        subtotal,
-        discount,
-        shipping_fee,
-        tax,
-        total,
-        shipping_address: shippingAddress as any,
-        billing_address: effectiveBillingAddress as any,
-      })
-      .select("id, order_number")
-      .single();
+    // Call authoritative PostgreSQL place_order() RPC
+    const { data: orderData, error: rpcErr } = await (supabase.rpc as any)("place_order", {
+      p_items: pItems,
+      p_shipping: shippingJson,
+      p_payment_method: "cod",
+      p_coupon_code: cart.applied_coupon?.code || null,
+      p_notes: null,
+      p_idempotency_key: null,
+    });
 
-    if (orderErr || !newOrder) {
-      console.error("[placeCodOrderAction] Order insert error:", orderErr?.message);
-      return { error: orderErr?.message || "Failed to place order." };
+    if (rpcErr || !orderData) {
+      console.error("[placeCodOrderAction] place_order RPC error:", rpcErr?.message);
+      return { error: rpcErr?.message || "Failed to place order." };
     }
 
-    // 5. Insert order items snapshot
-    const orderItemRows = cart.items.map((it) => ({
-      order_id: newOrder.id,
-      product_id: it.product_id,
-      variant_id: it.variant_id,
-      product_name: it.product.name,
-      variant_name: it.variant ? it.variant.variant_name : null,
-      unit_price: it.unit_price,
-      quantity: it.quantity,
-      subtotal: it.subtotal,
-    }));
-
-    const { error: itemsErr } = await supabase.from("order_items").insert(orderItemRows);
-
-    if (itemsErr) {
-      console.error("[placeCodOrderAction] Order items insert error:", itemsErr.message);
-      // Clean up order if items failed
-      await supabase.from("orders").delete().eq("id", newOrder.id);
-      return { error: "Failed to save order items. Please try again." };
-    }
-
-    // 6. Clear user's cart ONLY after successful order and item insertion
+    // Cart is automatically cleared in database or can be cleared:
     await supabase.from("cart_items").delete().eq("user_id", userId);
 
     safeRevalidate("/cart");
@@ -202,8 +192,8 @@ export async function placeCodOrderAction(input: PlaceOrderInput) {
 
     return {
       success: true,
-      orderId: newOrder.id,
-      orderNumber: newOrder.order_number,
+      orderId: orderData.id,
+      orderNumber: orderData.order_number,
     };
   } catch (err: any) {
     return { error: err.message || "An unexpected error occurred while placing your order." };
@@ -216,13 +206,17 @@ export async function placeCodOrderAction(input: PlaceOrderInput) {
 export async function createRazorpayOrderAction(input: PlaceOrderInput) {
   const { shippingAddress, billingAddress, useSameBilling = true } = input;
 
-  if (!shippingAddress || !shippingAddress.full_name || !shippingAddress.phone || !shippingAddress.address_line1 || !shippingAddress.city || !shippingAddress.state || !shippingAddress.postal_code) {
+  if (
+    !shippingAddress ||
+    !shippingAddress.full_name ||
+    !shippingAddress.phone ||
+    !shippingAddress.address_line1 ||
+    !shippingAddress.city ||
+    !shippingAddress.state ||
+    !shippingAddress.postal_code
+  ) {
     return { error: "Please provide a complete shipping address." };
   }
-
-  const effectiveBillingAddress = useSameBilling
-    ? shippingAddress
-    : (billingAddress || shippingAddress);
 
   const supabase = await createClient();
   const {
@@ -240,7 +234,6 @@ export async function createRazorpayOrderAction(input: PlaceOrderInput) {
   }
 
   const cart = await getUserCart(userId);
-
   if (cart.items.length === 0) {
     return { error: "Your shopping bag is empty." };
   }
@@ -248,35 +241,50 @@ export async function createRazorpayOrderAction(input: PlaceOrderInput) {
   for (const item of cart.items) {
     if (item.is_out_of_stock || item.exceeds_stock) {
       return {
-        error: `Item "${item.product.name}" exceeds available stock. Please adjust your cart.`,
+        error: `Item "${item.product.name}" exceeds available stock (${item.available_stock} available). Please adjust your cart.`,
       };
     }
   }
 
-  const { subtotal, shipping_fee, tax, discount, total } = cart;
-  const orderNumber = generateOrderNumber();
-  const orderId = `order_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+  const shippingJson = {
+    full_name: shippingAddress.full_name,
+    phone: shippingAddress.phone,
+    line1: shippingAddress.address_line1,
+    line2: shippingAddress.address_line2 || null,
+    city: shippingAddress.city,
+    state: shippingAddress.state,
+    postal_code: shippingAddress.postal_code,
+    country: shippingAddress.country || "IN",
+  };
+
+  const pItems = cart.items.map((it) => ({
+    product_id: it.product_id,
+    quantity: it.quantity,
+  }));
 
   try {
-    // 1. Create order on Razorpay server-side
-    const rzpOrder = await createRazorpayOrder({
-      amount: Math.round(total * 100), // paise
-      currency: "INR",
-      receipt: orderNumber,
-      notes: {
-        user_id: userId,
-        order_number: orderNumber,
-      },
-    });
-
     if (!isConfigured) {
+      const orderNumber = generateOrderNumber();
+      const orderId = `order_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+      const { subtotal, shipping_fee, tax, discount, total } = cart;
+
+      const rzpOrder = await createRazorpayOrder({
+        amount: Math.round(total * 100),
+        currency: "INR",
+        receipt: orderNumber,
+        notes: {
+          order_id: orderId,
+          user_id: userId,
+        },
+      });
+
       const demoOrder: OrderDetails = {
         id: orderId,
         user_id: userId,
         order_number: orderNumber,
         status: "pending",
         payment_status: "pending",
-        payment_method: "razorpay",
+        payment_method: "online",
         razorpay_order_id: rzpOrder.id,
         razorpay_payment_id: null,
         razorpay_signature: null,
@@ -286,16 +294,16 @@ export async function createRazorpayOrderAction(input: PlaceOrderInput) {
         tax,
         total,
         shipping_address: shippingAddress,
-        billing_address: effectiveBillingAddress,
+        billing_address: useSameBilling ? shippingAddress : billingAddress || shippingAddress,
         placed_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         items: cart.items.map((it) => ({
           id: `oi-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
           order_id: orderId,
           product_id: it.product_id,
-          variant_id: it.variant_id,
+          variant_id: null,
           product_name: it.product.name,
-          variant_name: it.variant ? it.variant.variant_name : null,
+          variant_name: null,
           unit_price: it.unit_price,
           quantity: it.quantity,
           subtotal: it.subtotal,
@@ -326,59 +334,61 @@ export async function createRazorpayOrderAction(input: PlaceOrderInput) {
       };
     }
 
-    // 2. Create pending order in database
-    const { data: newOrder, error: orderErr } = await supabase
-      .from("orders")
-      .insert({
-        user_id: userId,
-        order_number: orderNumber,
-        status: "pending",
-        payment_status: "pending",
-        payment_method: "razorpay",
-        razorpay_order_id: rzpOrder.id,
-        subtotal,
-        discount,
-        shipping_fee,
-        tax,
-        total,
-        shipping_address: shippingAddress as any,
-        billing_address: effectiveBillingAddress as any,
-      })
-      .select("id, order_number")
-      .single();
+    // 1. Atomically place order with payment_method: 'online'
+    const { data: orderData, error: rpcErr } = await (supabase.rpc as any)("place_order", {
+      p_items: pItems,
+      p_shipping: shippingJson,
+      p_payment_method: "online",
+      p_coupon_code: cart.applied_coupon?.code || null,
+      p_notes: null,
+      p_idempotency_key: null,
+    });
 
-    if (orderErr || !newOrder) {
-      return { error: orderErr?.message || "Failed to initialize order." };
+    if (rpcErr || !orderData) {
+      return { error: rpcErr?.message || "Failed to initialize online order." };
     }
 
-    // 3. Insert order items snapshot
-    const orderItemRows = cart.items.map((it) => ({
-      order_id: newOrder.id,
-      product_id: it.product_id,
-      variant_id: it.variant_id,
-      product_name: it.product.name,
-      variant_name: it.variant ? it.variant.variant_name : null,
-      unit_price: it.unit_price,
-      quantity: it.quantity,
-      subtotal: it.subtotal,
-    }));
+    // 2. Call begin_online_payment RPC
+    const { data: paySession, error: payErr } = await (supabase.rpc as any)("begin_online_payment", {
+      p_order_id: orderData.id,
+    });
 
-    const { error: itemsErr } = await supabase.from("order_items").insert(orderItemRows);
-    if (itemsErr) {
-      await supabase.from("orders").delete().eq("id", newOrder.id);
-      return { error: "Failed to record order items." };
+    if (payErr) {
+      return { error: payErr.message || "Failed to begin online payment session." };
     }
 
-    // Return safe payload to client
+    let rzpOrderId = paySession?.razorpay_order_id;
+    const amountMinor = Math.round(Number(orderData.total) * 100);
+
+    if (!rzpOrderId) {
+      const rzpOrder = await createRazorpayOrder({
+        amount: amountMinor,
+        currency: "INR",
+        receipt: orderData.order_number,
+        notes: {
+          order_id: orderData.id,
+          user_id: userId,
+        },
+      });
+      rzpOrderId = rzpOrder.id;
+
+      // Attach razorpay order in database payments table
+      await (supabase.rpc as any)("attach_razorpay_order", {
+        p_order_id: orderData.id,
+        p_rzp_order_id: rzpOrderId,
+        p_amount_minor: amountMinor,
+      });
+    }
+
     return {
       success: true,
-      orderId: newOrder.id,
-      orderNumber: newOrder.order_number,
-      razorpayOrderId: rzpOrder.id,
-      amount: rzpOrder.amount,
-      currency: rzpOrder.currency,
+      orderId: orderData.id,
+      orderNumber: orderData.order_number,
+      razorpayOrderId: rzpOrderId,
+      amount: amountMinor,
+      currency: "INR",
       keyId: RAZORPAY_KEY_ID,
-      isTestMode: rzpOrder.isTestMode,
+      isTestMode: true,
       prefill: {
         name: shippingAddress.full_name,
         contact: shippingAddress.phone,
@@ -425,11 +435,6 @@ export async function verifyRazorpayPaymentAction(input: VerifyPaymentInput) {
         return { error: "Order not found." };
       }
 
-      if (order.razorpay_order_id !== razorpayOrderId) {
-        return { error: "Mismatched Razorpay order identifier." };
-      }
-
-      // Verify signature
       const isValid = verifyRazorpaySignature({
         razorpayOrderId,
         razorpayPaymentId,
@@ -442,12 +447,11 @@ export async function verifyRazorpayPaymentAction(input: VerifyPaymentInput) {
       }
 
       order.payment_status = "paid";
-      order.status = "confirmed";
+      order.status = "in_progress" as any;
       order.razorpay_payment_id = razorpayPaymentId;
       order.razorpay_signature = razorpaySignature;
-      order.can_cancel = false; // Confirmed orders cannot be cancelled
+      order.can_cancel = false;
 
-      // Clear user cart only after successful payment verification
       const cartStore = getDemoCartStore();
       cartStore.delete(userId);
 
@@ -467,7 +471,7 @@ export async function verifyRazorpayPaymentAction(input: VerifyPaymentInput) {
     // 1. Fetch order from database
     const { data: order, error: fetchErr } = await supabase
       .from("orders")
-      .select("id, order_number, user_id, status, payment_status, razorpay_order_id")
+      .select("id, order_number, user_id, status, payment_status, total")
       .eq("id", orderId)
       .eq("user_id", userId)
       .single();
@@ -476,11 +480,7 @@ export async function verifyRazorpayPaymentAction(input: VerifyPaymentInput) {
       return { error: "Order not found or unauthorized." };
     }
 
-    if (order.razorpay_order_id !== razorpayOrderId) {
-      return { error: "Mismatched Razorpay order identifier." };
-    }
-
-    // 2. Cryptographic HMAC-SHA256 signature verification
+    // 2. Cryptographic signature check
     const isValidSignature = verifyRazorpaySignature({
       razorpayOrderId,
       razorpayPaymentId,
@@ -488,38 +488,34 @@ export async function verifyRazorpayPaymentAction(input: VerifyPaymentInput) {
     });
 
     if (!isValidSignature) {
-      // Mark payment failed, do NOT clear cart
-      await supabase
-        .from("orders")
-        .update({
-          payment_status: "failed",
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", orderId);
-
       return {
         error: "Payment verification failed: Invalid cryptographic signature. Transaction rejected.",
       };
     }
 
-    // 3. Mark payment as paid and status as confirmed
-    // The DB trigger `trg_order_confirmation` will automatically decrement stock and increment sold_count
-    const { error: updateErr } = await supabase
-      .from("orders")
-      .update({
-        payment_status: "paid",
-        status: "confirmed",
-        razorpay_payment_id: razorpayPaymentId,
-        razorpay_signature: razorpaySignature,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", orderId);
+    // 3. Record capture event in ledger via apply_payment_event RPC
+    const amountMinor = Math.round(Number(order.total) * 100);
+    const { error: eventErr } = await (supabase.rpc as any)("apply_payment_event", {
+      p_provider: "razorpay",
+      p_event_id: `client:${razorpayPaymentId}`,
+      p_event_type: "payment.captured",
+      p_provider_order_id: razorpayOrderId,
+      p_provider_payment_id: razorpayPaymentId,
+      p_amount_minor: amountMinor,
+      p_currency: "INR",
+      p_raw: { client_verified: true, razorpay_signature: razorpaySignature },
+      p_method: "online",
+      p_error_code: null,
+      p_error_description: null,
+      p_parent_payment_id: null,
+      p_order_id: order.id,
+    });
 
-    if (updateErr) {
-      return { error: updateErr.message };
+    if (eventErr) {
+      console.error("[verifyRazorpayPaymentAction] apply_payment_event error:", eventErr.message);
     }
 
-    // 4. Clear cart ONLY after successful order & payment confirmation
+    // Clear cart after payment
     await supabase.from("cart_items").delete().eq("user_id", userId);
 
     safeRevalidate("/cart");

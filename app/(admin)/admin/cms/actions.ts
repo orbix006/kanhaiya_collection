@@ -114,7 +114,7 @@ export async function saveBannerAction(payload: BannerPayload) {
 
   if (payload.id) {
     const { data, error } = await supabase
-      .from("banners")
+      .from("hero_banners")
       .update(record)
       .eq("id", payload.id)
       .select()
@@ -126,7 +126,7 @@ export async function saveBannerAction(payload: BannerPayload) {
     return { success: true, message: "Banner updated successfully.", banner: data };
   } else {
     const { data, error } = await supabase
-      .from("banners")
+      .from("hero_banners")
       .insert(record)
       .select()
       .single();
@@ -147,7 +147,7 @@ export async function toggleBannerStatusAction(id: string, is_active: boolean) {
     toggleMockBannerStatus(id);
   } else {
     const { error } = await auth.supabase
-      .from("banners")
+      .from("hero_banners")
       .update({ is_active, updated_at: new Date().toISOString() })
       .eq("id", id);
 
@@ -167,7 +167,7 @@ export async function deleteBannerAction(id: string) {
     const { deleteMockBanner } = await import("@/lib/mock-data/admin-store");
     deleteMockBanner(id);
   } else {
-    const { error } = await auth.supabase.from("banners").delete().eq("id", id);
+    const { error } = await auth.supabase.from("hero_banners").delete().eq("id", id);
     if (error) return { error: `Failed to delete banner: ${error.message}` };
   }
 
@@ -636,29 +636,75 @@ export async function savePolicyAction(
   const dbType = mapPolicyTypeToDatabase(type);
   if (!dbType) {
     return {
-      error: `Policy type '${type}' is not yet supported in the database enum (supported: ${SUPPORTED_DB_POLICY_TYPES.join(", ")}). A database migration (ALTER TYPE public.site_policy_type ADD VALUE '${type}') is required before saving to Supabase.`,
+      error: `Policy type '${type}' is not recognized (valid types: ${SUPPORTED_DB_POLICY_TYPES.join(", ")}).`,
     };
   }
 
-  const { supabase } = auth;
+  const { supabase, user } = auth;
+
+  // Try RPC admin_save_policy first as specified in schema.txt
+  const { data: rpcData, error: rpcError } = await (supabase as any).rpc("admin_save_policy", {
+    p_type: dbType,
+    p_content: validContent,
+    p_title: validTitle,
+    p_format: "markdown",
+  });
+
+  if (!rpcError && rpcData) {
+    revalidatePath(`/${type}`);
+    if (type === "refund" || type === "return") {
+      revalidatePath("/return");
+      revalidatePath("/refund");
+    }
+    if (type === "privacy") {
+      revalidatePath("/privacy");
+      revalidatePath("/privacy-policy");
+    }
+    revalidatePath("/terms");
+    revalidatePath("/shipping");
+    revalidatePath("/cancellation");
+    revalidatePath("/admin/cms/policies");
+    revalidatePath("/", "layout");
+    return { success: true, message: `${validTitle} updated and published successfully.`, policy: rpcData };
+  }
+
+  // Fallback to direct update on site_policies table
   const payload: Record<string, unknown> = {
-    type: dbType,
+    policy_type: dbType,
     title: validTitle,
     content: validContent,
+    content_format: "markdown",
     updated_at: new Date().toISOString(),
+    updated_by: user?.id || null,
   };
-
-  if (display_order !== undefined) {
-    payload.display_order = Number(display_order);
-  }
 
   const { data, error } = await supabase
     .from("site_policies")
-    .upsert(payload, { onConflict: "type" })
+    .upsert(payload, { onConflict: "policy_type" })
     .select()
     .single();
 
-  if (error) return { error: `Failed to save policy: ${error.message}` };
+  if (error) {
+    // Also try with 'type' column name if running against legacy table format
+    const legacyPayload = {
+      type: dbType,
+      title: validTitle,
+      content: validContent,
+      updated_at: new Date().toISOString(),
+    };
+    const { data: legData, error: legErr } = await supabase
+      .from("site_policies")
+      .upsert(legacyPayload, { onConflict: "type" })
+      .select()
+      .single();
+
+    if (legErr) {
+      return { error: `Failed to save policy: ${rpcError?.message || error.message}` };
+    }
+    revalidatePath(`/${type}`);
+    revalidatePath("/admin/cms/policies");
+    return { success: true, message: `${validTitle} updated successfully.`, policy: legData };
+  }
 
   revalidatePath(`/${type}`);
   if (type === "refund" || type === "return") {
@@ -669,9 +715,12 @@ export async function savePolicyAction(
     revalidatePath("/privacy");
     revalidatePath("/privacy-policy");
   }
+  revalidatePath("/terms");
+  revalidatePath("/shipping");
+  revalidatePath("/cancellation");
   revalidatePath("/admin/cms/policies");
   revalidatePath("/", "layout");
-  return { success: true, message: `${validTitle} updated successfully.`, policy: data };
+  return { success: true, message: `${validTitle} updated and published successfully.`, policy: data };
 }
 
 export async function updatePolicyOrderAction(
@@ -756,49 +805,147 @@ export async function saveAnnouncementAction(payload: AnnouncementPayload) {
     return { error: auth.error || "Forbidden: Administrator privileges required." };
   }
 
-  const { saveMockAnnouncement } = await import("@/lib/mock-data/admin-store");
-  const res = saveMockAnnouncement(payload);
-  if (!res.success) {
-    return { error: res.error || "Failed to save announcement." };
+  const text = payload.text?.trim();
+  if (!text) {
+    return { error: "Announcement text is required." };
   }
 
-  revalidatePath("/", "layout");
-  revalidatePath("/admin/cms/homepage");
-  return {
-    success: true,
-    message: "Announcement ribbon saved successfully.",
-    announcement: res.announcement,
+  if (auth.isDemo) {
+    const { saveMockAnnouncement } = await import("@/lib/mock-data/admin-store");
+    const res = saveMockAnnouncement(payload);
+    if (!res.success) {
+      return { error: res.error || "Failed to save announcement." };
+    }
+
+    revalidatePath("/", "layout");
+    revalidatePath("/admin/cms/homepage");
+    return {
+      success: true,
+      message: "Announcement ribbon saved successfully.",
+      announcement: res.announcement,
+    };
+  }
+
+  const { supabase } = auth;
+  const record = {
+    text,
+    display_order: Number(payload.display_order) || 0,
+    is_active: Boolean(payload.is_active ?? true),
+    updated_at: new Date().toISOString(),
   };
+
+  if (payload.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(payload.id)) {
+    const { data, error } = await supabase
+      .from("announcements")
+      .update(record)
+      .eq("id", payload.id)
+      .select()
+      .single();
+
+    if (error) return { error: `Failed to update announcement: ${error.message}` };
+    revalidatePath("/", "layout");
+    revalidatePath("/admin/cms/homepage");
+    return { success: true, message: "Announcement updated successfully.", announcement: data };
+  } else {
+    const { data, error } = await supabase
+      .from("announcements")
+      .insert(record)
+      .select()
+      .single();
+
+    if (error) return { error: `Failed to create announcement: ${error.message}` };
+    revalidatePath("/", "layout");
+    revalidatePath("/admin/cms/homepage");
+    return { success: true, message: "Announcement created successfully.", announcement: data };
+  }
 }
 
 export async function toggleAnnouncementStatusAction(id: string, is_active: boolean) {
   const auth = await verifyAdminCaller();
   if (!auth.authorized) return { error: auth.error };
 
-  const { toggleMockAnnouncementStatus } = await import("@/lib/mock-data/admin-store");
-  const res = toggleMockAnnouncementStatus(id);
-  if (!res.success) return { error: res.error || "Failed to toggle announcement." };
+  const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+
+  if (auth.isDemo || !isUUID) {
+    const { toggleMockAnnouncementStatus } = await import("@/lib/mock-data/admin-store");
+    const res = toggleMockAnnouncementStatus(id);
+    if (!res.success) return { error: res.error || "Failed to toggle announcement." };
+
+    revalidatePath("/", "layout");
+    revalidatePath("/admin/cms/homepage");
+    return {
+      success: true,
+      message: `Announcement ${is_active ? "activated" : "deactivated"} successfully.`,
+      announcement: res.announcement,
+    };
+  }
+
+  const { error } = await auth.supabase
+    .from("announcements")
+    .update({ is_active, updated_at: new Date().toISOString() })
+    .eq("id", id);
+
+  if (error) return { error: `Failed to toggle announcement: ${error.message}` };
 
   revalidatePath("/", "layout");
   revalidatePath("/admin/cms/homepage");
   return {
     success: true,
     message: `Announcement ${is_active ? "activated" : "deactivated"} successfully.`,
-    announcement: res.announcement,
   };
 }
 
 export async function deleteAnnouncementAction(id: string) {
+  if (!id || typeof id !== "string") {
+    return { error: "Valid announcement ID is required." };
+  }
+
   const auth = await verifyAdminCaller();
   if (!auth.authorized) return { error: auth.error };
 
-  const { deleteMockAnnouncement } = await import("@/lib/mock-data/admin-store");
-  const res = deleteMockAnnouncement(id);
-  if (!res.success) return { error: res.error || "Failed to delete announcement." };
+  const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+
+  if (auth.isDemo || !isUUID) {
+    const { loadMockStore, saveMockStore } = await import("@/lib/mock-data/admin-store");
+    const store = loadMockStore();
+    const item = (store.announcements || []).find((a: any) => a.id === id);
+    if (!item) {
+      if (isUUID && !auth.isDemo) {
+        // Fall through to Supabase
+      } else {
+        return { error: `Announcement '${id}' was not found.` };
+      }
+    } else {
+      item.is_active = false;
+      (item as any).deleted_at = new Date().toISOString();
+      saveMockStore(store);
+      revalidatePath("/", "layout");
+      revalidatePath("/admin/cms/homepage");
+      return { success: true, message: "Announcement soft-deleted successfully." };
+    }
+  }
+
+  // Soft-delete announcement from Supabase
+  const { error } = await auth.supabase
+    .from("announcements")
+    .update({ is_active: false, deleted_at: new Date().toISOString() })
+    .eq("id", id);
+
+  if (error) {
+    // Fallback without deleted_at if column not present
+    const { error: fallbackError } = await auth.supabase
+      .from("announcements")
+      .update({ is_active: false })
+      .eq("id", id);
+
+    if (fallbackError) {
+      return { error: `Failed to delete announcement: ${fallbackError.message}` };
+    }
+  }
 
   revalidatePath("/", "layout");
   revalidatePath("/admin/cms/homepage");
-  return { success: true, message: "Announcement removed successfully." };
+  return { success: true, message: "Announcement soft-deleted successfully." };
 }
 
 export async function reorderAnnouncementsAction(orderedIds: string[]) {
@@ -836,49 +983,179 @@ export async function saveFestiveCampaignAction(payload: FestiveCampaignPayload)
     return { error: auth.error || "Forbidden: Administrator privileges required." };
   }
 
-  const { saveMockFestiveCampaign } = await import("@/lib/mock-data/admin-store");
-  const res = saveMockFestiveCampaign(payload);
-  if (!res.success) {
-    return { error: res.error || "Failed to save festive campaign." };
+  const name = payload.name?.trim();
+  if (!name) {
+    return { error: "Campaign name is required." };
   }
 
-  revalidatePath("/");
-  revalidatePath("/admin/cms/homepage");
-  return {
-    success: true,
-    message: `Festive campaign '${payload.name}' saved successfully.`,
-    campaign: res.campaign,
+  if (auth.isDemo) {
+    const { saveMockFestiveCampaign } = await import("@/lib/mock-data/admin-store");
+    const res = saveMockFestiveCampaign(payload);
+    if (!res.success) {
+      return { error: res.error || "Failed to save festive campaign." };
+    }
+
+    revalidatePath("/");
+    revalidatePath("/admin/cms/homepage");
+    return {
+      success: true,
+      message: `Festive campaign '${payload.name}' saved successfully.`,
+      campaign: res.campaign,
+    };
+  }
+
+  const { supabase } = auth;
+  const isUUID = payload.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(payload.id);
+
+  // Use schema defined admin_save_campaign RPC
+  const rpcPayload: Record<string, any> = {
+    id: isUUID ? payload.id : undefined,
+    name,
+    description: payload.description?.trim() || "",
+    banner_image_url: payload.image_url?.trim() || "",
+    discount_percent: Number(payload.discount_percent) || 10,
+    display_order: Number(payload.display_order) || 0,
+    is_active: Boolean(payload.is_active ?? true),
+    product_ids: (payload.product_ids || []).filter((id) =>
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
+    ),
   };
+
+  const { data: rpcData, error: rpcError } = await supabase.rpc("admin_save_campaign", {
+    p: rpcPayload,
+  });
+
+  if (!rpcError && rpcData) {
+    revalidatePath("/");
+    revalidatePath("/admin/cms/homepage");
+    return {
+      success: true,
+      message: `Festive campaign '${name}' saved successfully to Supabase.`,
+      campaign: rpcData,
+    };
+  }
+
+  // Fallback direct table upsert on festive_campaigns
+  const record = {
+    name,
+    banner_image_url: payload.image_url?.trim() || "",
+    discount_percent: Number(payload.discount_percent) || 10,
+    display_order: Number(payload.display_order) || 0,
+    is_active: Boolean(payload.is_active ?? true),
+    updated_at: new Date().toISOString(),
+  };
+
+  if (isUUID) {
+    const { data, error } = await supabase
+      .from("festive_campaigns")
+      .update(record)
+      .eq("id", payload.id)
+      .select()
+      .single();
+
+    if (error) return { error: `Failed to update campaign: ${rpcError?.message || error.message}` };
+    revalidatePath("/");
+    revalidatePath("/admin/cms/homepage");
+    return { success: true, message: `Festive campaign '${name}' updated successfully.`, campaign: data };
+  } else {
+    const { data, error } = await supabase
+      .from("festive_campaigns")
+      .insert(record)
+      .select()
+      .single();
+
+    if (error) return { error: `Failed to create campaign: ${rpcError?.message || error.message}` };
+    revalidatePath("/");
+    revalidatePath("/admin/cms/homepage");
+    return { success: true, message: `Festive campaign '${name}' created successfully.`, campaign: data };
+  }
 }
 
 export async function toggleFestiveCampaignStatusAction(id: string, is_active: boolean) {
   const auth = await verifyAdminCaller();
   if (!auth.authorized) return { error: auth.error };
 
-  const { toggleMockFestiveCampaignStatus } = await import("@/lib/mock-data/admin-store");
-  const res = toggleMockFestiveCampaignStatus(id);
-  if (!res.success) return { error: res.error || "Failed to toggle campaign." };
+  const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+
+  if (auth.isDemo || !isUUID) {
+    const { toggleMockFestiveCampaignStatus } = await import("@/lib/mock-data/admin-store");
+    const res = toggleMockFestiveCampaignStatus(id);
+    if (!res.success) return { error: res.error || "Failed to toggle campaign." };
+
+    revalidatePath("/");
+    revalidatePath("/admin/cms/homepage");
+    return {
+      success: true,
+      message: `Festive campaign ${is_active ? "activated" : "deactivated"} successfully.`,
+      campaign: res.campaign,
+    };
+  }
+
+  const { error } = await auth.supabase
+    .from("festive_campaigns")
+    .update({ is_active, updated_at: new Date().toISOString() })
+    .eq("id", id);
+
+  if (error) return { error: `Failed to toggle campaign: ${error.message}` };
 
   revalidatePath("/");
   revalidatePath("/admin/cms/homepage");
   return {
     success: true,
     message: `Festive campaign ${is_active ? "activated" : "deactivated"} successfully.`,
-    campaign: res.campaign,
   };
 }
 
 export async function deleteFestiveCampaignAction(id: string) {
+  if (!id || typeof id !== "string") {
+    return { error: "Valid festive campaign ID is required." };
+  }
+
   const auth = await verifyAdminCaller();
   if (!auth.authorized) return { error: auth.error };
 
-  const { deleteMockFestiveCampaign } = await import("@/lib/mock-data/admin-store");
-  const res = deleteMockFestiveCampaign(id);
-  if (!res.success) return { error: res.error || "Failed to delete campaign." };
+  const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+
+  if (auth.isDemo || !isUUID) {
+    const { loadMockStore, saveMockStore } = await import("@/lib/mock-data/admin-store");
+    const store = loadMockStore();
+    const campaign = (store.festiveCampaigns || []).find((c: any) => c.id === id);
+    if (!campaign) {
+      if (isUUID && !auth.isDemo) {
+        // Fall through to Supabase
+      } else {
+        return { error: `Campaign '${id}' was not found.` };
+      }
+    } else {
+      campaign.is_active = false;
+      (campaign as any).deleted_at = new Date().toISOString();
+      saveMockStore(store);
+      revalidatePath("/");
+      revalidatePath("/admin/cms/homepage");
+      return { success: true, message: "Festive campaign soft-deleted successfully. Linked products and coupons remain intact." };
+    }
+  }
+
+  // Soft-delete festive campaign: set is_active=false and deleted_at
+  const { error: updateError } = await auth.supabase
+    .from("festive_campaigns")
+    .update({ is_active: false, deleted_at: new Date().toISOString() })
+    .eq("id", id);
+
+  if (updateError) {
+    const { error: fallbackError } = await auth.supabase
+      .from("festive_campaigns")
+      .update({ is_active: false })
+      .eq("id", id);
+
+    if (fallbackError) {
+      return { error: `Failed to soft-delete campaign: ${fallbackError.message}` };
+    }
+  }
 
   revalidatePath("/");
   revalidatePath("/admin/cms/homepage");
-  return { success: true, message: "Festive campaign deleted successfully." };
+  return { success: true, message: "Festive campaign soft-deleted successfully. Linked products and coupons remain intact." };
 }
 
 export async function reorderFestiveCampaignsAction(orderedIds: string[]) {

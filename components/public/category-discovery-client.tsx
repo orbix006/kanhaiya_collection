@@ -131,7 +131,7 @@ export function CategoryDiscoveryClient({
         };
         findDescendants(selectedCat.id);
 
-        result = result.filter((p) => p.category_id && childIds.has(p.category_id));
+        result = result.filter((p) => (p.category_id && childIds.has(p.category_id)) || ((p as any).subcategory_id && childIds.has((p as any).subcategory_id)));
       }
     } else if (activeTab === "main") {
       // Products belonging to root categories or their children
@@ -140,7 +140,7 @@ export function CategoryDiscoveryClient({
     } else if (activeTab === "sub") {
       // Products belonging directly to subcategories
       const subIds = new Set(subCategories.map((s) => s.id));
-      result = result.filter((p) => p.category_id && subIds.has(p.category_id));
+      result = result.filter((p) => (p.category_id && subIds.has(p.category_id)) || ((p as any).subcategory_id && subIds.has((p as any).subcategory_id)));
     }
 
     // 2. Search Query Filtering

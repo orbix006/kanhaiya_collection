@@ -45,6 +45,7 @@ export default async function AdminOrdersPage() {
           cancelledCount: result.cancelledCount,
           refundedCount: result.refundedCount,
           totalRevenue: result.totalRevenue,
+          kpis: result.kpis,
         }}
       />
     </div>

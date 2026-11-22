@@ -163,14 +163,120 @@ export async function markInquiryReadAction(
     return { error: auth.error || "Forbidden: Administrator privileges required." };
   }
 
-  const { markInquiryAsRead } = await import("@/lib/mock-data/admin-store");
-  const res = markInquiryAsRead(id, entityType);
-  if (!res.success) return { error: res.error || "Failed to mark as read." };
+  if (auth.isDemo) {
+    const { markInquiryAsRead } = await import("@/lib/mock-data/admin-store");
+    const res = markInquiryAsRead(id, entityType);
+    if (!res.success) return { error: res.error || "Failed to mark as read." };
+
+    revalidatePath("/admin/inbox");
+    revalidatePath("/admin/inbox/contact");
+    revalidatePath("/admin/inbox/leads");
+    return { success: true, message: "Record marked as reviewed.", newStatus: res.newStatus };
+  }
+
+  const { supabase } = auth;
+  // If updating a lead in Supabase, mark as read
+  if (entityType === "lead") {
+    // Try admin_update_lead RPC first
+    const { error: rpcErr } = await (supabase as any).rpc("admin_update_lead", {
+      p_id: id,
+      p_status: "read",
+    });
+
+    if (rpcErr) {
+      await supabase
+        .from("leads")
+        .update({ status: "read", updated_at: new Date().toISOString() })
+        .eq("id", id);
+    }
+  }
 
   revalidatePath("/admin/inbox");
   revalidatePath("/admin/inbox/contact");
   revalidatePath("/admin/inbox/leads");
-  return { success: true, message: "Record marked as reviewed.", newStatus: res.newStatus };
+  return { success: true, message: "Record marked as read." };
+}
+
+export async function markLeadUnreadAction(id: string) {
+  const auth = await verifyAdminCaller();
+  if (!auth.authorized) {
+    return { error: auth.error || "Forbidden: Administrator privileges required." };
+  }
+
+  if (auth.isDemo) {
+    const { loadMockStore, saveMockStore } = await import("@/lib/mock-data/admin-store");
+    const store = loadMockStore();
+    const lead = store.leads?.find((l) => l.id === id);
+    if (lead) {
+      lead.status = "new";
+      lead.updated_at = new Date().toISOString();
+      saveMockStore(store);
+    }
+    const sub = store.contactSubmissions?.find((s) => s.id === id);
+    if (sub) {
+      sub.status = "new";
+      sub.updated_at = new Date().toISOString();
+      saveMockStore(store);
+    }
+    revalidatePath("/admin/inbox");
+    return { success: true, message: "Record marked as unread." };
+  }
+
+  const { supabase } = auth;
+  await (supabase as any).rpc("admin_update_lead", {
+    p_id: id,
+    p_status: "unread",
+  }).catch(() => null);
+
+  await supabase
+    .from("leads")
+    .update({ status: "unread", updated_at: new Date().toISOString() })
+    .eq("id", id);
+
+  revalidatePath("/admin/inbox");
+  return { success: true, message: "Lead marked as unread." };
+}
+
+export async function toggleLeadResponseAction(id: string, markResponded: boolean) {
+  const auth = await verifyAdminCaller();
+  if (!auth.authorized) {
+    return { error: auth.error || "Forbidden: Administrator privileges required." };
+  }
+
+  const targetStatus = markResponded ? "responded" : "read";
+
+  if (auth.isDemo) {
+    const { loadMockStore, saveMockStore } = await import("@/lib/mock-data/admin-store");
+    const store = loadMockStore();
+    const lead = store.leads?.find((l) => l.id === id);
+    if (lead) {
+      lead.status = markResponded ? "converted" : "new";
+      lead.updated_at = new Date().toISOString();
+      saveMockStore(store);
+    }
+    revalidatePath("/admin/inbox");
+    return { success: true, message: `Lead marked as ${markResponded ? "responded" : "unresponded"}.` };
+  }
+
+  const { supabase } = auth;
+  const { error: rpcErr } = await (supabase as any).rpc("admin_update_lead", {
+    p_id: id,
+    p_status: targetStatus,
+  });
+
+  if (rpcErr) {
+    await supabase
+      .from("leads")
+      .update({
+        status: targetStatus,
+        responded_at: markResponded ? new Date().toISOString() : null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", id);
+  }
+
+  revalidatePath("/admin/inbox");
+  return { success: true, message: `Lead marked as ${markResponded ? "responded" : "unresponded"}.` };
 }
 
 export async function updateUnifiedInquiryStatusAction(

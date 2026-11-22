@@ -5,7 +5,6 @@ import { SEED_CATEGORIES, loadMockCategories, loadMockProducts } from "@/lib/moc
 import { FolderTree, Sparkles } from "lucide-react";
 import type { Category } from "@/lib/data/homepage";
 
-
 export const dynamic = "force-dynamic";
 
 export default async function AdminCategoriesPage() {
@@ -13,25 +12,45 @@ export default async function AdminCategoriesPage() {
     Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL) &&
     process.env.NEXT_PUBLIC_SUPABASE_URL !== "https://placeholder-project.supabase.co";
 
-  const mockCats = loadMockCategories();
-  let categories: Category[] = (mockCats && mockCats.length > 0 ? mockCats : SEED_CATEGORIES) as unknown as Category[];
+  let categories: Category[] = [];
+  let products: any[] = [];
 
   if (isConfigured) {
     try {
       const supabase = await createClient();
-      const { data: dbCats, error } = await supabase
-        .from("categories")
-        .select("*")
-        .order("display_order", { ascending: true });
+      const [catRes, prodRes] = await Promise.all([
+        supabase
+          .from("categories")
+          .select("*")
+          .order("sort_order", { ascending: true }),
+        supabase
+          .from("products")
+          .select("id, name, category_id, subcategory_id"),
+      ]);
 
-      if (!error && dbCats && dbCats.length > 0) {
-        categories = dbCats as Category[];
+      if (!catRes.error && catRes.data) {
+        categories = catRes.data.map((c: any) => ({
+          id: c.id,
+          parent_id: c.parent_id,
+          name: c.name,
+          slug: c.slug,
+          description: c.description,
+          image_url: c.thumbnail_url || c.image_url || null,
+          thumbnail_path: c.thumbnail_path || null,
+          display_order: c.sort_order ?? c.display_order ?? 0,
+          is_active: c.is_active ?? true,
+          show_on_homepage: c.is_visible ?? c.show_on_homepage ?? true,
+        })) as Category[];
+      }
+
+      if (!prodRes.error && prodRes.data) {
+        products = prodRes.data;
       }
     } catch {
-      // Use mock categories
+      categories = [];
+      products = [];
     }
   }
-
 
   return (
     <div className="space-y-8">
@@ -46,7 +65,7 @@ export default async function AdminCategoriesPage() {
             Category Administration
           </h1>
           <p className="text-xs sm:text-sm text-muted-foreground mt-1 max-w-2xl">
-            Organize catalog categories with unlimited-depth hierarchy. Create subcategories, customize auto-slugs, and manage storefront visibility.
+            Hierarchical category tree with two-level depth, direct thumbnail upload to Supabase Storage, and real-time drag-and-drop reordering.
           </p>
         </div>
 
@@ -56,7 +75,7 @@ export default async function AdminCategoriesPage() {
         </div>
       </div>
 
-      <CategoryManager initialCategories={categories} />
+      <CategoryManager initialCategories={categories} initialProducts={products} />
     </div>
   );
 }

@@ -69,12 +69,23 @@ export function CategoryTree({
   } | null>(null);
   const [isOverRootZone, setIsOverRootZone] = useState(false);
 
-  // Helper to determine if targetId is an invalid drop target (self or descendant)
+  // Helper to determine if targetId is an invalid drop target:
+  // 1. Self or descendant
+  // 2. Maximum depth limit: schema only supports 2 levels (category > subcategory).
+  //    Target category cannot already have a parent (cannot nest inside a subcategory).
   const isInvalidDropTarget = (targetId: string, currentDraggedId: string | null): boolean => {
     if (!currentDraggedId) return false;
     if (targetId === currentDraggedId) return true;
     const descendantIds = getDescendantCategoryIds(currentDraggedId, allCategories);
-    return descendantIds.includes(targetId);
+    if (descendantIds.includes(targetId)) return true;
+
+    // Enforce 2-level hierarchy: a subcategory cannot become a parent
+    const targetCat = allCategories.find((c) => c.id === targetId);
+    if (targetCat && targetCat.parent_id !== null) {
+      return true; // Target is already a subcategory, cannot nest inside it
+    }
+
+    return false;
   };
 
   const handleDragStart = (e: React.DragEvent, id: string) => {
@@ -266,21 +277,15 @@ export function CategoryTree({
             )}
 
             {/* Thumbnail */}
-            {node.image_url ? (
-              <div className="relative h-9 w-9 rounded-xl border border-border overflow-hidden shrink-0 bg-muted">
-                <Image
-                  src={node.image_url}
-                  alt={node.name}
-                  fill
-                  className="object-cover"
-                  unoptimized
-                />
-              </div>
-            ) : (
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-muted text-muted-foreground/60 shrink-0">
-                <ImageIcon className="h-4 w-4" />
-              </div>
-            )}
+            <div className="relative h-9 w-9 rounded-xl border border-border overflow-hidden shrink-0 bg-muted">
+              <Image
+                src={node.image_url || (node as any).thumbnail_url || "/images/default-category.svg"}
+                alt={node.name}
+                fill
+                className="object-cover"
+                unoptimized
+              />
+            </div>
 
             {/* Name, Slug, Order & Product Count */}
             <div className="flex flex-col min-w-0">

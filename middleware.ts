@@ -93,11 +93,11 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(loginUrl);
     }
 
-    // Role check at middleware edge from public.users
+    // Role check at middleware edge from public.profiles
     let dbProfile: { role?: string; id?: string } | null = null;
     try {
       const { data, error: profileErr } = await supabase
-        .from("users")
+        .from("profiles")
         .select("id, role")
         .eq("id", user.id)
         .single();

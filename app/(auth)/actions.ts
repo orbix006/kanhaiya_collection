@@ -160,9 +160,9 @@ export async function loginAction(prevState: any, formData: FormData) {
         return { error: error.message };
       }
 
-      // Fetch authoritative database record from public.users
+      // Fetch authoritative database record from public.profiles
       const { data: profile, error: profileError } = await supabase
-        .from("users")
+        .from("profiles")
         .select("id, full_name, email, role")
         .eq("id", data.user.id)
         .single();

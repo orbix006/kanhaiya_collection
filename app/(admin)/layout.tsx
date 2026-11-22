@@ -32,9 +32,9 @@ export default async function AdminLayout({
         redirect("/login?redirect=/admin");
       }
 
-      // Query authoritative database record from public.users
+      // Query authoritative database record from public.profiles
       const { data: dbProfile, error: profileError } = await supabase
-        .from("users")
+        .from("profiles")
         .select("id, full_name, email, role, avatar_url")
         .eq("id", user.id)
         .single();

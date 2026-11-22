@@ -146,10 +146,22 @@ export function LeadsInbox({ initialLeads }: LeadsInboxProps) {
     }
   };
 
-  const statusBadges = {
+  const statusBadges: Record<string, { label: string; className: string }> = {
     new: {
       label: "New",
       className: "bg-blue-500/15 text-blue-700 dark:text-blue-400 border-blue-500/30 font-bold",
+    },
+    unread: {
+      label: "Unread",
+      className: "bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30 font-bold",
+    },
+    read: {
+      label: "Read",
+      className: "bg-blue-500/15 text-blue-700 dark:text-blue-400 border-blue-500/30 font-bold",
+    },
+    responded: {
+      label: "Responded",
+      className: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 font-bold",
     },
     contacted: {
       label: "Contacted",
@@ -244,14 +256,14 @@ export function LeadsInbox({ initialLeads }: LeadsInboxProps) {
       header: "Status",
       sortable: true,
       render: (l) => {
-        const badge = statusBadges[l.status];
+        const badge = statusBadges[l.status] || statusBadges.new;
         return (
           <span
             className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] border ${badge.className}`}
           >
-            {l.status === "new" && <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />}
-            {l.status === "contacted" && <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />}
-            {l.status === "converted" && <Check className="h-3 w-3" />}
+            {(l.status === "new" || l.status === "unread") && <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />}
+            {(l.status === "contacted" || l.status === "read") && <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />}
+            {(l.status === "converted" || l.status === "responded") && <Check className="h-3 w-3" />}
             {l.status === "closed" && <XCircle className="h-3 w-3" />}
             <span>{badge.label}</span>
           </span>

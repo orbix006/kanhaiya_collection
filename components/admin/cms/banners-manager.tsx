@@ -31,6 +31,7 @@ import {
   toggleBannerStatusAction,
   BannerPayload,
 } from "@/app/(admin)/admin/cms/actions";
+import { ImageUploader } from "@/components/ui/image-uploader";
 import {
   loadMockBanners,
   saveMockBanner,
@@ -75,21 +76,15 @@ export function BannersManager({ initialBanners }: BannersManagerProps) {
     type: "success" | "error";
   } | null>(null);
 
-  // Hydrate on mount from mock store
   const refreshFromStore = () => {
-    try {
-      const stored = loadMockBanners();
-      if (stored && stored.length > 0) {
-        setBanners(stored);
-      }
-    } catch {
-      // fallback
-    }
+    // Initial banners from server props are authoritative
   };
 
   useEffect(() => {
-    refreshFromStore();
-  }, []);
+    if (initialBanners) {
+      setBanners(initialBanners);
+    }
+  }, [initialBanners]);
 
   // Filter active banners for carousel preview in storefront sequence order
   const activeBanners = useMemo(() => {
@@ -228,23 +223,28 @@ export function BannersManager({ initialBanners }: BannersManagerProps) {
     };
 
     try {
-      // 1. Direct local mock store save
-      saveMockBanner(payload);
-
-      // 2. Server action sync
+      // 1. Server action to persist in Supabase hero_banners
       const res = await saveBannerAction(payload);
       if (res.error) {
         setFormError(res.error);
-      } else {
-        refreshFromStore();
-        setToastMessage({
-          text: res.message || "Banner saved successfully.",
-          type: "success",
-        });
-        setModalOpen(false);
+        return;
       }
-    } catch {
-      setFormError("Failed to save banner. Please verify form inputs.");
+
+      // 2. Synchronize local store only on confirmed save
+      const savedBanner = res.banner || payload;
+      saveMockBanner({
+        ...payload,
+        id: (savedBanner as any).id || payload.id,
+      });
+
+      refreshFromStore();
+      setToastMessage({
+        text: res.message || "Banner saved successfully.",
+        type: "success",
+      });
+      setModalOpen(false);
+    } catch (err: any) {
+      setFormError(err.message || "Failed to save banner. Please verify form inputs.");
     } finally {
       setIsSubmitting(false);
     }
@@ -626,144 +626,162 @@ export function BannersManager({ initialBanners }: BannersManagerProps) {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-muted/40 border-b border-border/70 text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
-              <tr>
-                <th className="py-3 px-4 w-16 text-center">Order</th>
-                <th className="py-3 px-4 w-28">Preview</th>
-                <th className="py-3 px-4">Title & Details</th>
-                <th className="py-3 px-4">Destination Link</th>
-                <th className="py-3 px-4 text-center">Status</th>
-                <th className="py-3 px-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border/60">
-              {banners.map((banner, index) => (
-                <tr
-                  key={banner.id}
-                  className={`hover:bg-muted/30 transition-colors ${
-                    !banner.is_active ? "opacity-60 bg-muted/10" : ""
-                  }`}
-                >
-                  {/* Order Controls */}
-                  <td className="py-3 px-4 text-center">
-                    <div className="flex items-center justify-center gap-1">
-                      <div className="flex flex-col gap-0.5">
+        {banners.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-muted/40 border-b border-border/70 text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
+                <tr>
+                  <th className="py-3 px-4 w-16 text-center">Order</th>
+                  <th className="py-3 px-4 w-28">Preview</th>
+                  <th className="py-3 px-4">Title & Details</th>
+                  <th className="py-3 px-4">Destination Link</th>
+                  <th className="py-3 px-4 text-center">Status</th>
+                  <th className="py-3 px-4 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/60">
+                {banners.map((banner, index) => (
+                  <tr
+                    key={banner.id}
+                    className={`hover:bg-muted/30 transition-colors ${
+                      !banner.is_active ? "opacity-60 bg-muted/10" : ""
+                    }`}
+                  >
+                    {/* Order Controls */}
+                    <td className="py-3 px-4 text-center">
+                      <div className="flex items-center justify-center gap-1">
+                        <div className="flex flex-col gap-0.5">
+                          <button
+                            type="button"
+                            onClick={() => moveBanner(index, "up")}
+                            disabled={index === 0}
+                            className="p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-20 cursor-pointer"
+                            title="Move Up"
+                          >
+                            <ChevronUp className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => moveBanner(index, "down")}
+                            disabled={index === banners.length - 1}
+                            className="p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-20 cursor-pointer"
+                            title="Move Down"
+                          >
+                            <ChevronDown className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                        <span className="font-mono font-bold text-sm text-foreground ml-1">
+                          {banner.display_order}
+                        </span>
+                      </div>
+                    </td>
+
+                    {/* Thumbnail Preview */}
+                    <td className="py-3 px-4">
+                      <div className="h-14 w-24 rounded-xl border border-border/80 overflow-hidden bg-muted shadow-xs">
+                        <img
+                          src={banner.image_url}
+                          alt={banner.title || "Banner"}
+                          className="h-full w-full object-cover"
+                        />
+                      </div>
+                    </td>
+
+                    {/* Title & Caption */}
+                    <td className="py-3 px-4">
+                      <span className="font-bold text-foreground text-sm block">
+                        {banner.title || (
+                          <span className="italic text-muted-foreground font-normal">
+                            Untitled Hero Banner
+                          </span>
+                        )}
+                      </span>
+                      <span className="text-[11px] text-muted-foreground font-mono mt-0.5 block truncate max-w-sm">
+                        {banner.image_url}
+                      </span>
+                    </td>
+
+                    {/* Destination Link */}
+                    <td className="py-3 px-4">
+                      {banner.link_url ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-muted text-foreground font-mono text-[11px] border border-border/60">
+                          <LinkIcon className="h-3 w-3 text-primary shrink-0" />
+                          <span className="truncate max-w-[180px]">{banner.link_url}</span>
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground italic">— None —</span>
+                      )}
+                    </td>
+
+                    {/* Active Status Switch */}
+                    <td className="py-3 px-4 text-center">
+                      <button
+                        type="button"
+                        onClick={() => handleToggle(banner)}
+                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold border transition-colors cursor-pointer ${
+                          banner.is_active
+                            ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/25"
+                            : "bg-muted text-muted-foreground border-border hover:bg-muted/80"
+                        }`}
+                      >
+                        {banner.is_active ? (
+                          <>
+                            <Eye className="h-3 w-3" /> Active
+                          </>
+                        ) : (
+                          <>
+                            <EyeOff className="h-3 w-3" /> Hidden
+                          </>
+                        )}
+                      </button>
+                    </td>
+
+                    {/* Action Buttons */}
+                    <td className="py-3 px-4 text-right">
+                      <div className="flex items-center justify-end gap-1.5">
                         <button
                           type="button"
-                          onClick={() => moveBanner(index, "up")}
-                          disabled={index === 0}
-                          className="p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-20 cursor-pointer"
-                          title="Move Up"
+                          onClick={() => openEditModal(banner)}
+                          className="p-1.5 rounded-lg border border-border hover:bg-muted text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
+                          title="Edit Banner"
                         >
-                          <ChevronUp className="h-3.5 w-3.5" />
+                          <Edit2 className="h-3.5 w-3.5" />
                         </button>
                         <button
                           type="button"
-                          onClick={() => moveBanner(index, "down")}
-                          disabled={index === banners.length - 1}
-                          className="p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-20 cursor-pointer"
-                          title="Move Down"
+                          onClick={() => {
+                            setBannerToDelete(banner);
+                            setDeleteModalOpen(true);
+                          }}
+                          className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 cursor-pointer transition-colors"
+                          title="Delete Banner"
                         >
-                          <ChevronDown className="h-3.5 w-3.5" />
+                          <Trash2 className="h-3.5 w-3.5" />
                         </button>
                       </div>
-                      <span className="font-mono font-bold text-sm text-foreground ml-1">
-                        {banner.display_order}
-                      </span>
-                    </div>
-                  </td>
-
-                  {/* Thumbnail Preview */}
-                  <td className="py-3 px-4">
-                    <div className="h-14 w-24 rounded-xl border border-border/80 overflow-hidden bg-muted shadow-xs">
-                      <img
-                        src={banner.image_url}
-                        alt={banner.title || "Banner"}
-                        className="h-full w-full object-cover"
-                      />
-                    </div>
-                  </td>
-
-                  {/* Title & Caption */}
-                  <td className="py-3 px-4">
-                    <span className="font-bold text-foreground text-sm block">
-                      {banner.title || (
-                        <span className="italic text-muted-foreground font-normal">
-                          Untitled Hero Banner
-                        </span>
-                      )}
-                    </span>
-                    <span className="text-[11px] text-muted-foreground font-mono mt-0.5 block truncate max-w-sm">
-                      {banner.image_url}
-                    </span>
-                  </td>
-
-                  {/* Destination Link */}
-                  <td className="py-3 px-4">
-                    {banner.link_url ? (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-muted text-foreground font-mono text-[11px] border border-border/60">
-                        <LinkIcon className="h-3 w-3 text-primary shrink-0" />
-                        <span className="truncate max-w-[180px]">{banner.link_url}</span>
-                      </span>
-                    ) : (
-                      <span className="text-muted-foreground italic">— None —</span>
-                    )}
-                  </td>
-
-                  {/* Active Status Switch */}
-                  <td className="py-3 px-4 text-center">
-                    <button
-                      type="button"
-                      onClick={() => handleToggle(banner)}
-                      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold border transition-colors cursor-pointer ${
-                        banner.is_active
-                          ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/25"
-                          : "bg-muted text-muted-foreground border-border hover:bg-muted/80"
-                      }`}
-                    >
-                      {banner.is_active ? (
-                        <>
-                          <Eye className="h-3 w-3" /> Active
-                        </>
-                      ) : (
-                        <>
-                          <EyeOff className="h-3 w-3" /> Hidden
-                        </>
-                      )}
-                    </button>
-                  </td>
-
-                  {/* Action Buttons */}
-                  <td className="py-3 px-4 text-right">
-                    <div className="flex items-center justify-end gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => openEditModal(banner)}
-                        className="p-1.5 rounded-lg border border-border hover:bg-muted text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
-                        title="Edit Banner"
-                      >
-                        <Edit2 className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setBannerToDelete(banner);
-                          setDeleteModalOpen(true);
-                        }}
-                        className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 cursor-pointer transition-colors"
-                        title="Delete Banner"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="p-12 text-center text-muted-foreground flex flex-col items-center justify-center">
+            <ImageIcon className="h-10 w-10 mx-auto mb-3 text-muted-foreground/50" />
+            <h4 className="text-base font-bold text-foreground">No hero banners yet</h4>
+            <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
+              Add your first hero banner to showcase collections and promotions on your storefront.
+            </p>
+            <button
+              type="button"
+              onClick={openCreateModal}
+              className="mt-4 px-4 py-2 rounded-xl bg-primary text-primary-foreground font-bold text-xs hover:bg-primary/90 transition-colors shadow-xs cursor-pointer inline-flex items-center gap-1.5"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              <span>Add Banner</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* CREATE / EDIT BANNER MODAL */}
@@ -791,21 +809,21 @@ export function BannersManager({ initialBanners }: BannersManagerProps) {
             )}
 
             <form onSubmit={handleSubmit} className="space-y-4 text-xs">
-              {/* Image URL Input */}
+              {/* File Image Upload */}
               <div className="space-y-1.5">
                 <label className="font-bold text-foreground">
-                  Image URL <span className="text-destructive">*</span>
+                  Banner Image File <span className="text-destructive">*</span>
                 </label>
-                <input
-                  type="text"
-                  placeholder="https://images.unsplash.com/... or /banners/..."
-                  value={imageUrl}
-                  onChange={(e) => setImageUrl(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background focus:outline-hidden focus:ring-2 focus:ring-primary/20 text-xs"
-                  required
+                <ImageUploader
+                  bucket="hero-banners"
+                  folderPath="banners"
+                  aspectRatio="banner"
+                  currentImageUrl={imageUrl}
+                  onUploadComplete={(url) => setImageUrl(url)}
+                  label=""
                 />
                 <span className="text-[11px] text-muted-foreground block">
-                  Must be a valid high-resolution image URL (starts with http://, https://, or /).
+                  Select a high-resolution hero photo from your device (JPEG, PNG, WebP up to 8MB).
                 </span>
               </div>
 

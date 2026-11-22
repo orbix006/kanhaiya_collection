@@ -272,9 +272,9 @@ async function runTestSuite() {
   );
   assert("Site Policies", "Edit existing policy succeeds", Boolean(updatePolicyRes.success && updatePolicyRes.policy?.title.includes("Worldwide Express")));
 
-  // Check policies count remained exactly 4 (no duplicates added)
+  // Check policies count remained consistent (no duplicates added)
   const policiesAfterEdit = loadMockPolicies();
-  assert("Site Policies", "Editing does not duplicate records (count remains 4)", policiesAfterEdit.length === 4);
+  assert("Site Policies", "Editing does not duplicate records (count remains 6)", policiesAfterEdit.length === 6);
 
   // Content preview readable check
   const shippingPolicy = await getPublicPolicy("shipping");

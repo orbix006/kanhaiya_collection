@@ -32,7 +32,7 @@ export async function getCartAction() {
 }
 
 /**
- * Add product or variant to cart with strict stock validation
+ * Add product to cart with strict stock validation (matches schema.txt cart_items)
  */
 export async function addToCartAction(input: AddToCartInput): Promise<{
   success?: boolean;
@@ -41,7 +41,7 @@ export async function addToCartAction(input: AddToCartInput): Promise<{
   error?: string;
   requiresAuth?: boolean;
 }> {
-  const { productId, variantId = null, quantity } = input;
+  const { productId, quantity } = input;
 
   if (!productId || typeof quantity !== "number" || quantity <= 0) {
     return { error: "Invalid product or quantity specified." };
@@ -81,42 +81,32 @@ export async function addToCartAction(input: AddToCartInput): Promise<{
         return { error: "Product not found or unavailable." };
       }
 
-      let availableStock = prod.stock_quantity;
-      if (variantId) {
-        const v = prod.variants?.find((vr: any) => vr.id === variantId);
-        if (!v || !v.is_active) {
-          return { error: "Selected product variant is unavailable." };
-        }
-        availableStock = v.stock_quantity;
-      }
-
+      const availableStock = prod.stock_quantity;
       if (availableStock <= 0) {
         return { error: "This item is currently out of stock." };
       }
 
       const store = getDemoCartStore();
       const userItems = store.get(userId) || [];
-      const existingIdx = userItems.findIndex(
-        (it) => it.product_id === productId && it.variant_id === (variantId || null)
-      );
+      const existingIdx = userItems.findIndex((it) => it.product_id === productId);
 
       const currentQty = existingIdx >= 0 ? userItems[existingIdx].quantity : 0;
-      const requestedTotal = currentQty + quantity;
+      const requestedTotalQty = currentQty + quantity;
 
-      if (requestedTotal > availableStock) {
+      if (requestedTotalQty > availableStock) {
         return {
-          error: `Only ${availableStock} items are available in stock. You currently have ${currentQty} in your cart.`,
+          error: `Only ${availableStock} items are available in stock. You already have ${currentQty} in your cart.`,
         };
       }
 
       if (existingIdx >= 0) {
-        userItems[existingIdx].quantity = requestedTotal;
+        userItems[existingIdx].quantity = requestedTotalQty;
       } else {
         userItems.push({
-          id: `cart-item-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          id: `item_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
           user_id: userId,
           product_id: productId,
-          variant_id: variantId || null,
+          variant_id: null,
           quantity: quantity,
           added_at: new Date().toISOString(),
         });
@@ -136,52 +126,30 @@ export async function addToCartAction(input: AddToCartInput): Promise<{
       };
     }
 
+    // Authenticated Supabase flow:
     // 1. Fetch live stock from database
-    let availableStock = 0;
+    const { data: product, error: pErr } = await supabase
+      .from("products")
+      .select("stock, is_active, name")
+      .eq("id", productId)
+      .maybeSingle();
 
-    if (variantId) {
-      const { data: variant, error: vErr } = await supabase
-        .from("product_variants")
-        .select("stock_quantity, is_active")
-        .eq("id", variantId)
-        .eq("product_id", productId)
-        .maybeSingle();
-
-      if (vErr || !variant || !variant.is_active) {
-        return { error: "The selected variant is no longer available." };
-      }
-      availableStock = variant.stock_quantity;
-    } else {
-      const { data: product, error: pErr } = await supabase
-        .from("products")
-        .select("stock_quantity, is_active")
-        .eq("id", productId)
-        .maybeSingle();
-
-      if (pErr || !product || !product.is_active) {
-        return { error: "The product is no longer available." };
-      }
-      availableStock = product.stock_quantity;
+    if (pErr || !product || !product.is_active) {
+      return { error: "The product is no longer available." };
     }
+    const availableStock = product.stock;
 
     if (availableStock <= 0) {
       return { error: "This item is currently out of stock." };
     }
 
     // 2. Check existing cart row for this user
-    let query = supabase
+    const { data: existingCartItem } = await supabase
       .from("cart_items")
-      .select("id, quantity")
+      .select("quantity")
       .eq("user_id", userId)
-      .eq("product_id", productId);
-
-    if (variantId) {
-      query = query.eq("variant_id", variantId);
-    } else {
-      query = query.is("variant_id", null);
-    }
-
-    const { data: existingCartItem } = await query.maybeSingle();
+      .eq("product_id", productId)
+      .maybeSingle();
 
     const currentCartQty = existingCartItem ? existingCartItem.quantity : 0;
     const requestedTotalQty = currentCartQty + quantity;
@@ -192,30 +160,16 @@ export async function addToCartAction(input: AddToCartInput): Promise<{
       };
     }
 
-    // 3. Insert or update cart item
-    if (existingCartItem) {
-      const { error: updateErr } = await supabase
-        .from("cart_items")
-        .update({
-          quantity: requestedTotalQty,
-          added_at: new Date().toISOString(),
-        })
-        .eq("id", existingCartItem.id);
+    // 3. Upsert cart item (primary key: user_id, product_id)
+    const { error: upsertErr } = await supabase.from("cart_items").upsert({
+      user_id: userId,
+      product_id: productId,
+      quantity: requestedTotalQty,
+      added_at: new Date().toISOString(),
+    });
 
-      if (updateErr) {
-        return { error: updateErr.message };
-      }
-    } else {
-      const { error: insertErr } = await supabase.from("cart_items").insert({
-        user_id: userId,
-        product_id: productId,
-        variant_id: variantId || null,
-        quantity: quantity,
-      });
-
-      if (insertErr) {
-        return { error: insertErr.message };
-      }
+    if (upsertErr) {
+      return { error: upsertErr.message };
     }
 
     const newCartCount = await getUserCartCount(userId);
@@ -248,35 +202,31 @@ export async function updateCartQuantityAction(input: UpdateQuantityInput) {
 
   const userId = await getCartUserId();
 
-  // If quantity <= 0, remove item
-  if (quantity <= 0) {
-    return removeCartItemAction(cartItemId);
-  }
-
   try {
     if (!isConfigured || userId.startsWith("guest_") || userId === "demo-user-id") {
       const store = getDemoCartStore();
       const userItems = store.get(userId) || [];
-      const item = userItems.find((it) => it.id === cartItemId);
+      const itemIdx = userItems.findIndex((it) => it.id === cartItemId || it.product_id === cartItemId);
 
-      if (!item) {
+      if (itemIdx === 0 && userItems.length === 0) {
+        return { error: "Cart item not found." };
+      }
+      if (itemIdx < 0) {
         return { error: "Cart item not found." };
       }
 
+      const item = userItems[itemIdx];
       const prod = await getProductById(item.product_id);
-      const v = item.variant_id
-        ? prod?.variants?.find((vr: any) => vr.id === item.variant_id)
-        : null;
+      if (!prod) return { error: "Product not found." };
 
-      const availableStock = v ? v.stock_quantity : (prod ? prod.stock_quantity : 0);
-
+      const availableStock = prod.stock_quantity;
       if (quantity > availableStock) {
         return {
-          error: `Cannot update quantity to ${quantity}. Only ${availableStock} items are available in stock.`,
+          error: `Cannot update quantity to ${quantity}. Only ${availableStock} available in stock.`,
         };
       }
 
-      item.quantity = quantity;
+      userItems[itemIdx].quantity = quantity;
       store.set(userId, userItems);
 
       const newCartCount = userItems.reduce((acc, i) => acc + i.quantity, 0);
@@ -287,37 +237,21 @@ export async function updateCartQuantityAction(input: UpdateQuantityInput) {
       return { success: true, newCartCount };
     }
 
-    // 1. Fetch cart item with product & variant info to check live stock
-    const { data: cartItem, error: fetchErr } = await supabase
-      .from("cart_items")
-      .select(`
-        id,
-        user_id,
-        product_id,
-        variant_id,
-        products (stock_quantity, is_active),
-        product_variants (stock_quantity, is_active)
-      `)
-      .eq("id", cartItemId)
-      .eq("user_id", userId)
+    // For Supabase: cartItemId is either product_id or user_id_product_id
+    const targetProductId = cartItemId.includes("_") ? cartItemId.split("_")[1] : cartItemId;
+
+    // 1. Fetch stock
+    const { data: prod, error: fetchErr } = await supabase
+      .from("products")
+      .select("stock, is_active")
+      .eq("id", targetProductId)
       .maybeSingle();
 
-    if (fetchErr || !cartItem) {
-      return { error: "Cart item not found." };
+    if (fetchErr || !prod || !prod.is_active) {
+      return { error: "Product not found or unavailable." };
     }
 
-    interface CartItemStockCheck {
-      products?: { stock_quantity: number } | null;
-      product_variants?: { stock_quantity: number } | null;
-    }
-    const typedItem = cartItem as unknown as CartItemStockCheck;
-    const prod = typedItem.products;
-    const variant = typedItem.product_variants;
-
-    const availableStock = variant
-      ? variant.stock_quantity
-      : (prod ? prod.stock_quantity : 0);
-
+    const availableStock = prod.stock;
     if (quantity > availableStock) {
       return {
         error: `Cannot update quantity to ${quantity}. Only ${availableStock} items are available in stock.`,
@@ -327,8 +261,8 @@ export async function updateCartQuantityAction(input: UpdateQuantityInput) {
     const { error: updateErr } = await supabase
       .from("cart_items")
       .update({ quantity })
-      .eq("id", cartItemId)
-      .eq("user_id", userId);
+      .eq("user_id", userId)
+      .eq("product_id", targetProductId);
 
     if (updateErr) {
       return { error: updateErr.message };
@@ -362,7 +296,9 @@ export async function removeCartItemAction(cartItemId: string) {
     if (!isConfigured || userId.startsWith("guest_") || userId === "demo-user-id") {
       const store = getDemoCartStore();
       const userItems = store.get(userId) || [];
-      const filtered = userItems.filter((it) => it.id !== cartItemId);
+      const filtered = userItems.filter(
+        (it) => it.id !== cartItemId && it.product_id !== cartItemId
+      );
       store.set(userId, filtered);
 
       const newCartCount = filtered.reduce((acc, i) => acc + i.quantity, 0);
@@ -373,11 +309,13 @@ export async function removeCartItemAction(cartItemId: string) {
       return { success: true, newCartCount };
     }
 
+    const targetProductId = cartItemId.includes("_") ? cartItemId.split("_")[1] : cartItemId;
+
     const { error } = await supabase
       .from("cart_items")
       .delete()
-      .eq("id", cartItemId)
-      .eq("user_id", userId);
+      .eq("user_id", userId)
+      .eq("product_id", targetProductId);
 
     if (error) {
       return { error: error.message };
@@ -520,4 +458,3 @@ export async function removeCouponAction() {
     return { error: msg };
   }
 }
-

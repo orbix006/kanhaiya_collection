@@ -8,6 +8,7 @@ export async function POST(request: NextRequest) {
   try {
     const rawBody = await request.text();
     const signature = request.headers.get("x-razorpay-signature") || "";
+    const eventId = request.headers.get("x-razorpay-event-id") || `evt_${Date.now()}`;
 
     if (!signature) {
       return NextResponse.json(
@@ -36,12 +37,24 @@ export async function POST(request: NextRequest) {
 
     let razorpayOrderId: string | null = null;
     let razorpayPaymentId: string | null = null;
+    let amountMinor: number = 0;
+    let currency: string = "INR";
+    let paymentMethod: string = "online";
+    let errorCode: string | null = null;
+    let errorDescription: string | null = null;
 
     if (payload?.payment?.entity) {
-      razorpayPaymentId = payload.payment.entity.id;
-      razorpayOrderId = payload.payment.entity.order_id;
+      const p = payload.payment.entity;
+      razorpayPaymentId = p.id;
+      razorpayOrderId = p.order_id;
+      amountMinor = p.amount || 0;
+      currency = p.currency || "INR";
+      paymentMethod = p.method || "online";
+      errorCode = p.error_code || null;
+      errorDescription = p.error_description || null;
     } else if (payload?.order?.entity) {
       razorpayOrderId = payload.order.entity.id;
+      amountMinor = payload.order.entity.amount || 0;
     }
 
     if (!razorpayOrderId) {
@@ -58,8 +71,8 @@ export async function POST(request: NextRequest) {
     if (!isConfigured) {
       // Demo store handling with strict idempotency
       const ordersStore = getDemoOrdersStore();
-      let matchedOrder = null;
-      let matchedUserId = null;
+      let matchedOrder: any = null;
+      let matchedUserId: any = null;
 
       for (const [uid, orders] of ordersStore.entries()) {
         const found = orders.find((o) => o.razorpay_order_id === razorpayOrderId);
@@ -77,32 +90,14 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Idempotency Check: if already processed and marked paid/confirmed, safely ignore
-      if (
-        (eventType === "order.paid" || eventType === "payment.captured") &&
-        matchedOrder.payment_status === "paid" &&
-        matchedOrder.status === "confirmed"
-      ) {
-        return NextResponse.json(
-          {
-            status: "idempotent_duplicate_ignored",
-            orderNumber: matchedOrder.order_number,
-            event: eventType,
-          },
-          { status: 200 }
-        );
-      }
-
       if (eventType === "order.paid" || eventType === "payment.captured") {
         matchedOrder.payment_status = "paid";
-        matchedOrder.status = "confirmed";
+        matchedOrder.status = "in_progress";
         matchedOrder.can_cancel = false;
-        if (razorpayPaymentId) {
-          matchedOrder.razorpay_payment_id = razorpayPaymentId;
-        }
-        if (matchedUserId) {
-          getDemoCartStore().delete(matchedUserId);
-        }
+        if (razorpayPaymentId) matchedOrder.razorpay_payment_id = razorpayPaymentId;
+
+        const cartStore = getDemoCartStore();
+        if (matchedUserId) cartStore.delete(matchedUserId);
       } else if (eventType === "payment.failed") {
         matchedOrder.payment_status = "failed";
       }
@@ -117,75 +112,35 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Remote database handling with idempotency (using elevated service client for background webhook)
+    // Authoritative PostgreSQL service_role client
     const supabase = createServiceClient();
 
-    // 2. Locate order by razorpay_order_id
-    const { data: order, error: fetchErr } = await supabase
-      .from("orders")
-      .select("id, user_id, order_number, status, payment_status, razorpay_order_id")
-      .eq("razorpay_order_id", razorpayOrderId)
-      .maybeSingle();
+    // Call public.apply_payment_event RPC
+    const { data: res, error: rpcErr } = await (supabase.rpc as any)("apply_payment_event", {
+      p_provider: "razorpay",
+      p_event_id: eventId,
+      p_event_type: eventType,
+      p_provider_order_id: razorpayOrderId,
+      p_provider_payment_id: razorpayPaymentId,
+      p_amount_minor: amountMinor,
+      p_currency: currency,
+      p_raw: eventData,
+      p_method: paymentMethod,
+      p_error_code: errorCode,
+      p_error_description: errorDescription,
+      p_parent_payment_id: null,
+      p_order_id: null,
+    });
 
-    if (fetchErr || !order) {
-      console.warn(`[Razorpay Webhook] Order not found for razorpay_order_id: ${razorpayOrderId}`);
-      return NextResponse.json(
-        { status: "order_not_found", razorpayOrderId },
-        { status: 200 }
-      );
-    }
-
-    // 3. IDEMPOTENCY GUARD: If order is already paid and confirmed, ignore duplicate webhook safely
-    if (
-      (eventType === "order.paid" || eventType === "payment.captured") &&
-      order.payment_status === "paid" &&
-      order.status === "confirmed"
-    ) {
-      return NextResponse.json(
-        {
-          status: "idempotent_duplicate_ignored",
-          orderNumber: order.order_number,
-          event: eventType,
-        },
-        { status: 200 }
-      );
-    }
-
-    // 4. Update order state based on verified webhook event
-    if (eventType === "order.paid" || eventType === "payment.captured") {
-      const updateData: {
-        payment_status: "paid";
-        status: "confirmed";
-        updated_at: string;
-        razorpay_payment_id?: string;
-      } = {
-        payment_status: "paid",
-        status: "confirmed",
-        updated_at: new Date().toISOString(),
-      };
-      if (razorpayPaymentId) {
-        updateData.razorpay_payment_id = razorpayPaymentId;
-      }
-
-      await supabase.from("orders").update(updateData).eq("id", order.id);
-
-      // Clear user cart if still present
-      await supabase.from("cart_items").delete().eq("user_id", order.user_id);
-    } else if (eventType === "payment.failed") {
-      await supabase
-        .from("orders")
-        .update({
-          payment_status: "failed",
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", order.id);
+    if (rpcErr) {
+      console.error("[Razorpay Webhook apply_payment_event error]:", rpcErr.message);
     }
 
     return NextResponse.json(
       {
         status: "processed",
-        orderNumber: order.order_number,
         event: eventType,
+        result: res || null,
       },
       { status: 200 }
     );

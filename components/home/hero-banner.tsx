@@ -18,22 +18,12 @@ export function HeroBanner({ banners }: HeroBannerProps) {
   const [isPaused, setIsPaused] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Sync real-time updates when admin saves or reorders banners
+  // Sync real-time updates when prop changes
   useEffect(() => {
-    const handleSync = async () => {
-      try {
-        const { loadMockBanners } = await import("@/lib/mock-data/admin-store");
-        const stored = loadMockBanners();
-        if (stored && stored.length > 0) {
-          setActiveBanners(stored.filter((b) => b.is_active) as any);
-        }
-      } catch {}
-    };
-
-    handleSync();
-    window.addEventListener("catalog_updated", handleSync);
-    return () => window.removeEventListener("catalog_updated", handleSync);
-  }, []);
+    if (banners) {
+      setActiveBanners(banners.filter((b) => b.is_active));
+    }
+  }, [banners]);
 
   // Autoplay carousel (6s interval, pauses on hover)
   useEffect(() => {

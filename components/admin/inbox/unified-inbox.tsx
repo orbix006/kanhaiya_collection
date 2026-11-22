@@ -34,6 +34,8 @@ import { ADMIN_STORE_STORAGE_KEY } from "@/lib/mock-data/admin-store";
 import {
   addResponseNoteAction,
   markInquiryReadAction,
+  markLeadUnreadAction,
+  toggleLeadResponseAction,
   updateUnifiedInquiryStatusAction,
   deleteUnifiedInquiryAction,
 } from "@/app/(admin)/admin/inbox/actions";
@@ -306,6 +308,76 @@ export function UnifiedInbox({
     }
   };
 
+  // Handle Mark as Unread
+  const handleMarkAsUnread = async (inquiry: UnifiedInquiry, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setIsUpdating(true);
+    try {
+      const res = await markLeadUnreadAction(inquiry.id);
+      if (res.error) {
+        setToastMessage({ text: res.error, type: "error" });
+      } else {
+        const updatedTime = new Date().toISOString();
+        if (inquiry.entity_type === "contact_submission") {
+          setSubmissions((prev) =>
+            prev.map((s) => (s.id === inquiry.id ? { ...s, status: "new" as any, updated_at: updatedTime } : s))
+          );
+        } else {
+          setLeads((prev) =>
+            prev.map((l) => (l.id === inquiry.id ? { ...l, status: "new" as any, is_read: false, updated_at: updatedTime } : l))
+          );
+        }
+        setToastMessage({ text: `Marked "${inquiry.name}" as unread.`, type: "success" });
+      }
+    } catch {
+      setToastMessage({ text: "Failed to mark as unread.", type: "error" });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  // Handle Toggle Responded Status
+  const handleToggleResponded = async (inquiry: UnifiedInquiry, markResponded: boolean, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setIsUpdating(true);
+    try {
+      const res = await toggleLeadResponseAction(inquiry.id, markResponded);
+      if (res.error) {
+        setToastMessage({ text: res.error, type: "error" });
+      } else {
+        const updatedTime = new Date().toISOString();
+        if (markResponded) {
+          // Add a note locally as well to sync response
+          setResponseNotes((prev) => [
+            {
+              id: `note-${Date.now()}`,
+              inquiry_id: inquiry.id,
+              entity_type: inquiry.entity_type,
+              note: "Marked as responded by administrator.",
+              responder: "Admin",
+              created_at: updatedTime,
+            },
+            ...prev,
+          ]);
+        }
+        if (inquiry.entity_type === "contact_submission") {
+          setSubmissions((prev) =>
+            prev.map((s) => (s.id === inquiry.id ? { ...s, status: markResponded ? ("resolved" as any) : ("in_progress" as any), updated_at: updatedTime } : s))
+          );
+        } else {
+          setLeads((prev) =>
+            prev.map((l) => (l.id === inquiry.id ? { ...l, status: markResponded ? ("converted" as any) : ("contacted" as any), responded_at: markResponded ? updatedTime : null, updated_at: updatedTime } : l))
+          );
+        }
+        setToastMessage({ text: `Updated response status for "${inquiry.name}".`, type: "success" });
+      }
+    } catch {
+      setToastMessage({ text: "Failed to update response status.", type: "error" });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
   // Handle Status Update in Modal
   const handleUpdateStatus = async () => {
     if (!selectedInquiry || !modalStatus) return;
@@ -529,7 +601,7 @@ export function UnifiedInbox({
       <div>
         <div className="flex items-center justify-between mb-3">
           <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-            <span>Inquiry & Lead Performance Metrics</span>
+            <span>Inquiry &amp; Lead Performance Metrics</span>
             <button
               type="button"
               onClick={() => setShowKpiExplanation(!showKpiExplanation)}
@@ -540,7 +612,7 @@ export function UnifiedInbox({
             </button>
           </div>
           <span className="text-[11px] text-muted-foreground">
-            Shared Local Repository (Zero External DB)
+            Authoritative Supabase &amp; Leads Hub
           </span>
         </div>
 
@@ -870,8 +942,8 @@ export function UnifiedInbox({
                     {/* Compact Actions */}
                     <td className="py-3 px-4 align-middle text-right whitespace-nowrap">
                       <div className="inline-flex items-center gap-1">
-                        {/* Quick Mark As Read (if status === 'new') */}
-                        {item.status === "new" && (
+                        {/* Toggle Read / Unread */}
+                        {item.status === "new" ? (
                           <button
                             type="button"
                             onClick={(e) => handleMarkAsRead(item, e)}
@@ -880,7 +952,30 @@ export function UnifiedInbox({
                           >
                             <Check className="h-3.5 w-3.5" />
                           </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={(e) => handleMarkAsUnread(item, e)}
+                            className="p-1.5 rounded-lg text-muted-foreground hover:text-amber-600 hover:bg-amber-500/10 transition-colors cursor-pointer"
+                            title="Mark as unread"
+                          >
+                            <Clock className="h-3.5 w-3.5" />
+                          </button>
                         )}
+
+                        {/* Toggle Responded / Actioned */}
+                        <button
+                          type="button"
+                          onClick={(e) => handleToggleResponded(item, !item.has_response, e)}
+                          className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                            item.has_response
+                              ? "text-emerald-600 hover:bg-emerald-500/10"
+                              : "text-muted-foreground hover:text-emerald-600 hover:bg-emerald-500/10"
+                          }`}
+                          title={item.has_response ? "Mark as unresponded" : "Mark as responded"}
+                        >
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                        </button>
 
                         {/* View Details Icon */}
                         <button
@@ -1008,11 +1103,11 @@ export function UnifiedInbox({
         <div className="flex items-center gap-2">
           <Info className="h-4 w-4 text-primary shrink-0" />
           <span>
-            <strong>Local Workflow Model:</strong> Status updates and recorded response notes are saved directly to the local development repository. Live automated email dispatching requires a configured transactional email service, which is out of scope.
+            <strong>Audience Operations:</strong> Leads and customer submissions are captured directly into Supabase. Status changes and response records sync with server actions.
           </span>
         </div>
         <span className="text-[11px] font-mono text-muted-foreground/70 shrink-0">
-          Zero Supabase Connection • Local Mock Persistence
+          Supabase Synchronized
         </span>
       </div>
 

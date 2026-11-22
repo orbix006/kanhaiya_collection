@@ -190,7 +190,7 @@ export function Header({ user, profile, categories = [] }: HeaderProps) {
         if (authUser) {
           setProfileLoading(true);
           const { data: dbUser, error } = await supabase
-            .from("users")
+            .from("profiles")
             .select("id, full_name, email, role")
             .eq("id", authUser.id)
             .single();
@@ -239,7 +239,7 @@ export function Header({ user, profile, categories = [] }: HeaderProps) {
       if (event === "SIGNED_IN" || event === "USER_UPDATED" || event === "TOKEN_REFRESHED") {
         if (session?.user) {
           const { data: dbUser, error } = await supabase
-            .from("users")
+            .from("profiles")
             .select("id, full_name, email, role")
             .eq("id", session.user.id)
             .single();

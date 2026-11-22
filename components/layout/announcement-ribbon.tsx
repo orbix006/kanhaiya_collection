@@ -16,7 +16,7 @@ export function AnnouncementRibbon({ initialAnnouncements }: AnnouncementRibbonP
   // 1. Deterministic mount guard to guarantee SSR and client hydration markup match 100%
   const [mounted, setMounted] = useState<boolean>(false);
 
-  // 2. Initialize with deterministic data across Server and Client (no window/localStorage access in initializer)
+  // 2. Initialize with deterministic data across Server and Client (no mock fallback in production)
   const [announcements, setAnnouncements] = useState<Announcement[]>(
     initialAnnouncements && initialAnnouncements.length > 0 ? initialAnnouncements : []
   );
@@ -24,23 +24,12 @@ export function AnnouncementRibbon({ initialAnnouncements }: AnnouncementRibbonP
   const [currentIndex, setCurrentIndex] = useState<number>(0);
   const [isPaused, setIsPaused] = useState<boolean>(false);
 
-  // 3. Client-side hydration sync: runs only after initial hydration mount
   useEffect(() => {
     setMounted(true);
-
-    const handleSync = () => {
-      try {
-        const stored = loadMockAnnouncements();
-        if (stored && stored.length > 0) {
-          setAnnouncements(stored);
-        }
-      } catch {}
-    };
-
-    handleSync();
-    window.addEventListener("catalog_updated", handleSync);
-    return () => window.removeEventListener("catalog_updated", handleSync);
-  }, []);
+    if (initialAnnouncements) {
+      setAnnouncements(initialAnnouncements);
+    }
+  }, [initialAnnouncements]);
 
   const activeAnnouncements = useMemo(() => {
     return announcements

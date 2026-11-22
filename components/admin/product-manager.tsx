@@ -64,22 +64,15 @@ export function ProductManager({
 
   const [togglingId, setTogglingId] = useState<string | null>(null);
 
-  // Safe client hydration from MockStore localStorage & real-time catalog event listener
+  // Initial products and categories passed from server component are authoritative
   useEffect(() => {
-    const syncFromStore = () => {
-      const store = loadMockStore();
-      if (store.products && store.products.length > 0) {
-        setProducts(store.products as unknown as ProductDetail[]);
-      }
-      if (store.categories && store.categories.length > 0) {
-        setCategories(store.categories as unknown as Category[]);
-      }
-    };
-
-    syncFromStore();
-    window.addEventListener("catalog_updated", syncFromStore);
-    return () => window.removeEventListener("catalog_updated", syncFromStore);
-  }, []);
+    if (initialProducts) {
+      setProducts(initialProducts);
+    }
+    if (initialCategories) {
+      setCategories(initialCategories);
+    }
+  }, [initialProducts, initialCategories]);
 
   // Tab counts
   const tabCounts = useMemo(() => {

@@ -46,14 +46,22 @@ export async function updateUserRoleAction(targetUserId: string, newRole: "admin
       };
     }
 
-    // Update target user's role
-    const { error: updateError } = await supabase
-      .from("profiles")
-      .update({ role: newRole })
-      .eq("id", targetUserId);
+    // Call schema-compliant RPC admin_set_user_role
+    const { data: updatedProfile, error: rpcError } = await supabase.rpc("admin_set_user_role", {
+      p_user_id: targetUserId,
+      p_role: newRole,
+    });
 
-    if (updateError) {
-      return { error: `Failed to update role: ${updateError.message}` };
+    if (rpcError) {
+      // Fallback to direct update if RPC is not yet executed on db
+      const { error: updateError } = await supabase
+        .from("profiles")
+        .update({ role: newRole })
+        .eq("id", targetUserId);
+
+      if (updateError) {
+        return { error: `Failed to update role: ${rpcError.message || updateError.message}` };
+      }
     }
 
     revalidatePath("/admin/users");

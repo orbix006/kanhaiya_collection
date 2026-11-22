@@ -44,7 +44,7 @@ export default async function CheckoutPage() {
       .order("is_default", { ascending: false })
       .order("created_at", { ascending: false });
 
-    savedAddresses = (addressRows as AddressItem[]) || [];
+    savedAddresses = (addressRows as unknown as AddressItem[]) || [];
   } else {
     // Local / development mode
     const localSession = await getLocalSession();

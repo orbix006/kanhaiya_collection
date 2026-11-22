@@ -120,14 +120,14 @@ export async function updateOrderStatusAction(
     };
   }
 
-  // 5. Update status (triggers schema trg_order_confirmation when status becomes 'confirmed')
-  const { error: updateErr } = await supabase
+  // 5. Update status (triggers schema trg_orders_status_guard)
+  const { error: updateErr } = await (supabase as any)
     .from("orders")
     .update({
       status: newStatus,
       updated_at: new Date().toISOString(),
     })
-    .eq("id", currentOrder.id);
+    .eq("id", (currentOrder as any).id);
 
   if (updateErr) {
     return { error: `Failed to update order status: ${updateErr.message}` };
@@ -257,3 +257,95 @@ export async function updateOrderPaymentStatusAction(
     message: `Payment status for Order #${currentOrder.order_number} updated to '${newPaymentStatus}'.`,
   };
 }
+
+/**
+ * Marks an order as read by an administrator without changing its customer-facing order status.
+ * Strictly adheres to schema.txt and triggers public.admin_update_order RPC.
+ */
+export async function markOrderAsReadAction(orderId: string): Promise<{
+  success?: boolean;
+  message?: string;
+  error?: string;
+}> {
+  if (!orderId) {
+    return { error: "Missing required order ID." };
+  }
+
+  const supabase = await createClient();
+
+  const isConfigured =
+    Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL) &&
+    process.env.NEXT_PUBLIC_SUPABASE_URL !== "https://placeholder-project.supabase.co";
+
+  if (!isConfigured) {
+    const store = getDemoOrdersStore();
+    for (const list of store.values()) {
+      const found = list.find((o) => o.id === orderId || o.order_number === orderId);
+      if (found) {
+        (found as any).is_read = true;
+        (found as any).read_at = new Date().toISOString();
+        break;
+      }
+    }
+    safeRevalidate("/admin");
+    safeRevalidate("/admin/orders");
+    safeRevalidate(`/admin/orders/${orderId}`);
+    return { success: true, message: "Order marked as read." };
+  }
+
+  // 1. Verify acting user is admin
+  const {
+    data: { user: caller },
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError || !caller) {
+    return { error: "Unauthorized: You must be logged in to manage orders." };
+  }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", caller.id)
+    .single();
+
+  if (!isUserAdmin(caller, profile)) {
+    return { error: "Forbidden: Administrator privileges required." };
+  }
+
+  // 2. Invoke public.admin_update_order(p_order_id, p_is_read := true)
+  // This explicitly guarantees customer-facing order.status is NOT changed.
+  try {
+    const { error: rpcErr } = await (supabase.rpc as any)("admin_update_order", {
+      p_order_id: orderId,
+      p_is_read: true,
+      p_status: null,
+      p_note: null,
+    });
+
+    if (rpcErr) {
+      // Fallback direct table update if RPC failed
+      const { error: updateErr } = await supabase
+        .from("orders")
+        .update({
+          is_read: true,
+          read_at: new Date().toISOString(),
+          read_by: caller.id,
+        })
+        .eq("id", orderId);
+
+      if (updateErr) {
+        return { error: updateErr.message };
+      }
+    }
+  } catch (err: any) {
+    return { error: err.message || "Failed to mark order as read." };
+  }
+
+  safeRevalidate("/admin");
+  safeRevalidate("/admin/orders");
+  safeRevalidate(`/admin/orders/${orderId}`);
+
+  return { success: true, message: "Order marked as read." };
+}
+

@@ -55,9 +55,9 @@ export interface ProfileLike {
 
 /**
  * Authoritatively evaluates whether a user holds administrator privileges.
- * Directly inspects the authoritative database role from public.users:
- * 1. Checks profile?.role === 'admin' (database users record role)
- * 2. Checks user?.role === 'admin' (database users record role mapped to user object)
+ * Directly inspects the authoritative database role from public.profiles:
+ * 1. Checks profile?.role === 'admin' (database profiles record role)
+ * 2. Checks user?.role === 'admin' (database profiles record role mapped to user object)
  */
 export function isUserAdmin(
   user?: UserLike | null,
@@ -65,12 +65,12 @@ export function isUserAdmin(
 ): boolean {
   if (!user && !profile) return false;
 
-  // 1. Authoritative Database public.users record role
+  // 1. Authoritative Database public.profiles record role
   if (profile?.role === "admin") {
     return true;
   }
 
-  // 2. Direct User role attribute from public.users record / session
+  // 2. Direct User role attribute from public.profiles record / session
   if (user?.role === "admin") {
     return true;
   }

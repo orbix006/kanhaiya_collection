@@ -48,6 +48,7 @@ export interface Product {
   is_featured_top_seller: boolean;
   top_seller_display_order?: number | null;
   image_url: string;
+  deleted_at?: string | null;
   created_at: string;
   updated_at: string;
   sku?: string | null;
@@ -80,123 +81,16 @@ export interface StoreData {
   festive_offer: FestiveOffer;
 }
 
-// Initial seed data reflecting authentic Kanhaiya Collection devotional products
+// Initial seed data empty
 const INITIAL_STORE_DATA: StoreData = {
-  banners: [
-    {
-      id: "banner-1",
-      title: "Janmashtami Collection",
-      subtitle: "Celebrate divine love and devotion with consecrated brass idols and sacred flute offerings.",
-      cta_text: "Explore Collection",
-      cta_link: "/shop?category=idols",
-      image_url: "/images/janmashtami-campaign.jpg",
-      mobile_image_url: "/images/janmashtami-mobile.jpg",
-      is_active: true,
-      display_order: 1,
-      start_date: null,
-      end_date: null,
-      created_at: new Date(Date.now() - 86400000 * 5).toISOString(),
-      updated_at: new Date(Date.now() - 86400000 * 5).toISOString(),
-    },
-    {
-      id: "banner-2",
-      title: "Diwali Deepotsav Collection",
-      subtitle: "Bring sacred light, consecrated brass akhand diyas and timeless warmth to your home mandir.",
-      cta_text: "Shop Now",
-      cta_link: "/shop?category=pooja-essentials",
-      image_url: "/images/diwali-campaign.jpg",
-      mobile_image_url: null,
-      is_active: true,
-      display_order: 2,
-      start_date: null,
-      end_date: null,
-      created_at: new Date(Date.now() - 86400000 * 3).toISOString(),
-      updated_at: new Date(Date.now() - 86400000 * 3).toISOString(),
-    },
-    {
-      id: "banner-3",
-      title: "Sacred Temple Brassware & Aromas",
-      subtitle: "Artisan engraved puja thalis, pure cow-dung dhoop cones and natural Vrindavan chandan.",
-      cta_text: "Discover Pooja Essentials",
-      cta_link: "/shop?category=sacred-aromas",
-      image_url: "/images/temple-atmosphere.jpg",
-      mobile_image_url: null,
-      is_active: true,
-      display_order: 3,
-      start_date: null,
-      end_date: null,
-      created_at: new Date(Date.now() - 86400000 * 1).toISOString(),
-      updated_at: new Date(Date.now() - 86400000 * 1).toISOString(),
-    },
-  ],
-  categories: [
-    {
-      id: "cat-1",
-      name: "Idols & Murtis",
-      slug: "idols",
-      description: "Handcrafted sacred Radha Krishna, Bal Gopal and Ganesha brass idols",
-      image_url: "/images/preview-murti.jpg",
-      display_order: 1,
-      is_active: true,
-      show_on_homepage: true,
-      created_at: new Date(Date.now() - 86400000 * 10).toISOString(),
-      updated_at: new Date(Date.now() - 86400000 * 10).toISOString(),
-    },
-    {
-      id: "cat-2",
-      name: "Pooja Essentials",
-      slug: "pooja-essentials",
-      description: "Pure brass engraved thalis, akhand diyas, ghanti bells and aarti vessels",
-      image_url: "/images/preview-thali.jpg",
-      display_order: 2,
-      is_active: true,
-      show_on_homepage: true,
-      created_at: new Date(Date.now() - 86400000 * 9).toISOString(),
-      updated_at: new Date(Date.now() - 86400000 * 9).toISOString(),
-    },
-    {
-      id: "cat-3",
-      name: "Sacred Aromas",
-      slug: "sacred-aromas",
-      description: "Natural temple chandan, pure cow dung dhoop, sambrani and incense cones",
-      image_url: "/images/temple-atmosphere.jpg",
-      display_order: 3,
-      is_active: true,
-      show_on_homepage: true,
-      created_at: new Date(Date.now() - 86400000 * 8).toISOString(),
-      updated_at: new Date(Date.now() - 86400000 * 8).toISOString(),
-    },
-    {
-      id: "cat-4",
-      name: "Temple Brassware",
-      slug: "temple-brassware",
-      description: "Heavy cast brass mandir bells, shankh stands and ceremonial kalashes",
-      image_url: "/images/hero-flute.jpg",
-      display_order: 4,
-      is_active: true,
-      show_on_homepage: true,
-      created_at: new Date(Date.now() - 86400000 * 7).toISOString(),
-      updated_at: new Date(Date.now() - 86400000 * 7).toISOString(),
-    },
-    {
-      id: "cat-5",
-      name: "Decorative & Aasans",
-      slug: "decorative",
-      description: "Pure silk deity robes, handwoven mandir prayer rugs and altar textiles",
-      image_url: "/images/preview-murti.jpg",
-      display_order: 5,
-      is_active: true,
-      show_on_homepage: true,
-      created_at: new Date(Date.now() - 86400000 * 6).toISOString(),
-      updated_at: new Date(Date.now() - 86400000 * 6).toISOString(),
-    },
-  ],
+  banners: [],
+  categories: [],
   products: [],
   festive_offer: {
-    enabled: true,
-    title: "Deepotsav & Sacred Festive Offerings",
-    subtitle: "Bless your home mandir this season with consecrated brassware and auspicious puja essentials.",
-    product_ids: ["prod-1", "prod-2", "prod-3", "prod-8"],
+    enabled: false,
+    title: "",
+    subtitle: "",
+    product_ids: [],
     updated_at: new Date().toISOString(),
   },
 };
@@ -352,21 +246,17 @@ export async function getActiveCategories(): Promise<Category[]> {
         .from("categories")
         .select("*")
         .eq("is_active", true)
-        .order("display_order", { ascending: true });
+        .order("sort_order", { ascending: true });
 
-      if (!error && data && data.length > 0) {
+      if (!error && data) {
         return data.map(normalizeCategoryRow);
       }
     } catch {
-      // Fallback below
+      return [];
     }
   }
 
-  const store = getLocalStoreData();
-  return store.categories
-    .filter((c) => c.is_active)
-    .sort((a, b) => a.display_order - b.display_order)
-    .map(normalizeCategoryRow);
+  return [];
 }
 
 export async function getAllCategories(): Promise<Category[]> {
@@ -378,20 +268,17 @@ export async function getAllCategories(): Promise<Category[]> {
       const { data, error } = await supabase
         .from("categories")
         .select("*")
-        .order("display_order", { ascending: true });
+        .order("sort_order", { ascending: true });
 
-      if (!error && data && data.length > 0) {
+      if (!error && data) {
         return data.map(normalizeCategoryRow);
       }
     } catch {
-      // Fallback below
+      return [];
     }
   }
 
-  const store = getLocalStoreData();
-  return store.categories
-    .sort((a, b) => a.display_order - b.display_order)
-    .map(normalizeCategoryRow);
+  return [];
 }
 
 export async function getAllProducts(): Promise<Product[]> {
@@ -406,22 +293,26 @@ export async function getAllProducts(): Promise<Product[]> {
           *,
           product_images (
             id,
+            url,
             image_url,
             is_primary,
+            sort_order,
             display_order
           )
         `)
         .order("created_at", { ascending: false });
 
-      if (!error && data && data.length > 0) {
+      if (!error && data) {
         return data.map((p: any) => {
           const sortedImgs = p.product_images
             ? [...p.product_images].sort(
-                (a, b) => (a.display_order || 0) - (b.display_order || 0)
+                (a, b) => ((a.sort_order ?? a.display_order) || 0) - ((b.sort_order ?? b.display_order) || 0)
               )
             : [];
           const primaryImg =
+            sortedImgs.find((img) => img.is_primary)?.url ||
             sortedImgs.find((img) => img.is_primary)?.image_url ||
+            sortedImgs[0]?.url ||
             sortedImgs[0]?.image_url ||
             p.image_url ||
             null;
@@ -429,13 +320,13 @@ export async function getAllProducts(): Promise<Product[]> {
           return {
             id: String(p.id),
             category_id: p.category_id || null,
-            name: p.product_name || p.name || "Sacred Item",
+            name: p.name || p.product_name || "Sacred Item",
             slug: p.slug || String(p.id),
             description: p.description || null,
             brand: p.brand || "Kanhaiya Collection",
-            base_price: Number(p.base_price || p.price || 0),
+            base_price: Number(p.price ?? p.base_price ?? 0),
             compare_at_price: p.compare_at_price || p.mrp ? Number(p.compare_at_price || p.mrp) : null,
-            stock_quantity: Number(p.stock_quantity ?? 0),
+            stock_quantity: Number(p.stock ?? p.stock_quantity ?? 0),
             sold_count: Number(p.sold_count || 0),
             is_active: Boolean(p.is_active ?? true),
             is_featured_top_seller: Boolean(p.is_featured_top_seller ?? false),
@@ -450,22 +341,11 @@ export async function getAllProducts(): Promise<Product[]> {
         });
       }
     } catch {
-      // Fallback
+      return [];
     }
   }
 
-  const store = getLocalStoreData();
-  const prods = Array.isArray(store?.products) ? store.products : [];
-  return prods.map((p) => {
-    const primaryImg =
-      p.images?.find((img) => img.is_primary)?.image_url ||
-      p.images?.[0]?.image_url ||
-      p.image_url;
-    return {
-      ...p,
-      image_url: primaryImg || "",
-    };
-  });
+  return [];
 }
 
 export async function getProductById(id: string): Promise<Product | null> {
@@ -643,38 +523,105 @@ export async function getProductsByIds(ids: string[]): Promise<Product[]> {
   return result;
 }
 
-export async function getBestsellerProducts(limit = 8): Promise<Product[]> {
-  const store = getLocalStoreData();
-  const prods = Array.isArray(store?.products) ? store.products : [];
-  const sorted = [...prods]
-    .filter((p) => p.is_active)
-    .sort((a, b) => {
-      if (a.is_featured_top_seller !== b.is_featured_top_seller) {
-        return a.is_featured_top_seller ? -1 : 1;
+export async function getBestsellerProducts(limit = 10): Promise<Product[]> {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (supabaseUrl) {
+    try {
+      const supabase = await createClient();
+      const { data: orderItems, error: itemsError } = await (supabase
+        .from("order_items")
+        .select(`product_id, quantity, orders!inner(order_status, payment_status)`) as any)
+        .not("product_id", "is", null)
+        .not("orders.order_status", "in", `("cancelled","rejected")`)
+        .in("orders.payment_status", ["paid"]);
+
+      if (!itemsError && orderItems && orderItems.length > 0) {
+        const salesMap = new Map<string, number>();
+        for (const item of orderItems as any[]) {
+          if (item.product_id) {
+            const current = salesMap.get(item.product_id) || 0;
+            salesMap.set(item.product_id, current + (Number(item.quantity) || 1));
+          }
+        }
+        const sortedProductIds = Array.from(salesMap.entries())
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, limit)
+          .map(([id]) => id);
+
+        if (sortedProductIds.length > 0) {
+          const allProds = await getAllProducts();
+          const prodMap = new Map(allProds.map((p) => [p.id, p]));
+          const result: Product[] = [];
+          for (const id of sortedProductIds) {
+            const found = prodMap.get(id);
+            if (found && found.is_active) {
+              result.push(found);
+            }
+          }
+          if (result.length > 0) return result;
+        }
       }
-      return b.sold_count - a.sold_count;
-    });
-  return sorted.slice(0, limit);
+    } catch {}
+  }
+
+  const store = getLocalStoreData();
+  const orders = Array.isArray((store as any)?.orders) ? (store as any).orders : [];
+  const salesMap = new Map<string, number>();
+  for (const order of orders) {
+    const isPaid = ["paid", "succeeded", "completed"].includes(String(order.payment_status).toLowerCase());
+    const isNotCancelled = !["cancelled", "rejected"].includes(String(order.order_status).toLowerCase());
+    if (isPaid && isNotCancelled && Array.isArray(order.items)) {
+      for (const item of order.items) {
+        if (item.product_id) {
+          const current = salesMap.get(item.product_id) || 0;
+          salesMap.set(item.product_id, current + (Number(item.quantity) || 1));
+        }
+      }
+    }
+  }
+
+  if (salesMap.size > 0) {
+    const sortedProductIds = Array.from(salesMap.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, limit)
+      .map(([id]) => id);
+    const allProds = await getAllProducts();
+    const prodMap = new Map(allProds.map((p) => [p.id, p]));
+    const result: Product[] = [];
+    for (const id of sortedProductIds) {
+      const found = prodMap.get(id);
+      if (found && found.is_active) result.push(found);
+    }
+    return result;
+  }
+  return [];
 }
 
-export async function getNewlyAddedProducts(limit = 10): Promise<Product[]> {
-  const store = getLocalStoreData();
-  const prods = Array.isArray(store?.products) ? store.products : [];
-  const sorted = [...prods]
+export async function getNewlyAddedProducts(limit = 20): Promise<Product[]> {
+  const allProds = await getAllProducts();
+  const sorted = [...allProds]
     .filter((p) => p.is_active)
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   return sorted.slice(0, limit);
+}
+
+export async function getExploreProducts(limit = 12): Promise<Product[]> {
+  const allProds = await getAllProducts();
+  return allProds.filter((p) => p.is_active).slice(0, limit);
 }
 
 export async function getFestiveOffer(): Promise<{
   offer: FestiveOffer;
   products: Product[];
 }> {
-  const store = getLocalStoreData();
-  const offer = store.festive_offer;
-  if (!offer.enabled) {
-    return { offer, products: [] };
-  }
-  const products = await getProductsByIds(offer.product_ids);
-  return { offer, products };
+  return {
+    offer: {
+      enabled: false,
+      title: "",
+      subtitle: "",
+      product_ids: [],
+      updated_at: new Date().toISOString(),
+    },
+    products: [],
+  };
 }

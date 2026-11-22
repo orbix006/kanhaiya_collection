@@ -5,6 +5,7 @@ import {
   getAllProducts,
   getBestsellerProducts,
   getNewlyAddedProducts,
+  getExploreProducts,
   getFestiveOffer,
 } from "@/lib/store";
 import { getActiveFestiveCampaigns } from "@/lib/data/cms";
@@ -13,6 +14,7 @@ import { HeroBanner } from "@/components/home/hero-banner";
 import { RecentlyViewed } from "@/components/home/recently-viewed";
 import { BestsellerSection } from "@/components/home/bestseller-section";
 import { NewlyAddedSection } from "@/components/home/newly-added-section";
+import { ExploreProductsSection } from "@/components/home/explore-products-section";
 import { FestiveOfferSection } from "@/components/home/festive-offer-section";
 import { CategoriesSection } from "@/components/home/categories-section";
 import { TestimonialsSection } from "@/components/home/testimonials-section";
@@ -33,6 +35,7 @@ export default async function HomePage() {
     allProducts,
     bestsellers,
     newlyAdded,
+    exploreProducts,
     festiveOfferData,
     festiveCampaigns,
     testimonials,
@@ -40,8 +43,9 @@ export default async function HomePage() {
     getActiveBanners(),
     getActiveCategories(),
     getAllProducts(),
-    getBestsellerProducts(8),
-    getNewlyAddedProducts(10),
+    getBestsellerProducts(10),
+    getNewlyAddedProducts(20),
+    getExploreProducts(12),
     getFestiveOffer(),
     getActiveFestiveCampaigns(),
     getActiveTestimonials(),
@@ -61,7 +65,10 @@ export default async function HomePage() {
       {/* 4. Newly Added (Latest products sorted by created_at desc) */}
       <NewlyAddedSection products={newlyAdded} categories={categories} />
 
-      {/* 5. Festive Discount Campaigns (Slideshow of active campaigns, hidden if disabled) */}
+      {/* 5. Build / Explore Products (Dynamic gallery of products) */}
+      <ExploreProductsSection products={exploreProducts} categories={categories} />
+
+      {/* 6. Festive Discount Campaigns (Slideshow of active campaigns, hidden if disabled) */}
       <FestiveOfferSection
         offer={festiveOfferData.offer}
         campaigns={festiveCampaigns}
@@ -69,10 +76,10 @@ export default async function HomePage() {
         categories={categories}
       />
 
-      {/* 6. Categories (All active categories) */}
+      {/* 7. Categories (All active categories) */}
       <CategoriesSection categories={categories} />
 
-      {/* 7. Customer Reviews & Ratings (Wall of Love) */}
+      {/* 8. Customer Reviews & Ratings (Wall of Love) */}
       <TestimonialsSection testimonials={testimonials} />
     </div>
   );

@@ -1,24 +1,24 @@
 import React from "react";
-import { getFestiveOffer } from "@/lib/store";
-import { loadMockStore } from "@/lib/mock-data/admin-store";
-import { DashboardView } from "@/components/admin/dashboard-view";
+import { getAdminDashboardStats, getUnreadOrdersAction } from "@/lib/data/admin-dashboard";
+import { ProductionDashboardView } from "@/components/admin/production-dashboard-view";
 
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Executive Admin Dashboard | Kanhaiya Collection",
-  description: "Executive Management & Operations Portal for Kanhaiya Collection",
+  title: "Admin Dashboard | Kanhaiya Collection",
+  description: "Executive Administration & Operations Control Center for Kanhaiya Collection",
 };
 
 export default async function AdminDashboardPage() {
-  const festiveData = await getFestiveOffer();
-  const initialStore = loadMockStore();
+  const [stats, unreadOrders] = await Promise.all([
+    getAdminDashboardStats(),
+    getUnreadOrdersAction(),
+  ]);
 
   return (
-    <DashboardView
-      initialStore={initialStore}
-      festiveOffer={festiveData.offer}
+    <ProductionDashboardView
+      stats={stats}
+      unreadOrders={unreadOrders}
     />
   );
 }
-

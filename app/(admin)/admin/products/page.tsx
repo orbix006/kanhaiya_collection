@@ -33,37 +33,19 @@ export default async function AdminProductsPage() {
         .order("display_order", { ascending: true });
 
       if (dbCats && dbCats.length > 0) {
-        categories = dbCats as Category[];
+        categories = dbCats as unknown as Category[];
       } else {
         categories = await getAllActiveCategories();
       }
 
-      // 2. Fetch all products (including archived / inactive)
+      // 2. Fetch all products from products table with images and category details
+      // Supports both schema.txt (price, stock, batch_no, hsn_code) and existing columns
       const { data: dbProducts, error: prodError } = await supabase
         .from("products")
         .select(`
-          id,
-          category_id,
-          name,
-          slug,
-          description,
-          brand,
-          sku,
-          base_price,
-          compare_at_price,
-          stock_quantity,
-          sold_count,
-          is_active,
-          is_featured_top_seller,
-          top_seller_display_order,
-          avg_rating,
-          review_count,
-          meta_title,
-          meta_description,
-          created_at,
-          category:categories(id, name, slug, parent_id),
-          images:product_images(id, product_id, image_url, alt_text, display_order, is_primary),
-          variants:product_variants(id, product_id, variant_name, sku, attributes, price, compare_at_price, stock_quantity, image_url, is_active)
+          *,
+          category:categories!products_category_id_fkey(id, name, slug, parent_id),
+          images:product_images(id, product_id, url, storage_path, sort_order, is_primary)
         `)
         .order("created_at", { ascending: false });
 
@@ -71,21 +53,21 @@ export default async function AdminProductsPage() {
         products = dbProducts.map((p: any) => {
           const rawCat = Array.isArray(p.category) ? p.category[0] : p.category;
           const rawImages = Array.isArray(p.images) ? p.images : [];
-          const rawVariants = Array.isArray(p.variants) ? p.variants : [];
 
-          // Sort images by display_order
+          // Sort images by sort_order / display_order
           const sortedImages = [...rawImages].sort(
-            (a, b) => (a.display_order ?? 0) - (b.display_order ?? 0)
-          );
-
-          // Clean variants attributes
-          const cleanedVariants = rawVariants.map((v: any) => ({
-            ...v,
-            attributes:
-              typeof v.attributes === "object" && v.attributes !== null
-                ? v.attributes
-                : {},
+            (a, b) => (a.sort_order ?? a.display_order ?? 0) - (b.sort_order ?? b.display_order ?? 0)
+          ).map((img: any) => ({
+            id: img.id,
+            product_id: img.product_id,
+            image_url: img.url || img.image_url,
+            alt_text: img.alt_text || null,
+            display_order: img.sort_order ?? img.display_order ?? 0,
+            is_primary: Boolean(img.is_primary),
           }));
+
+          const effectivePrice = Number(p.price ?? p.base_price ?? 0);
+          const effectiveStock = Number(p.stock ?? p.stock_quantity ?? 0);
 
           return {
             id: p.id,
@@ -93,11 +75,11 @@ export default async function AdminProductsPage() {
             name: p.name,
             slug: p.slug,
             description: p.description,
-            brand: p.brand,
+            brand: p.brand || "Kanhaiya Collection",
             sku: p.sku,
-            base_price: Number(p.base_price),
+            base_price: effectivePrice,
             compare_at_price: p.compare_at_price ? Number(p.compare_at_price) : null,
-            stock_quantity: Number(p.stock_quantity ?? 0),
+            stock_quantity: effectiveStock,
             sold_count: Number(p.sold_count ?? 0),
             is_active: Boolean(p.is_active),
             is_featured_top_seller: Boolean(p.is_featured_top_seller),
@@ -106,24 +88,57 @@ export default async function AdminProductsPage() {
               : null,
             avg_rating: Number(p.avg_rating ?? 0),
             review_count: Number(p.review_count ?? 0),
-            meta_title: p.meta_title,
-            meta_description: p.meta_description,
+            meta_title: p.meta_title || null,
+            meta_description: p.meta_description || null,
             created_at: p.created_at,
             category: rawCat || null,
             images: sortedImages,
-            variants: cleanedVariants,
+            variants: [],
+            batch_number: p.batch_no || p.batch_number || null,
           };
         });
       } else {
-        products = SEED_PRODUCTS as unknown as ProductDetail[];
+        // Fallback query if relation syntax differs
+        const { data: fallbackProds } = await supabase
+          .from("products")
+          .select("*")
+          .order("created_at", { ascending: false });
+
+        if (fallbackProds && fallbackProds.length > 0) {
+          products = fallbackProds.map((p: any) => ({
+            id: p.id,
+            category_id: p.category_id,
+            name: p.name,
+            slug: p.slug,
+            description: p.description,
+            brand: p.brand || "Kanhaiya Collection",
+            sku: p.sku,
+            base_price: Number(p.price ?? p.base_price ?? 0),
+            compare_at_price: p.compare_at_price ? Number(p.compare_at_price) : null,
+            stock_quantity: Number(p.stock ?? p.stock_quantity ?? 0),
+            sold_count: Number(p.sold_count ?? 0),
+            is_active: Boolean(p.is_active),
+            is_featured_top_seller: Boolean(p.is_featured_top_seller),
+            top_seller_display_order: null,
+            avg_rating: 0,
+            review_count: 0,
+            meta_title: null,
+            meta_description: null,
+            created_at: p.created_at,
+            category: null,
+            images: [],
+            variants: [],
+            batch_number: p.batch_no || null,
+          }));
+        }
       }
     } catch {
-      categories = SEED_CATEGORIES as unknown as Category[];
-      products = SEED_PRODUCTS as unknown as ProductDetail[];
+      categories = [];
+      products = [];
     }
   } else {
-    categories = SEED_CATEGORIES as unknown as Category[];
-    products = SEED_PRODUCTS as unknown as ProductDetail[];
+    categories = [];
+    products = [];
   }
 
   return (

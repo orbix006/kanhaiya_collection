@@ -992,123 +992,17 @@ export const SEED_HOMEPAGE_SECTIONS: MockHomepageSection[] = [
 // -----------------------------------------------------------------------------
 // BASELINE CANONICAL SEED BANNERS
 // -----------------------------------------------------------------------------
-export const SEED_BANNERS: MockBanner[] = [
-  {
-    id: "ban-rk-collection",
-    image_url: "https://images.unsplash.com/photo-1599707367072-cd6ada2bc375?auto=format&fit=crop&w=1600&q=80",
-    title: "Divine Brass Radha Krishna Murtis — Handcrafted in Varanasi",
-    link_url: "/shop?category=idols",
-    display_order: 1,
-    is_active: true,
-    created_at: "2026-10-01T10:00:00.000Z",
-    updated_at: "2026-10-01T10:00:00.000Z",
-  },
-  {
-    id: "ban-akhand-diya",
-    image_url: "https://images.unsplash.com/photo-1606293926075-69a00dbfde81?auto=format&fit=crop&w=1600&q=80",
-    title: "Sacred Akhand Diyas & Artisan Pooja Thalis for Home Mandir",
-    link_url: "/shop?category=pooja-essentials",
-    display_order: 2,
-    is_active: true,
-    created_at: "2026-10-02T10:00:00.000Z",
-    updated_at: "2026-10-02T10:00:00.000Z",
-  },
-  {
-    id: "ban-sacred-aromas",
-    image_url: "https://images.unsplash.com/photo-1608571423902-eed4a5ad8108?auto=format&fit=crop&w=1600&q=80",
-    title: "Pure Temple Chandan & Handcrafted Cow-Dung Sambrani Dhoop",
-    link_url: "/shop?category=sacred-aromas",
-    display_order: 3,
-    is_active: true,
-    created_at: "2026-10-03T10:00:00.000Z",
-    updated_at: "2026-10-03T10:00:00.000Z",
-  },
-  {
-    id: "ban-temple-brass",
-    image_url: "https://images.unsplash.com/photo-1582738411706-bfc8e691d1c2?auto=format&fit=crop&w=1600&q=80",
-    title: "Heavy Cast Mandir Ghanti Bells & Consecrated Kalashes",
-    link_url: "/shop?category=temple-brassware",
-    display_order: 4,
-    is_active: true,
-    created_at: "2026-10-04T10:00:00.000Z",
-    updated_at: "2026-10-04T10:00:00.000Z",
-  },
-];
+export const SEED_BANNERS: MockBanner[] = [];
 
 // -----------------------------------------------------------------------------
 // BASELINE CANONICAL SEED ANNOUNCEMENTS (Text-Only Ribbon Above Header)
 // -----------------------------------------------------------------------------
-export const SEED_ANNOUNCEMENTS: MockAnnouncement[] = [
-  {
-    id: "ann-1",
-    text: "Shubh Deepavali Special: Complimentary Brass Diya Set with sacred orders above ₹2,499. Use code DIWALI108.",
-    is_active: true,
-    display_order: 1,
-    created_at: "2026-10-01T10:00:00.000Z",
-    updated_at: "2026-10-01T10:00:00.000Z",
-  },
-  {
-    id: "ann-2",
-    text: "Free Nationwide Sacred Dispatch across India on all consecrated Puja Thalis, Akhand Diyas & Murtis.",
-    is_active: true,
-    display_order: 2,
-    created_at: "2026-10-02T10:00:00.000Z",
-    updated_at: "2026-10-02T10:00:00.000Z",
-  },
-  {
-    id: "ann-3",
-    text: "Authentic Shilpa Shastra Brass Idols hand-sculpted by master sthapatis and artisans in Varanasi.",
-    is_active: true,
-    display_order: 3,
-    created_at: "2026-10-03T10:00:00.000Z",
-    updated_at: "2026-10-03T10:00:00.000Z",
-  },
-];
+export const SEED_ANNOUNCEMENTS: MockAnnouncement[] = [];
 
 // -----------------------------------------------------------------------------
 // BASELINE CANONICAL SEED FESTIVE CAMPAIGNS
 // -----------------------------------------------------------------------------
-export const SEED_FESTIVE_CAMPAIGNS: MockFestiveCampaign[] = [
-  {
-    id: "camp-deepotsav",
-    name: "Deepotsav & Sacred Diwali Offerings",
-    description: "Bless your home mandir this season with consecrated brassware and auspicious puja essentials. Enjoy complimentary brass diya with select festival items.",
-    image_url: "https://images.unsplash.com/photo-1606293926075-69a00dbfde81?auto=format&fit=crop&w=1200&q=80",
-    product_ids: ["prod-1", "prod-2", "prod-3", "prod-8"],
-    discount_tag: "Festive Grace",
-    discount_percent: 15,
-    is_active: true,
-    display_order: 1,
-    created_at: "2026-10-01T10:00:00.000Z",
-    updated_at: "2026-10-01T10:00:00.000Z",
-  },
-  {
-    id: "camp-janmashtami",
-    name: "Janmashtami Bal Gopal Shringar Mahotsav",
-    description: "Special celebration collection featuring handcrafted brass Bal Gopal murtis, designer jhulas, and natural Vrindavan chandan.",
-    image_url: null, // Clean rendering test without banner image
-    product_ids: ["prod-1", "prod-4", "prod-5"],
-    discount_tag: "Devotional Joy",
-    discount_percent: null,
-    is_active: true,
-    display_order: 2,
-    created_at: "2026-10-05T10:00:00.000Z",
-    updated_at: "2026-10-05T10:00:00.000Z",
-  },
-  {
-    id: "camp-navratri",
-    name: "Navratri Temple Brassware Specials",
-    description: "Authentic Ashtadhatu aarti thalis, heavy resonant ghanti bells, and temple kalashes for nine auspicious nights of divine worship.",
-    image_url: "https://images.unsplash.com/photo-1582738411706-bfc8e691d1c2?auto=format&fit=crop&w=1200&q=80",
-    product_ids: ["prod-2", "prod-3", "prod-6"],
-    discount_tag: "Shakti Mahotsav",
-    discount_percent: 10,
-    is_active: false,
-    display_order: 3,
-    created_at: "2026-10-08T10:00:00.000Z",
-    updated_at: "2026-10-08T10:00:00.000Z",
-  },
-];
+export const SEED_FESTIVE_CAMPAIGNS: MockFestiveCampaign[] = [];
 
 // -----------------------------------------------------------------------------
 // BASELINE CANONICAL SEED TESTIMONIALS (Wall of Love)
@@ -3262,7 +3156,7 @@ export function updateMockHomepageSections(
 
 export function loadMockBanners(): MockBanner[] {
   const store = loadMockStore();
-  const banners = store.banners || SEED_BANNERS;
+  const banners = store.banners || [];
   return [...banners].sort((a, b) => a.display_order - b.display_order);
 }
 
@@ -3396,7 +3290,7 @@ export function reorderMockBanners(orderedIds: string[]): {
 
 export function loadMockAnnouncements(): MockAnnouncement[] {
   const store = loadMockStore();
-  const announcements = store.announcements || SEED_ANNOUNCEMENTS;
+  const announcements = (store.announcements || []).filter((a: any) => !a.deleted_at);
   return [...announcements].sort((a, b) => a.display_order - b.display_order);
 }
 
@@ -3518,7 +3412,7 @@ export function reorderMockAnnouncements(orderedIds: string[]): {
 
 export function loadMockFestiveCampaigns(): MockFestiveCampaign[] {
   const store = loadMockStore();
-  const campaigns = store.festiveCampaigns || SEED_FESTIVE_CAMPAIGNS;
+  const campaigns = (store.festiveCampaigns || []).filter((c: any) => !c.deleted_at);
   return [...campaigns].sort((a, b) => a.display_order - b.display_order);
 }
 

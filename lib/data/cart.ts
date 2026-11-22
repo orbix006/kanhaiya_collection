@@ -1,7 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
 import { getLocalSession } from "@/lib/auth/local-auth";
-import { loadMockProducts } from "@/lib/mock-data/admin-store";
 import { getProductById } from "@/lib/store";
 
 /**
@@ -74,7 +73,7 @@ export interface AddToCartInput {
 }
 
 export interface UpdateQuantityInput {
-  cartItemId: string;
+  cartItemId: string; // productId or synthetic id
   quantity: number;
 }
 
@@ -99,7 +98,7 @@ export interface CartAppliedCoupon {
   discount: number;
   discount_type: "percentage" | "fixed";
   discount_value: number;
-  description?: string | null;
+  description: string | null;
 }
 
 export interface CartSummary {
@@ -111,76 +110,110 @@ export interface CartSummary {
   discount: number;
   tax: number;
   total: number;
+  applied_coupon?: CartAppliedCoupon;
   has_out_of_stock: boolean;
   has_stock_exceeded: boolean;
   free_shipping_threshold: number;
   amount_for_free_shipping: number;
-  applied_coupon?: CartAppliedCoupon | null;
 }
 
-export const FREE_SHIPPING_THRESHOLD = 1999;
+// In-memory fallback for local demo guest sessions
+interface DemoCartRow {
+  id: string;
+  user_id: string;
+  product_id: string;
+  variant_id: string | null;
+  quantity: number;
+  added_at: string;
+}
+
+const demoCartStore = new Map<string, DemoCartRow[]>();
+
+export const FREE_SHIPPING_THRESHOLD = 999;
 export const STANDARD_SHIPPING_FEE = 99;
 
-// In-memory demo cart storage for offline development resilience
-const demoCartStore: Map<string, Array<{ id: string; user_id: string; product_id: string; variant_id: string | null; quantity: number; added_at: string }>> = new Map();
-
 /**
- * Calculates deterministic pricing totals server-side directly from item data
+ * Calculates cart totals including subtotal, coupon discount, shipping, tax, and final payable amount.
  */
 export function calculateCartTotals(
   items: CartItemWithDetails[],
-  appliedCouponCode?: string | null
-): Omit<CartSummary, "items" | "item_count" | "distinct_count" | "has_out_of_stock" | "has_stock_exceeded"> {
+  couponCode?: string | null
+): Pick<
+  CartSummary,
+  | "subtotal"
+  | "shipping_fee"
+  | "discount"
+  | "tax"
+  | "total"
+  | "applied_coupon"
+  | "free_shipping_threshold"
+  | "amount_for_free_shipping"
+> {
   const subtotal = items.reduce((acc, item) => acc + item.subtotal, 0);
-  const shipping_fee = subtotal >= FREE_SHIPPING_THRESHOLD || subtotal === 0 ? 0 : STANDARD_SHIPPING_FEE;
-  const tax = 0; // Prices are tax-inclusive
 
   let discount = 0;
-  let applied_coupon: CartAppliedCoupon | null = null;
+  let appliedCoupon: CartAppliedCoupon | undefined = undefined;
 
-  if (appliedCouponCode && subtotal > 0) {
-    try {
-      const { validateCoupon } = require("@/lib/data/coupons");
-      const result = validateCoupon(appliedCouponCode, subtotal);
-      if (result.valid && result.coupon) {
-        discount = result.discount;
-        applied_coupon = {
-          code: result.coupon.code,
-          discount: result.discount,
-          discount_type: result.coupon.discount_type,
-          discount_value: result.coupon.discount_value,
-          description: result.coupon.description,
-        };
-      }
-    } catch {
-      // Ignore coupon calculation if module loading fails
+  if (couponCode && subtotal > 0) {
+    const { validateCoupon } = require("@/lib/data/coupons");
+    const result = validateCoupon(couponCode, subtotal);
+    if (result.valid && result.coupon) {
+      discount = result.discount;
+      appliedCoupon = {
+        code: result.coupon.code,
+        discount: result.discount,
+        discount_type: result.coupon.discount_type,
+        discount_value: result.coupon.discount_value,
+        description: result.coupon.description,
+      };
     }
   }
 
-  const total = Math.max(0, subtotal - discount + shipping_fee + tax);
-  const amount_for_free_shipping = Math.max(0, FREE_SHIPPING_THRESHOLD - subtotal);
+  const discountedSubtotal = Math.max(0, subtotal - discount);
+
+  let shipping_fee = 0;
+  let amount_for_free_shipping = 0;
+
+  if (items.length > 0) {
+    if (discountedSubtotal >= FREE_SHIPPING_THRESHOLD) {
+      shipping_fee = 0;
+      amount_for_free_shipping = 0;
+    } else {
+      shipping_fee = STANDARD_SHIPPING_FEE;
+      amount_for_free_shipping = FREE_SHIPPING_THRESHOLD - discountedSubtotal;
+    }
+  }
+
+  const tax = 0; // Tax is inclusive in catalog pricing
+  const total = Math.max(0, discountedSubtotal + shipping_fee);
 
   return {
-    subtotal: Math.round(subtotal * 100) / 100,
+    subtotal,
     shipping_fee,
-    discount: Math.round(discount * 100) / 100,
+    discount,
     tax,
-    total: Math.round(total * 100) / 100,
+    total,
+    applied_coupon: appliedCoupon,
     free_shipping_threshold: FREE_SHIPPING_THRESHOLD,
-    amount_for_free_shipping: Math.round(amount_for_free_shipping * 100) / 100,
-    applied_coupon,
+    amount_for_free_shipping,
   };
 }
 
 /**
- * Fetches user's cart from database backed by `cart_items` with live stock and server-calculated totals
+ * Reads user's active cart with live pricing and stock validation from the database.
  */
 export async function getUserCart(
   userId: string,
-  explicitCouponCode?: string | null
+  couponCodeOverride?: string | null
 ): Promise<CartSummary> {
-  let activeCouponCode = explicitCouponCode;
-  if (activeCouponCode === undefined) {
+  const isConfigured =
+    Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL) &&
+    process.env.NEXT_PUBLIC_SUPABASE_URL !== "https://placeholder-project.supabase.co";
+
+  let activeCouponCode: string | null = null;
+  if (couponCodeOverride !== undefined) {
+    activeCouponCode = couponCodeOverride;
+  } else {
     try {
       const cookieStore = await cookies();
       activeCouponCode = cookieStore.get("applied_coupon_code")?.value || null;
@@ -189,41 +222,26 @@ export async function getUserCart(
     }
   }
 
-  const isConfigured =
-    Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL) &&
-    process.env.NEXT_PUBLIC_SUPABASE_URL !== "https://placeholder-project.supabase.co";
-
+  // Guest / local fallback
   if (!isConfigured || userId.startsWith("guest_") || userId === "demo-user-id") {
-    // Offline / guest in-memory fallback
     const rawItems = demoCartStore.get(userId) || [];
     const detailedItems: CartItemWithDetails[] = [];
 
-    for (const item of rawItems) {
-      const prod = await getProductById(item.product_id);
+    for (const raw of rawItems) {
+      const prod = await getProductById(raw.product_id);
       if (!prod) continue;
 
-      const variant = item.variant_id
-        ? prod.variants?.find((v: any) => v.id === item.variant_id) || null
-        : null;
-
-      const unitPrice = variant?.price ?? prod.base_price;
-      const availableStock = variant
-        ? variant.stock_quantity
-        : prod.stock_quantity;
-
-      const primaryImage =
-        prod.images?.find((img: any) => img.is_primary)?.image_url ||
-        prod.images?.[0]?.image_url ||
-        prod.image_url ||
-        null;
+      const unitPrice = prod.base_price;
+      const availableStock = prod.stock_quantity;
+      const primaryImg = (prod as any).primary_image || (prod.images && prod.images[0]?.image_url) || null;
 
       detailedItems.push({
-        id: item.id,
-        user_id: userId,
-        product_id: item.product_id,
-        variant_id: item.variant_id,
-        quantity: item.quantity,
-        added_at: item.added_at,
+        id: raw.id,
+        user_id: raw.user_id,
+        product_id: raw.product_id,
+        variant_id: null,
+        quantity: raw.quantity,
+        added_at: raw.added_at,
         product: {
           id: prod.id,
           name: prod.name,
@@ -232,23 +250,14 @@ export async function getUserCart(
           compare_at_price: prod.compare_at_price || null,
           stock_quantity: prod.stock_quantity,
           is_active: prod.is_active,
-          primary_image: primaryImage,
+          primary_image: primaryImg,
         },
-        variant: variant
-          ? {
-              id: variant.id,
-              variant_name: variant.variant_name,
-              price: variant.price,
-              compare_at_price: variant.compare_at_price,
-              stock_quantity: variant.stock_quantity,
-              is_active: variant.is_active,
-            }
-          : null,
+        variant: null,
         unit_price: unitPrice,
-        subtotal: unitPrice * item.quantity,
+        subtotal: unitPrice * raw.quantity,
         available_stock: availableStock,
         is_out_of_stock: availableStock <= 0,
-        exceeds_stock: item.quantity > availableStock,
+        exceeds_stock: raw.quantity > availableStock,
       });
     }
 
@@ -267,36 +276,26 @@ export async function getUserCart(
 
   const supabase = await createClient();
 
+  // Primary key on cart_items is (user_id, product_id)
   const { data: cartRows, error: cartError } = await supabase
     .from("cart_items")
     .select(`
-      id,
       user_id,
       product_id,
-      variant_id,
       quantity,
       added_at,
       products (
         id,
         name,
         slug,
-        base_price,
-        compare_at_price,
-        stock_quantity,
+        price,
+        stock,
         is_active,
         product_images (
-          image_url,
+          url,
           is_primary,
-          display_order
+          sort_order
         )
-      ),
-      product_variants (
-        id,
-        variant_name,
-        price,
-        compare_at_price,
-        stock_quantity,
-        is_active
       )
     `)
     .eq("user_id", userId)
@@ -320,86 +319,41 @@ export async function getUserCart(
     };
   }
 
-  interface CartRowProductImage {
-    image_url: string;
-    is_primary?: boolean;
-    display_order?: number;
-  }
-  interface CartRowProductVariant {
-    id: string;
-    variant_name: string;
-    sku?: string | null;
-    price: number | string;
-    compare_at_price?: number | string | null;
-    stock_quantity: number | string;
-    is_active?: boolean;
-  }
-  interface CartRowProduct {
-    id: string;
-    name: string;
-    slug: string;
-    base_price: number | string;
-    compare_at_price?: number | string | null;
-    stock_quantity: number | string;
-    is_active: boolean;
-    product_images?: CartRowProductImage[];
-  }
-  interface CartRowData {
-    id: string;
-    user_id: string;
-    product_id: string;
-    variant_id: string | null;
-    quantity: number | string;
-    added_at: string;
-    products: CartRowProduct | null;
-    product_variants: CartRowProductVariant | null;
-  }
-
   const detailedItems: CartItemWithDetails[] = [];
 
-  for (const row of (cartRows as unknown as CartRowData[])) {
+  for (const row of cartRows as any[]) {
     const prod = row.products;
     if (!prod) continue;
 
-    const variant = row.product_variants || null;
-    const unitPrice = Number(variant?.price ?? prod.base_price);
-    const availableStock = variant ? Number(variant.stock_quantity) : Number(prod.stock_quantity);
+    const unitPrice = Number(prod.price ?? 0);
+    const availableStock = Number(prod.stock ?? 0);
 
-    const images = prod.product_images || [];
+    const images = (prod.product_images || []) as { url: string; is_primary?: boolean; sort_order?: number }[];
     const primaryImg =
-      images.find((img) => img.is_primary)?.image_url ||
-      images.sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0))[0]?.image_url ||
+      images.find((img) => img.is_primary)?.url ||
+      images.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))[0]?.url ||
       null;
 
     const qty = Number(row.quantity);
 
     detailedItems.push({
-      id: row.id,
+      id: `${row.user_id}_${row.product_id}`,
       user_id: row.user_id,
       product_id: row.product_id,
-      variant_id: row.variant_id,
+      variant_id: null,
       quantity: qty,
       added_at: row.added_at,
       product: {
         id: prod.id,
         name: prod.name,
         slug: prod.slug,
-        base_price: Number(prod.base_price),
-        compare_at_price: prod.compare_at_price ? Number(prod.compare_at_price) : null,
-        stock_quantity: Number(prod.stock_quantity),
+        base_price: unitPrice,
+        compare_at_price: null,
+        stock_quantity: availableStock,
         is_active: prod.is_active,
         primary_image: primaryImg,
       },
-      variant: variant
-        ? {
-            id: variant.id,
-            variant_name: variant.variant_name,
-            price: variant.price ? Number(variant.price) : null,
-            compare_at_price: variant.compare_at_price ? Number(variant.compare_at_price) : null,
-            stock_quantity: Number(variant.stock_quantity),
-            is_active: variant.is_active ?? true,
-          }
-        : null,
+      variant: null,
       unit_price: unitPrice,
       subtotal: unitPrice * qty,
       available_stock: availableStock,
@@ -442,7 +396,7 @@ export async function getUserCartCount(userId: string): Promise<number> {
       .eq("user_id", userId);
 
     if (error || !data) return 0;
-    return data.reduce((acc, row) => acc + Number(row.quantity), 0);
+    return data.reduce((acc: number, row: any) => acc + Number(row.quantity), 0);
   } catch {
     return 0;
   }
@@ -452,5 +406,3 @@ export async function getUserCartCount(userId: string): Promise<number> {
 export function getDemoCartStore() {
   return demoCartStore;
 }
-
-
