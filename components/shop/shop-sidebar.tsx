@@ -159,11 +159,9 @@ export function ShopSidebar({
   const renderCategoryNode = (node: CategoryTreeNode) => {
     const hasChildren = node.children && node.children.length > 0;
     const isSelected = currentCategorySlug === node.slug;
-    const isChildSelected = node.children.some(
-      (child) =>
-        child.slug === currentCategorySlug ||
-        child.children.some((sub) => sub.slug === currentCategorySlug)
-    );
+    const hasSelectedChild = (n: CategoryTreeNode): boolean =>
+      n.children.some((c) => c.slug === currentCategorySlug || hasSelectedChild(c));
+    const isChildSelected = hasSelectedChild(node);
     const isCollapsed = collapsedCategories[node.id] ?? (!isSelected && !isChildSelected);
 
     return (

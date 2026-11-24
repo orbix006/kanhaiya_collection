@@ -91,8 +91,8 @@ async function runDeleteTestSuite() {
   } as any);
   saveMockStore(storeWithOrder);
 
-  // Attempt delete of ordered product -> MUST trigger safe archival
-  const delOrderedRes = await deleteProductAction(orderedProdId);
+  // Attempt delete of ordered product -> can trigger safe archival when forceArchive passed
+  const delOrderedRes = await deleteProductAction(orderedProdId, { forceArchive: true });
   assert(delOrderedRes.success === true && delOrderedRes.archived === true, 'Safely archives product when referenced in historical orders');
 
   const storeAfterArchive = loadMockStore();

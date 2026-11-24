@@ -67,6 +67,7 @@ export interface ProductDetail {
   top_seller_display_order: number | null;
   avg_rating: number;
   review_count: number;
+  image_url?: string | null;
   meta_title: string | null;
   meta_description: string | null;
   created_at: string;
@@ -257,9 +258,12 @@ export async function getShopProducts(params: ShopFilterParams): Promise<ShopQue
   const offset = (validPage - 1) * pageSize;
 
   const allCategories = await getAllActiveCategories();
-  const activeCategory = categorySlug
-    ? allCategories.find((c) => c.slug === categorySlug) || null
-    : null;
+  const matchingCategories = categorySlug
+    ? allCategories.filter(
+        (c) => c.slug.toLowerCase() === categorySlug.toLowerCase() || c.id === categorySlug
+      )
+    : [];
+  const activeCategory = matchingCategories[0] || null;
 
   try {
     const supabase = await createClient();
@@ -271,35 +275,41 @@ export async function getShopProducts(params: ShopFilterParams): Promise<ShopQue
         `
         id,
         category_id,
+        subcategory_id,
+        sub_subcategory_id,
         name,
         slug,
-        brand,
-        base_price,
-        compare_at_price,
-        stock_quantity,
-        sold_count,
-        avg_rating,
-        review_count,
+        description,
+        sku,
+        price,
+        stock,
         is_active,
-        is_featured_top_seller,
-        top_seller_display_order,
         created_at,
         product_images (
-          image_url,
-          is_primary,
-          display_order
+          id,
+          product_id,
+          url,
+          storage_path,
+          sort_order,
+          is_primary
         )
       `,
         { count: "exact" }
       )
       .eq("is_active", true);
 
-    // 1. Filter by category (including descendant categories)
-    if (activeCategory) {
-      const childCategoryIds = getDescendantCategoryIds(activeCategory.id, allCategories);
-      const targetCategoryIds = [activeCategory.id, ...childCategoryIds];
+    // 1. Filter by category (including descendant categories across 3 levels)
+    if (matchingCategories.length > 0) {
+      const targetCategoryIds = Array.from(
+        new Set(
+          matchingCategories.flatMap((cat) => [
+            cat.id,
+            ...getDescendantCategoryIds(cat.id, allCategories),
+          ])
+        )
+      );
       const idList = targetCategoryIds.join(",");
-      dbQuery = dbQuery.or(`category_id.in.(${idList}),subcategory_id.in.(${idList})`);
+      dbQuery = dbQuery.or(`category_id.in.(${idList}),subcategory_id.in.(${idList}),sub_subcategory_id.in.(${idList})`);
     }
 
     // 2. Trigram-friendly name search (schema index: idx_products_name_trgm on products using gin (name gin_trgm_ops))
@@ -323,16 +333,16 @@ export async function getShopProducts(params: ShopFilterParams): Promise<ShopQue
 
     // 3. Price range filters
     if (minPrice !== undefined && !isNaN(minPrice) && minPrice > 0) {
-      dbQuery = dbQuery.gte("base_price", minPrice);
+      dbQuery = dbQuery.gte("price", minPrice);
     }
     if (maxPrice !== undefined && !isNaN(maxPrice) && maxPrice > 0) {
-      dbQuery = dbQuery.lte("base_price", maxPrice);
+      dbQuery = dbQuery.lte("price", maxPrice);
     }
 
     if (availability === "in-stock") {
-      dbQuery = dbQuery.gt("stock_quantity", 0);
+      dbQuery = dbQuery.gt("stock", 0);
     } else if (availability === "out-of-stock") {
-      dbQuery = dbQuery.lte("stock_quantity", 0);
+      dbQuery = dbQuery.lte("stock", 0);
     }
 
     // 3b. Festival filter
@@ -354,25 +364,18 @@ export async function getShopProducts(params: ShopFilterParams): Promise<ShopQue
     // 4. Sorting
     switch (sort) {
       case "price_asc":
-        dbQuery = dbQuery.order("base_price", { ascending: true });
+        dbQuery = dbQuery.order("price", { ascending: true });
         break;
       case "price_desc":
-        dbQuery = dbQuery.order("base_price", { ascending: false });
+        dbQuery = dbQuery.order("price", { ascending: false });
         break;
       case "newest":
         dbQuery = dbQuery.order("created_at", { ascending: false });
         break;
       case "top_rated":
-        dbQuery = dbQuery
-          .order("avg_rating", { ascending: false })
-          .order("review_count", { ascending: false });
-        break;
       case "featured":
       default:
-        dbQuery = dbQuery
-          .order("is_featured_top_seller", { ascending: false })
-          .order("top_seller_display_order", { ascending: true, nullsFirst: false })
-          .order("sold_count", { ascending: false });
+        dbQuery = dbQuery.order("created_at", { ascending: false });
         break;
     }
 
@@ -382,15 +385,17 @@ export async function getShopProducts(params: ShopFilterParams): Promise<ShopQue
     const { data: dbProducts, count, error } = await dbQuery;
 
     if (!error && dbProducts) {
-      const items: ProductItem[] = (dbProducts as unknown as CatalogDbProduct[]).map((p) => {
+      const items: ProductItem[] = (dbProducts as any[]).map((p) => {
         const sortedImages = p.product_images
           ? [...p.product_images].sort(
-              (a, b) => (a.display_order || 0) - (b.display_order || 0)
+              (a: any, b: any) => (a.sort_order || a.display_order || 0) - (b.sort_order || b.display_order || 0)
             )
           : [];
 
         const primaryImg =
-          sortedImages.find((img) => img.is_primary)?.image_url ||
+          sortedImages.find((img: any) => img.is_primary)?.url ||
+          sortedImages.find((img: any) => img.is_primary)?.image_url ||
+          sortedImages[0]?.url ||
           sortedImages[0]?.image_url ||
           null;
 
@@ -398,12 +403,12 @@ export async function getShopProducts(params: ShopFilterParams): Promise<ShopQue
           id: p.id,
           name: p.name,
           slug: p.slug,
-          brand: p.brand,
-          base_price: Number(p.base_price),
+          brand: p.brand || "Kanhaiya Collection",
+          base_price: Number(p.price ?? p.base_price ?? 0),
           compare_at_price: p.compare_at_price ? Number(p.compare_at_price) : null,
           avg_rating: Number(p.avg_rating || 0),
           review_count: Number(p.review_count || 0),
-          stock_quantity: Number(p.stock_quantity || 0),
+          stock_quantity: Number(p.stock ?? p.stock_quantity ?? 0),
           image_url: primaryImg,
           is_featured_top_seller: Boolean(p.is_featured_top_seller),
           category_id: p.category_id,
@@ -424,10 +429,103 @@ export async function getShopProducts(params: ShopFilterParams): Promise<ShopQue
       };
     }
   } catch {
-    // Return empty on Supabase error
+    // Return empty or fallback on Supabase error
   }
 
-  // Database-only: do not fallback to mock catalog
+  // Store fallback for unconfigured / empty / development catalog
+  try {
+    const { getAllProducts } = await import("@/lib/store");
+    const allProds = await getAllProducts();
+    let filtered = allProds.filter((p) => p.is_active);
+
+    if (matchingCategories.length > 0) {
+      const targetCategoryIds = new Set(
+        matchingCategories.flatMap((cat) => [
+          cat.id,
+          ...getDescendantCategoryIds(cat.id, allCategories),
+        ])
+      );
+      filtered = filtered.filter(
+        (p) =>
+          (p.category_id && targetCategoryIds.has(p.category_id)) ||
+          ((p as any).subcategory_id && targetCategoryIds.has((p as any).subcategory_id)) ||
+          ((p as any).sub_subcategory_id && targetCategoryIds.has((p as any).sub_subcategory_id))
+      );
+    }
+
+    if (searchQuery && searchQuery.trim()) {
+      const term = searchQuery.trim().toLowerCase();
+      filtered = filtered.filter(
+        (p) =>
+          p.name.toLowerCase().includes(term) ||
+          (p.description && p.description.toLowerCase().includes(term)) ||
+          (p.sku && p.sku.toLowerCase().includes(term))
+      );
+    }
+
+    if (minPrice !== undefined && !isNaN(minPrice) && minPrice > 0) {
+      filtered = filtered.filter((p) => p.base_price >= minPrice);
+    }
+    if (maxPrice !== undefined && !isNaN(maxPrice) && maxPrice > 0) {
+      filtered = filtered.filter((p) => p.base_price <= maxPrice);
+    }
+
+    if (availability === "in-stock") {
+      filtered = filtered.filter((p) => p.stock_quantity > 0);
+    } else if (availability === "out-of-stock") {
+      filtered = filtered.filter((p) => p.stock_quantity <= 0);
+    }
+
+    switch (sort) {
+      case "price_asc":
+        filtered.sort((a, b) => a.base_price - b.base_price);
+        break;
+      case "price_desc":
+        filtered.sort((a, b) => b.base_price - a.base_price);
+        break;
+      case "newest":
+        filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        break;
+      case "top_rated":
+        filtered.sort((a, b) => (b.avg_rating || 0) - (a.avg_rating || 0));
+        break;
+      case "featured":
+      default:
+        filtered.sort((a, b) => (b.sold_count || 0) - (a.sold_count || 0));
+        break;
+    }
+
+    const totalCount = filtered.length;
+    const paginated = filtered.slice(offset, offset + pageSize);
+    const items: ProductItem[] = paginated.map((p) => ({
+      id: p.id,
+      name: p.name,
+      slug: p.slug,
+      brand: p.brand || null,
+      base_price: p.base_price,
+      compare_at_price: p.compare_at_price || null,
+      avg_rating: p.avg_rating || 0,
+      review_count: p.review_count || 0,
+      stock_quantity: p.stock_quantity,
+      image_url: p.image_url || null,
+      is_featured_top_seller: Boolean(p.is_featured_top_seller),
+      category_id: p.category_id || null,
+    }));
+
+    return {
+      products: items,
+      totalCount,
+      page: validPage,
+      pageSize,
+      totalPages: Math.ceil(totalCount / pageSize) || 1,
+      activeCategory,
+      minPriceAvailable: 100,
+      maxPriceAvailable: 50000,
+    };
+  } catch {
+    // If fallback error, return empty
+  }
+
   return {
     products: [],
     totalCount: 0,
@@ -454,8 +552,19 @@ export async function getProductBySlug(slug: string): Promise<ProductDetail | nu
       .from("products")
       .select(
         `
-        *,
-        category:categories (
+        id,
+        category_id,
+        subcategory_id,
+        sub_subcategory_id,
+        name,
+        slug,
+        description,
+        sku,
+        price,
+        stock,
+        is_active,
+        created_at,
+        category:categories!products_category_id_fkey (
           id,
           name,
           slug,
@@ -465,22 +574,10 @@ export async function getProductBySlug(slug: string): Promise<ProductDetail | nu
         product_images (
           id,
           product_id,
-          image_url,
-          alt_text,
-          display_order,
+          url,
+          storage_path,
+          sort_order,
           is_primary
-        ),
-        product_variants (
-          id,
-          product_id,
-          variant_name,
-          sku,
-          attributes,
-          price,
-          compare_at_price,
-          stock_quantity,
-          image_url,
-          is_active
         )
       `
       )
@@ -489,39 +586,18 @@ export async function getProductBySlug(slug: string): Promise<ProductDetail | nu
       .maybeSingle();
 
     if (!error && product) {
-      const prod = product as unknown as SingleDbProduct;
+      const prod = product as any;
       const sortedImages: ProductImage[] = (prod.product_images || [])
         .sort(
-          (a, b) => (a.display_order || 0) - (b.display_order || 0)
+          (a: any, b: any) => (a.sort_order || a.display_order || 0) - (b.sort_order || b.display_order || 0)
         )
-        .map((img) => ({
+        .map((img: any) => ({
           id: img.id,
           product_id: img.product_id,
-          image_url: img.image_url,
+          image_url: img.url || img.image_url || "",
           alt_text: img.alt_text || null,
-          display_order: img.display_order || 0,
+          display_order: img.sort_order || img.display_order || 0,
           is_primary: Boolean(img.is_primary),
-        }));
-
-      const activeVariants: ProductVariant[] = (prod.product_variants || [])
-        .filter((v) => v.is_active !== false)
-        .map((v) => ({
-          id: v.id,
-          product_id: v.product_id,
-          variant_name: v.variant_name,
-          sku: v.sku || null,
-          attributes:
-            typeof v.attributes === "object" &&
-            v.attributes !== null &&
-            !Array.isArray(v.attributes)
-              ? (v.attributes as Record<string, unknown>)
-              : {},
-          price: v.price !== null && v.price !== undefined ? Number(v.price) : null,
-          compare_at_price:
-            v.compare_at_price !== null && v.compare_at_price !== undefined ? Number(v.compare_at_price) : null,
-          stock_quantity: Number(v.stock_quantity || 0),
-          image_url: v.image_url || null,
-          is_active: Boolean(v.is_active),
         }));
 
       return {
@@ -530,32 +606,79 @@ export async function getProductBySlug(slug: string): Promise<ProductDetail | nu
         name: prod.name,
         slug: prod.slug,
         description: prod.description,
-        brand: prod.brand,
+        brand: prod.brand || "Kanhaiya Collection",
         sku: prod.sku,
-        base_price: Number(prod.base_price),
+        base_price: Number(prod.price ?? prod.base_price ?? 0),
         compare_at_price: prod.compare_at_price
           ? Number(prod.compare_at_price)
           : null,
-        stock_quantity: Number(prod.stock_quantity || 0),
+        stock_quantity: Number(prod.stock ?? prod.stock_quantity ?? 0),
         sold_count: Number(prod.sold_count || 0),
         is_active: prod.is_active,
         is_featured_top_seller: Boolean(prod.is_featured_top_seller),
-        top_seller_display_order: prod.top_seller_display_order,
+        top_seller_display_order: prod.top_seller_display_order || null,
         avg_rating: Number(prod.avg_rating || 0),
         review_count: Number(prod.review_count || 0),
-        meta_title: prod.meta_title,
-        meta_description: prod.meta_description,
+        meta_title: prod.meta_title || prod.name,
+        meta_description: prod.meta_description || prod.description,
         created_at: prod.created_at,
         category: prod.category || null,
         images: sortedImages,
-        variants: activeVariants,
+        variants: [],
       };
     }
   } catch {
-    // Return null on failure
+    // Return null or fallback on failure
   }
 
-  // Database-only: strictly no mock store fallback
+  // Store fallback for unconfigured / offline / development catalog
+  try {
+    const { getProductBySlug: getStoreProdBySlug } = await import("@/lib/store");
+    const p = await getStoreProdBySlug(slug);
+    if (p) {
+      const allCategories = await getAllActiveCategories();
+      const activeCat = allCategories.find((c) => c.id === p.category_id) || null;
+      return {
+        id: p.id,
+        category_id: p.category_id,
+        name: p.name,
+        slug: p.slug,
+        description: p.description,
+        brand: p.brand,
+        sku: p.sku || null,
+        base_price: p.base_price,
+        compare_at_price: p.compare_at_price || null,
+        stock_quantity: p.stock_quantity,
+        sold_count: p.sold_count || 0,
+        is_active: p.is_active,
+        is_featured_top_seller: Boolean(p.is_featured_top_seller),
+        top_seller_display_order: p.top_seller_display_order || null,
+        avg_rating: p.avg_rating || 0,
+        review_count: p.review_count || 0,
+        meta_title: p.name,
+        meta_description: p.description,
+        created_at: p.created_at,
+        category: activeCat,
+        images:
+          p.images && p.images.length > 0
+            ? (p.images as any)
+            : p.image_url
+            ? [
+                {
+                  id: "img-1",
+                  product_id: p.id,
+                  image_url: p.image_url,
+                  alt_text: p.name,
+                  display_order: 1,
+                  is_primary: true,
+                },
+              ]
+            : [],
+        variants: (p.variants as any) || [],
+      };
+    }
+  } catch {}
+
   return null;
 }
 

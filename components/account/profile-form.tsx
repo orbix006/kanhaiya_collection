@@ -1,9 +1,9 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { updateProfileAction } from "@/app/(public)/account/actions";
+import { updateProfileAction, changePasswordAction } from "@/app/(public)/account/actions";
 import { ImageUploader } from "@/components/ui/image-uploader";
-import { Loader2, Save, MapPin, Package } from "lucide-react";
+import { Loader2, Save, MapPin, Package, KeyRound, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
 
 interface ProfileFormProps {
@@ -153,6 +153,90 @@ export function ProfileForm({
               <>
                 <Save className="h-4 w-4" />
                 Save Profile
+              </>
+            )}
+          </button>
+        </div>
+      </form>
+
+      {/* Dedicated Security & Password Management Form */}
+      <ChangePasswordSection />
+    </div>
+  );
+}
+
+function ChangePasswordSection() {
+  const [pwState, pwAction, pwPending] = useActionState(changePasswordAction, null);
+
+  return (
+    <div className="p-6 bg-card border border-border rounded-2xl shadow-sm space-y-4">
+      <div className="flex items-center gap-2">
+        <KeyRound className="h-5 w-5 text-primary" />
+        <h2 className="text-base font-semibold text-foreground">Security & Password</h2>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Set a new password to keep your account protected
+      </p>
+
+      {pwState?.error && (
+        <div className="p-3.5 text-xs sm:text-sm rounded-xl bg-destructive/10 border border-destructive/20 text-destructive">
+          {pwState.error}
+        </div>
+      )}
+
+      {pwState?.success && (
+        <div className="p-3.5 text-xs sm:text-sm rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center gap-2">
+          <CheckCircle2 className="h-4 w-4 shrink-0" />
+          <span>{pwState.success}</span>
+        </div>
+      )}
+
+      <form action={pwAction} className="space-y-4 pt-2">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium text-foreground" htmlFor="newPassword">
+              New Password
+            </label>
+            <input
+              id="newPassword"
+              name="newPassword"
+              type="password"
+              required
+              placeholder="Minimum 6 characters"
+              className="w-full h-11 px-3.5 rounded-lg border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium text-foreground" htmlFor="confirmNewPassword">
+              Confirm New Password
+            </label>
+            <input
+              id="confirmNewPassword"
+              name="confirmNewPassword"
+              type="password"
+              required
+              placeholder="Re-enter new password"
+              className="w-full h-11 px-3.5 rounded-lg border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+          </div>
+        </div>
+
+        <div className="flex justify-end pt-2">
+          <button
+            type="submit"
+            disabled={pwPending}
+            className="inline-flex items-center gap-2 h-10 px-5 rounded-lg bg-primary text-primary-foreground font-medium text-xs hover:bg-primary/90 transition-colors disabled:opacity-50 cursor-pointer shadow-xs"
+          >
+            {pwPending ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>Updating Password...</span>
+              </>
+            ) : (
+              <>
+                <KeyRound className="h-4 w-4" />
+                <span>Update Password</span>
               </>
             )}
           </button>

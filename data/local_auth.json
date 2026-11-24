@@ -89,6 +89,86 @@
       "role": "user",
       "created_at": "2026-10-31T06:33:39.264Z",
       "updated_at": "2026-10-31T06:33:39.264Z"
+    },
+    {
+      "id": "usr_5a1d46ca165140728ad975d05f9d7a9f",
+      "full_name": "Audit Customer",
+      "email": "audit-user-1795346386939@kanhaiya.test",
+      "password_hash": "bd3730c1c9ede74b4034c19ffdf8cd87102d918a39c3fd92b433afcdf61633dd3c00a6bd9475c65afc080d5b0011eaea91e2f7f0b8ba425a96e211e0230255b0",
+      "salt": "7dcaa85b5d73f4520ac34f28c8fd950b",
+      "role": "user",
+      "created_at": "2026-11-22T11:19:46.968Z",
+      "updated_at": "2026-11-22T11:19:47.276Z"
+    },
+    {
+      "id": "usr_env_configured_admin",
+      "full_name": "Custom Environment Admin",
+      "email": "custom-admin-1795346386939@kanhaiya.test",
+      "password_hash": "a9c6680210d16bffc8d5ae54993f67d9c37dc393b6d17646a94f7f6866ae289efa5bd4eaaf7471f54188a2e9322324396ea9f9c29b4e9d79c8d734b1e5321760",
+      "salt": "7ebf28954c48821d68be455b5ff8b177",
+      "role": "admin",
+      "created_at": "2026-11-22T11:19:47.411Z",
+      "updated_at": "2026-11-22T11:19:47.411Z"
+    },
+    {
+      "id": "usr_83bf455c7f3f436b840f5388c52639ed",
+      "full_name": "Audit Customer",
+      "email": "audit-user-1795346480039@kanhaiya.test",
+      "password_hash": "c1a0dabee936c41e02ab15f05bac44e445ed3e0c34b9ed2b594bfeece42cc6c0c88b6c9f3f9a6c72459b53bb2348265875e10a0cd8b647b3a569d0f85a57ba07",
+      "salt": "5e67f452dadebeeacc06a57941d557c7",
+      "role": "user",
+      "created_at": "2026-11-22T11:21:20.070Z",
+      "updated_at": "2026-11-22T11:21:20.328Z"
+    },
+    {
+      "id": "usr_acc80ab802d94c3b868904e35318c609",
+      "full_name": "Audit Customer",
+      "email": "audit-user-1795346585355@kanhaiya.test",
+      "password_hash": "8eb1cda4598388372c7d0f6aeb92e42f6c039e85be45962afa8b7c17b708eb1c6256ef4150d3a3573d4b269756eae5db5f4548b51cfad283894d1d67a859d4e2",
+      "salt": "457a5f4b99c67ac5301ecd838ac859b7",
+      "role": "user",
+      "created_at": "2026-11-22T11:23:05.383Z",
+      "updated_at": "2026-11-22T11:23:05.662Z"
+    },
+    {
+      "id": "usr_admin_de9030905aaf",
+      "full_name": "Custom Environment Admin",
+      "email": "custom-admin-1795346585355@kanhaiya.test",
+      "password_hash": "c81e107e2f2fd9e03e0331ec0c845e9844ce8a17654305eddd779d81903a2f5e21a325582d615418faa42041c029a6fc0d1ce7620768d8139b9bde65dfef1e71",
+      "salt": "e1d32600bf18043c64701a0a2ae103f6",
+      "role": "admin",
+      "created_at": "2026-11-22T11:23:05.780Z",
+      "updated_at": "2026-11-22T11:23:05.780Z"
+    },
+    {
+      "id": "usr_8e2751ad24b440eaa315ee450459de86",
+      "full_name": "Amber Priyadarshi",
+      "email": "ambermrinmayi11@gmail.com",
+      "password_hash": "d16851db5ac06bcedb99589164f6185debf3f4716aba90ef645ddfbe066e4e0c7b7bc0e68aaf8510cb555169bdad1a04e1756a4d9f70b71933ab590b746d324b",
+      "salt": "a923edf6d443f0591e5999fbb3d36829",
+      "role": "user",
+      "created_at": "2026-11-22T11:31:41.740Z",
+      "updated_at": "2026-11-22T11:31:41.740Z"
+    },
+    {
+      "id": "usr_6e6c1fe181a04ea78e965a55eb70e93f",
+      "full_name": "amber",
+      "email": "amberpriyadarshi0@gmail.com",
+      "password_hash": "d2ad8ec61f85145e8a07e5573bc1e96870829dc64acf17a2b97102f6e06a9beee898bfccdee2a6d64ce8584ccef79d44b13518a846d6d5a40e262c08bd6dee25",
+      "salt": "189a3bcdc8673ab032541eca3b3448a1",
+      "role": "user",
+      "created_at": "2026-11-22T11:35:10.127Z",
+      "updated_at": "2026-11-22T11:35:10.127Z"
+    },
+    {
+      "id": "usr_26ec2f67c08548fdb9e7931fd02837e4",
+      "full_name": "Amber Priyadarshi",
+      "email": "amberpriyadarshi75@gmail.com",
+      "password_hash": "1e42e46f3c61ed95be183a0332d37dc9ff22ddc4806d2e04a5c9bc75025e9edd80dd19e4a7f550a917584e539f4ec8fc7b05dc47ef981fb489e1e968ca6a924e",
+      "salt": "4da4e0c7a15e378c9d61551659847161",
+      "role": "user",
+      "created_at": "2026-11-22T12:20:35.744Z",
+      "updated_at": "2026-11-22T12:20:35.744Z"
     }
   ]
 }

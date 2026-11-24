@@ -446,20 +446,40 @@ export function CategoryDirectoryClient({
                           </div>
                         </div>
 
-                        {/* Subcategories (Revealed below parent with indentation) */}
+                        {/* Subcategories & Sub-subcategories (Revealed below parent with indentation) */}
                         {hasSubs && isExpanded && (
                           <div className="bg-[#FFFDF7] px-6 sm:px-12 py-3 border-t border-[#E8DCC8]/70">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                              {subcats.map((sub) => (
-                                <Link
-                                  key={sub.id}
-                                  href={`/shop?category=${sub.slug}`}
-                                  className="flex items-center justify-between py-2 px-3 rounded-xl hover:bg-white text-xs sm:text-sm font-semibold text-[#3B2416] hover:text-[#C8891A] transition-all group"
-                                >
-                                  <span className="truncate">{sub.name}</span>
-                                  <ChevronRight className="h-3.5 w-3.5 text-[#C8891A] group-hover:translate-x-0.5 transition-transform shrink-0" />
-                                </Link>
-                              ))}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              {subcats.map((sub) => {
+                                const subSubs = getSubcategories(sub.id);
+                                return (
+                                  <div
+                                    key={sub.id}
+                                    className="flex flex-col p-2.5 rounded-xl bg-white/70 border border-[#E8DCC8]/60"
+                                  >
+                                    <Link
+                                      href={`/shop?category=${sub.slug}`}
+                                      className="flex items-center justify-between text-xs sm:text-sm font-bold text-[#3B2416] hover:text-[#C8891A] transition-all group"
+                                    >
+                                      <span className="truncate">{sub.name}</span>
+                                      <ChevronRight className="h-3.5 w-3.5 text-[#C8891A] group-hover:translate-x-0.5 transition-transform shrink-0" />
+                                    </Link>
+                                    {subSubs.length > 0 && (
+                                      <div className="flex flex-wrap gap-1.5 mt-2 pt-1.5 border-t border-[#E8DCC8]/40">
+                                        {subSubs.map((ssc) => (
+                                          <Link
+                                            key={ssc.id}
+                                            href={`/shop?category=${ssc.slug}`}
+                                            className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-[#F8F1E3] text-[#806B57] hover:bg-[#C8891A] hover:text-white transition-colors"
+                                          >
+                                            {ssc.name}
+                                          </Link>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
                             </div>
                           </div>
                         )}

@@ -9,11 +9,19 @@ interface ProductCardProps {
 }
 
 export function ProductCard({ product, priority = false }: ProductCardProps) {
+  const effectiveBasePrice = Number(product.base_price ?? (product as any).price ?? 0);
+  const effectiveComparePrice =
+    product.compare_at_price !== undefined && product.compare_at_price !== null
+      ? Number(product.compare_at_price)
+      : (product as any).compare_price !== undefined && (product as any).compare_price !== null
+      ? Number((product as any).compare_price)
+      : null;
+
   const discountPercent =
-    product.compare_at_price && product.compare_at_price > product.base_price
+    effectiveComparePrice && effectiveComparePrice > effectiveBasePrice
       ? Math.round(
-          ((product.compare_at_price - product.base_price) /
-            product.compare_at_price) *
+          ((effectiveComparePrice - effectiveBasePrice) /
+            effectiveComparePrice) *
             100
         )
       : null;
@@ -22,19 +30,27 @@ export function ProductCard({ product, priority = false }: ProductCardProps) {
     style: "currency",
     currency: "INR",
     maximumFractionDigits: 0,
-  }).format(product.base_price);
+  }).format(effectiveBasePrice);
 
-  const formattedComparePrice = product.compare_at_price
+  const formattedComparePrice = effectiveComparePrice
     ? new Intl.NumberFormat("en-IN", {
         style: "currency",
         currency: "INR",
         maximumFractionDigits: 0,
-      }).format(product.compare_at_price)
+      }).format(effectiveComparePrice)
     : null;
 
-  const isLowStock =
-    product.stock_quantity > 0 && product.stock_quantity <= 5;
-  const isOutOfStock = product.stock_quantity <= 0;
+  const stockQty = Number(product.stock_quantity ?? (product as any).stock ?? 0);
+  const isLowStock = stockQty > 0 && stockQty <= 5;
+  const isOutOfStock = stockQty <= 0;
+
+  const displayImageUrl =
+    product.image_url ||
+    (product as any).images?.find((img: any) => img.is_primary)?.image_url ||
+    (product as any).images?.find((img: any) => img.is_primary)?.url ||
+    (product as any).images?.[0]?.image_url ||
+    (product as any).images?.[0]?.url ||
+    null;
 
   return (
     <div className="group relative flex flex-col rounded-2xl border border-border/70 bg-card text-card-foreground shadow-xs hover:shadow-xl transition-all duration-300 hover:-translate-y-1 overflow-hidden">
@@ -45,13 +61,18 @@ export function ProductCard({ product, priority = false }: ProductCardProps) {
           className="block h-full w-full"
           tabIndex={-1}
         >
-          {product.image_url ? (
+          {displayImageUrl ? (
             <Image
-              src={product.image_url}
+              src={displayImageUrl}
               alt={product.name}
               fill
               sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
               priority={priority}
+              unoptimized={
+                displayImageUrl.startsWith("http") ||
+                displayImageUrl.startsWith("blob:") ||
+                displayImageUrl.startsWith("data:")
+              }
               className="object-cover object-center transition-transform duration-500 ease-out group-hover:scale-105"
             />
           ) : (
@@ -78,7 +99,7 @@ export function ProductCard({ product, priority = false }: ProductCardProps) {
         {/* Stock status badge */}
         {isLowStock && (
           <span className="absolute bottom-3 left-3 rounded-md bg-amber-100 text-amber-900 dark:bg-amber-950/80 dark:text-amber-200 px-2 py-0.5 text-[10px] font-medium backdrop-blur-xs border border-amber-300/50">
-            Only {product.stock_quantity} left
+            Only {stockQty} left
           </span>
         )}
         {isOutOfStock && (

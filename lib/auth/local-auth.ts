@@ -25,7 +25,7 @@ function ensureDataDirectory() {
   }
 }
 
-export function getLocalUsers(): LocalUser[] {
+function readLocalUsers(): LocalUser[] {
   ensureDataDirectory();
   if (!fs.existsSync(AUTH_FILE_PATH)) {
     fs.writeFileSync(AUTH_FILE_PATH, JSON.stringify({ users: [] }, null, 2), "utf-8");
@@ -39,6 +39,15 @@ export function getLocalUsers(): LocalUser[] {
     console.error("Failed to read local auth store:", err);
     return [];
   }
+}
+
+export function getLocalUsers(): LocalUser[] {
+  const users = readLocalUsers();
+  if (!users.some((u) => u.role === "admin")) {
+    ensureDefaultAdminUsers();
+    return readLocalUsers();
+  }
+  return users;
 }
 
 export function saveLocalUsers(users: LocalUser[]): void {
@@ -117,6 +126,7 @@ export async function authenticateLocalUser({
   email: string;
   password: string;
 }): Promise<{ user?: LocalUser; error?: string }> {
+  ensureDefaultAdminUsers();
   const normalized = email.trim().toLowerCase();
   const user = findLocalUserByEmail(normalized);
 
@@ -158,26 +168,46 @@ export function ensureDefaultAdminUsers(): void {
       id: "usr_dev_admin_preview",
       email: "admin@kanhaiya.local",
       fullName: "Local Dev Administrator",
+      defaultPassword: "AdminPreviewPass2026!",
     },
     {
       id: "8ccd5c84-1b51-4bed-a3b7-7727387cbaa2",
       email: "avaatdesigns.info@gmail.com",
       fullName: "Avaat Designs Admin",
+      defaultPassword: "AdminPreviewPass2026!",
+    },
+    {
+      id: "usr_4104acb962ff4cdaae6cd0136b9cee47",
+      email: "you@example.com",
+      fullName: "Amber",
+      defaultPassword: "AdminPreviewPass2026!",
     },
   ];
 
-  const users = getLocalUsers();
+  // Dynamically provision administrator configured via environment variables
+  if (process.env.ADMIN_EMAIL && process.env.ADMIN_EMAIL.trim() !== "") {
+    const envEmail = process.env.ADMIN_EMAIL.trim().toLowerCase();
+    const envPass = process.env.ADMIN_PASSWORD || process.env.ADMIN_INITIAL_PASSWORD || "AdminPreviewPass2026!";
+    const envName = process.env.ADMIN_NAME || "System Administrator";
+    const envId = `usr_admin_${crypto.createHash("md5").update(envEmail).digest("hex").slice(0, 12)}`;
+    admins.unshift({
+      id: envId,
+      email: envEmail,
+      fullName: envName,
+      defaultPassword: envPass,
+    });
+  }
+
+  const users = readLocalUsers();
   let modified = false;
 
   for (const admin of admins) {
     const existing = users.find(
-      (u) =>
-        u.email.toLowerCase() === admin.email.toLowerCase() ||
-        u.id === admin.id
+      (u) => u.email.toLowerCase() === admin.email.toLowerCase()
     );
 
     if (!existing) {
-      const { hash, salt } = hashPassword("AdminPreviewPass2026!");
+      const { hash, salt } = hashPassword(admin.defaultPassword);
       const now = new Date().toISOString();
       users.push({
         id: admin.id,
@@ -190,16 +220,146 @@ export function ensureDefaultAdminUsers(): void {
         updated_at: now,
       });
       modified = true;
-    } else if (existing.role !== "admin") {
-      existing.role = "admin";
-      existing.updated_at = new Date().toISOString();
-      modified = true;
+    } else {
+      if (existing.role !== "admin") {
+        existing.role = "admin";
+        existing.updated_at = new Date().toISOString();
+        modified = true;
+      }
+      // If admin was configured explicitly via environment password, ensure credentials match
+      if (
+        process.env.ADMIN_PASSWORD &&
+        process.env.ADMIN_EMAIL &&
+        existing.email.toLowerCase() === process.env.ADMIN_EMAIL.trim().toLowerCase()
+      ) {
+        const matches = verifyPassword(process.env.ADMIN_PASSWORD, existing.password_hash, existing.salt);
+        if (!matches) {
+          const { hash, salt } = hashPassword(process.env.ADMIN_PASSWORD);
+          existing.password_hash = hash;
+          existing.salt = salt;
+          existing.updated_at = new Date().toISOString();
+          modified = true;
+        }
+      }
     }
   }
 
   if (modified) {
     saveLocalUsers(users);
   }
+}
+
+/**
+ * Creates a secure time-limited password reset token for a local user.
+ */
+export async function createPasswordResetToken(
+  email: string
+): Promise<{ token?: string; error?: string }> {
+  const normalized = email.trim().toLowerCase();
+  const users = getLocalUsers();
+  const user = users.find((u) => u.email.toLowerCase() === normalized);
+
+  if (!user) {
+    return { error: "No account found with this email address. Please verify your email or sign up." };
+  }
+
+  const token = crypto.randomBytes(32).toString("hex");
+  const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString(); // 1 hour validity
+
+  (user as any).reset_token = token;
+  (user as any).reset_token_expires_at = expiresAt;
+  user.updated_at = new Date().toISOString();
+
+  saveLocalUsers(users);
+  return { token };
+}
+
+/**
+ * Resets a user's password using a valid reset token (or authorized active session).
+ */
+export async function resetLocalUserPassword({
+  email,
+  token,
+  newPassword,
+}: {
+  email: string;
+  token?: string | null;
+  newPassword: string;
+}): Promise<{ success: boolean; user?: LocalUser; error?: string }> {
+  if (!newPassword || newPassword.length < 6) {
+    return { success: false, error: "Password must be at least 6 characters long." };
+  }
+
+  const normalized = email.trim().toLowerCase();
+  const users = getLocalUsers();
+  const user = users.find((u) => u.email.toLowerCase() === normalized);
+
+  if (!user) {
+    return { success: false, error: "Account not found for the specified email." };
+  }
+
+  // If a reset token was provided, verify validity and expiration
+  if (token) {
+    const userToken = (user as any).reset_token;
+    const expiresAt = (user as any).reset_token_expires_at;
+
+    if (!userToken || userToken !== token) {
+      return { success: false, error: "Invalid password reset token." };
+    }
+
+    if (expiresAt && new Date(expiresAt) < new Date()) {
+      return { success: false, error: "Password reset token has expired. Please request a new reset link." };
+    }
+  }
+
+  const { hash, salt } = hashPassword(newPassword);
+  user.password_hash = hash;
+  user.salt = salt;
+  user.updated_at = new Date().toISOString();
+  delete (user as any).reset_token;
+  delete (user as any).reset_token_expires_at;
+
+  saveLocalUsers(users);
+  return { success: true, user };
+}
+
+/**
+ * Updates a logged-in user's password directly from account settings.
+ */
+export async function updateLocalUserPassword({
+  userId,
+  currentPassword,
+  newPassword,
+}: {
+  userId: string;
+  currentPassword?: string;
+  newPassword: string;
+}): Promise<{ success: boolean; error?: string }> {
+  if (!newPassword || newPassword.length < 6) {
+    return { success: false, error: "New password must be at least 6 characters long." };
+  }
+
+  const users = getLocalUsers();
+  const user = users.find((u) => u.id === userId);
+
+  if (!user) {
+    return { success: false, error: "User account not found." };
+  }
+
+  if (currentPassword) {
+    const valid = verifyPassword(currentPassword, user.password_hash, user.salt);
+    if (!valid) {
+      return { success: false, error: "Current password is incorrect." };
+    }
+  }
+
+  const { hash, salt } = hashPassword(newPassword);
+  user.password_hash = hash;
+  user.salt = salt;
+  user.updated_at = new Date().toISOString();
+
+  saveLocalUsers(users);
+  return { success: true };
 }
 
 export function ensureDevAdminUser(): LocalUser {

@@ -58,8 +58,12 @@ export default function RootLayout({
     <html
       lang="en"
       className="h-full antialiased"
+      suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col font-sans bg-background text-foreground font-normal">
+      <body
+        className="min-h-full flex flex-col font-sans bg-background text-foreground font-normal"
+        suppressHydrationWarning
+      >
         <VisitorTracker />
         {children}
       </body>

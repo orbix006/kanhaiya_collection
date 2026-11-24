@@ -28,8 +28,19 @@ export default function ForgotPasswordPage() {
       )}
 
       {state?.success && (
-        <div className="p-3 text-sm rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400">
-          {state.success}
+        <div className="p-3 text-sm rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 space-y-3">
+          <p>{state.success}</p>
+          {(state as any)?.resetUrl && (
+            <div className="pt-2">
+              <Link
+                href={(state as any).resetUrl}
+                className="w-full inline-flex items-center justify-center gap-2 py-2 px-4 rounded-lg bg-primary text-primary-foreground font-semibold text-xs hover:bg-primary/90 transition-colors shadow-xs"
+              >
+                <span>Proceed to Set New Password</span>
+                <KeyRound className="h-3.5 w-3.5" />
+              </Link>
+            </div>
+          )}
         </div>
       )}
 

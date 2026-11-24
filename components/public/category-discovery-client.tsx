@@ -365,24 +365,66 @@ export function CategoryDiscoveryClient({
                         )}
                       </div>
 
-                      {/* Subcategories */}
+                      {/* Subcategories & Sub-subcategories */}
                       {hasSubs && isExpanded && (
-                        <div className="pl-4 py-1 flex flex-col space-y-0.5 border-l-2 border-[#E8DCC8] ml-3 my-0.5">
+                        <div className="pl-3.5 py-1 flex flex-col space-y-0.5 border-l-2 border-[#E8DCC8] ml-3 my-0.5">
                           {subcats.map((sub) => {
                             const isSubSelected = selectedCategorySlug === sub.slug;
+                            const subSubcats = getSubcategories(sub.id);
+                            const hasSubSubs = subSubcats.length > 0;
+                            const isSubExpanded = Boolean(sidebarExpanded[sub.id]);
+
                             return (
-                              <button
-                                key={sub.id}
-                                type="button"
-                                onClick={() => handleSelectCategory(sub.slug)}
-                                className={`text-left py-1 px-2 rounded-lg text-[11px] font-medium transition-colors truncate cursor-pointer ${
-                                  isSubSelected
-                                    ? "bg-[#C8891A] text-white font-semibold"
-                                    : "text-[#806B57] hover:text-[#C8891A] hover:bg-[#F8F1E3]"
-                                }`}
-                              >
-                                {sub.name}
-                              </button>
+                              <div key={sub.id} className="flex flex-col">
+                                <div className="flex items-center justify-between">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSelectCategory(sub.slug)}
+                                    className={`text-left py-1 px-2 rounded-lg text-[11px] font-medium transition-colors truncate cursor-pointer flex-1 ${
+                                      isSubSelected
+                                        ? "bg-[#C8891A] text-white font-semibold"
+                                        : "text-[#806B57] hover:text-[#C8891A] hover:bg-[#F8F1E3]"
+                                    }`}
+                                  >
+                                    {sub.name}
+                                  </button>
+                                  {hasSubSubs && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => toggleSidebarExpand(sub.id, e)}
+                                      className="p-1 rounded text-[#806B57] hover:text-[#C8891A] cursor-pointer"
+                                      aria-label={isSubExpanded ? `Collapse ${sub.name}` : `Expand ${sub.name}`}
+                                    >
+                                      <ChevronDown
+                                        className={`h-3 w-3 transition-transform duration-200 ${
+                                          isSubExpanded ? "rotate-180 text-[#C8891A]" : ""
+                                        }`}
+                                      />
+                                    </button>
+                                  )}
+                                </div>
+                                {hasSubSubs && isSubExpanded && (
+                                  <div className="pl-3 py-0.5 flex flex-col space-y-0.5 border-l-2 border-[#E8DCC8]/70 ml-2 my-0.5">
+                                    {subSubcats.map((ssc) => {
+                                      const isSscSelected = selectedCategorySlug === ssc.slug;
+                                      return (
+                                        <button
+                                          key={ssc.id}
+                                          type="button"
+                                          onClick={() => handleSelectCategory(ssc.slug)}
+                                          className={`text-left py-1 px-2 rounded-lg text-[10px] font-medium transition-colors truncate cursor-pointer ${
+                                            isSscSelected
+                                              ? "bg-[#C8891A] text-white font-semibold"
+                                              : "text-[#806B57] hover:text-[#C8891A] hover:bg-[#F8F1E3]"
+                                          }`}
+                                        >
+                                          • {ssc.name}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </div>
                             );
                           })}
                         </div>
@@ -638,20 +680,64 @@ export function CategoryDiscoveryClient({
                   >
                     All Sacred Offerings
                   </button>
-                  {rootCategories.map((c) => (
-                    <button
-                      key={c.id}
-                      type="button"
-                      onClick={() => handleSelectCategory(c.slug)}
-                      className={`w-full text-left py-1.5 px-2 rounded-lg text-xs font-semibold ${
-                        selectedCategorySlug === c.slug
-                          ? "bg-[#C8891A] text-white"
-                          : "text-[#3B2416] hover:bg-[#F8F1E3]"
-                      }`}
-                    >
-                      {c.name}
-                    </button>
-                  ))}
+                  {rootCategories.map((c) => {
+                    const subcats = getSubcategories(c.id);
+                    return (
+                      <div key={c.id} className="flex flex-col space-y-0.5">
+                        <button
+                          type="button"
+                          onClick={() => handleSelectCategory(c.slug)}
+                          className={`w-full text-left py-1.5 px-2 rounded-lg text-xs font-semibold ${
+                            selectedCategorySlug === c.slug
+                              ? "bg-[#C8891A] text-white"
+                              : "text-[#3B2416] hover:bg-[#F8F1E3]"
+                          }`}
+                        >
+                          {c.name}
+                        </button>
+                        {subcats.length > 0 && (
+                          <div className="pl-3 flex flex-col space-y-0.5 border-l border-[#E8DCC8] ml-2">
+                            {subcats.map((sub) => {
+                              const subSubs = getSubcategories(sub.id);
+                              return (
+                                <div key={sub.id} className="flex flex-col space-y-0.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSelectCategory(sub.slug)}
+                                    className={`w-full text-left py-1 px-2 rounded-lg text-[11px] font-medium ${
+                                      selectedCategorySlug === sub.slug
+                                        ? "bg-[#C8891A] text-white"
+                                        : "text-[#806B57] hover:bg-[#F8F1E3]"
+                                    }`}
+                                  >
+                                    {sub.name}
+                                  </button>
+                                  {subSubs.length > 0 && (
+                                    <div className="pl-2.5 flex flex-col space-y-0.5 border-l border-[#E8DCC8]/60 ml-2">
+                                      {subSubs.map((ssc) => (
+                                        <button
+                                          key={ssc.id}
+                                          type="button"
+                                          onClick={() => handleSelectCategory(ssc.slug)}
+                                          className={`w-full text-left py-0.5 px-2 rounded-lg text-[10px] ${
+                                            selectedCategorySlug === ssc.slug
+                                              ? "bg-[#C8891A] text-white"
+                                              : "text-[#806B57]/90 hover:bg-[#F8F1E3]"
+                                          }`}
+                                        >
+                                          • {ssc.name}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 

@@ -69,16 +69,9 @@ export function ProductDeleteModal({
         return;
       }
 
-      // Backend confirmed deletion or archival
-      if (res.archived) {
-        archiveProductInStore(product.id, true);
-        setIsProcessing(false);
-        onSuccess(product.id, "archive");
-      } else {
-        deleteProductFromStore(product.id);
-        setIsProcessing(false);
-        onSuccess(product.id, "delete");
-      }
+      deleteProductFromStore(product.id);
+      setIsProcessing(false);
+      onSuccess(product.id, "delete");
       onClose();
     } catch (err: any) {
       setIsProcessing(false);

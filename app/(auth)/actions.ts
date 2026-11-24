@@ -163,17 +163,13 @@ export async function loginAction(prevState: any, formData: FormData) {
       // Fetch authoritative database record from public.profiles
       const { data: profile, error: profileError } = await supabase
         .from("profiles")
-        .select("id, full_name, email, role")
+        .select("id, full_name, role, avatar_url")
         .eq("id", data.user.id)
         .single();
 
       if (profileError) {
         console.error("Profile fetch failed:", profileError);
       }
-
-      console.log("Authenticated user ID:", data.user?.id);
-      console.log("Database profile:", profile);
-      console.log("Database role:", profile?.role);
 
       const isAdmin = isUserAdmin(data.user, profile);
 
@@ -250,31 +246,47 @@ export async function forgotPasswordAction(prevState: any, formData: FormData) {
   if (isSupabaseConfigured()) {
     try {
       const supabase = await createClient();
-      const origin = typeof window !== "undefined" ? window.location.origin : "http://localhost:3000";
+      const origin =
+        process.env.NEXT_PUBLIC_SITE_URL ||
+        (typeof window !== "undefined" ? window.location.origin : "http://localhost:3000");
 
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${origin}/reset-password`,
+        redirectTo: `${origin}/auth/callback?next=/reset-password`,
       });
 
       if (error) {
         return { error: error.message };
       }
 
-      return { success: "Password reset instructions have been sent to your email." };
+      return {
+        success:
+          "Password reset instructions have been sent to your email. Please check your inbox and click the link to proceed.",
+      };
     } catch {
       return { error: "Unable to reach the authentication service. Please try again later." };
     }
   }
 
+  // Local Development Mode
+  const { createPasswordResetToken } = await import("@/lib/auth/local-auth");
+  const result = await createPasswordResetToken(email);
+
+  if (result.error) {
+    return { error: result.error };
+  }
+
   return {
     success:
-      "In local development mode, password changes can be administered using the local scripts or direct credentials.",
+      "Password reset link generated. In local development mode, use the link below to set your new password:",
+    resetUrl: `/reset-password?email=${encodeURIComponent(email)}&token=${result.token}`,
   };
 }
 
 export async function resetPasswordAction(prevState: any, formData: FormData) {
   const password = formData.get("password") as string;
   const confirmPassword = formData.get("confirmPassword") as string;
+  const email = (formData.get("email") as string)?.trim().toLowerCase();
+  const token = (formData.get("token") as string)?.trim();
 
   if (!password || !confirmPassword) {
     return { error: "Please fill in all fields." };
@@ -285,7 +297,7 @@ export async function resetPasswordAction(prevState: any, formData: FormData) {
   }
 
   if (password !== confirmPassword) {
-    return { error: "Passwords do not match." };
+    return { error: "Passwords do not match. Please re-enter your new password." };
   }
 
   if (isSupabaseConfigured()) {
@@ -300,11 +312,50 @@ export async function resetPasswordAction(prevState: any, formData: FormData) {
       }
 
       revalidatePath("/", "layout");
-      return { success: "Your password has been reset successfully." };
+      return { success: "Your password has been updated successfully! You can now log in." };
     } catch {
       return { error: "Unable to reach the authentication service. Please try again later." };
     }
   }
 
-  return { success: "Password updated successfully." };
+  // Local Development Mode
+  const { resetLocalUserPassword, getLocalSession, setSessionCookie } = await import(
+    "@/lib/auth/local-auth"
+  );
+
+  let targetEmail = email;
+  let resetToken = token || null;
+
+  if (!targetEmail) {
+    const session = await getLocalSession();
+    if (session) {
+      targetEmail = session.email;
+      resetToken = null;
+    }
+  }
+
+  if (!targetEmail) {
+    return {
+      error:
+        "Email address is required to reset your password. Please provide your email or use the reset link.",
+    };
+  }
+
+  const result = await resetLocalUserPassword({
+    email: targetEmail,
+    token: resetToken,
+    newPassword: password,
+  });
+
+  if (!result.success || !result.user) {
+    return { error: result.error || "Failed to update password." };
+  }
+
+  await setSessionCookie(result.user);
+  revalidatePath("/", "layout");
+
+  return {
+    success:
+      "Your password has been updated successfully! Your account is now active with the new password.",
+  };
 }

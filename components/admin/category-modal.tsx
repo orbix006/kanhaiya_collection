@@ -18,6 +18,10 @@ import {
 import {
   generateSlug,
   getDescendantCategoryIds,
+  getCategoryDepth,
+  getCategoryHeight,
+  isSafeParent,
+  getCategoryPathLabel,
 } from "@/lib/data/categories";
 import { upsertCategoryInStore } from "@/lib/mock-data/admin-store";
 import { saveCategoryAction, CategoryPayload } from "@/app/(admin)/admin/categories/actions";
@@ -80,18 +84,19 @@ export function CategoryModal({
 
   if (!isOpen) return null;
 
-  // Safe Parent Picker: Calculate disallowed IDs (cannot select itself or any descendants)
-  const disallowedParentIds: string[] = [];
-  if (categoryToEdit) {
-    disallowedParentIds.push(categoryToEdit.id);
-    const descendantIds = getDescendantCategoryIds(categoryToEdit.id, allCategories);
-    disallowedParentIds.push(...descendantIds);
-  }
-
-  // Available parent options (Only root categories can be parents; max 2 levels)
-  const parentOptions = allCategories.filter(
-    (cat) => !disallowedParentIds.includes(cat.id) && !cat.parent_id
-  );
+  // Safe Parent Picker: Calculate eligible parents for 3-level categories (Category → Subcategory → Sub-subcategory)
+  const parentOptions = allCategories
+    .filter((cat) => {
+      const safety = isSafeParent(categoryToEdit?.id, cat.id, allCategories);
+      return safety.safe;
+    })
+    .sort((a, b) => {
+      // Sort parents hierarchically
+      const depthA = getCategoryDepth(a.id, allCategories);
+      const depthB = getCategoryDepth(b.id, allCategories);
+      if (depthA !== depthB) return depthA - depthB;
+      return a.display_order - b.display_order;
+    });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -104,13 +109,14 @@ export function CategoryModal({
     // Auto-generate safe slug
     const finalSlug = categoryToEdit?.slug || generateSlug(trimmedName) || `category-${Date.now()}`;
 
-    // Schema constraint check: prevent duplicate lower(name) under the same parent
+    // Hierarchy-aware constraint check: prevent duplicate name or slug under the SAME parent
     const targetParentId = parentId.trim() ? parentId : null;
     const duplicateName = allCategories.find((c) => {
       const sameParent = (c.parent_id || null) === targetParentId;
       const sameName = c.name.toLowerCase() === trimmedName.toLowerCase();
+      const sameSlug = c.slug.toLowerCase() === finalSlug.toLowerCase();
       const notCurrent = c.id !== categoryToEdit?.id;
-      return sameParent && sameName && notCurrent;
+      return sameParent && (sameName || sameSlug) && notCurrent;
     });
 
     if (duplicateName) {
@@ -229,21 +235,26 @@ export function CategoryModal({
             />
           </FormField>
 
-          {/* 2. Parent Category (Dropdown: None or existing categories) */}
+          {/* 2. Parent Category (Dropdown: None or existing categories up to Level 2) */}
           <FormField
             label="2. Parent Category"
-            helperText="Select 'None' for main/parent category, or choose an existing parent category to create a subcategory."
+            helperText="Select 'None' for root category, choose a root category to create a subcategory, or choose a subcategory to create a sub-subcategory (3 levels max)."
           >
             <FormSelect
               value={parentId}
               onChange={(e) => setParentId(e.target.value)}
             >
-              <option value="">None (Main / Parent Category)</option>
-              {parentOptions.map((cat) => (
-                <option key={cat.id} value={cat.id}>
-                  {cat.name}
-                </option>
-              ))}
+              <option value="">None (Top-Level Root Category)</option>
+              {parentOptions.map((cat) => {
+                const depth = getCategoryDepth(cat.id, allCategories);
+                const prefix = depth === 0 ? "📁 Category: " : "  └ 📂 Subcategory: ";
+                const label = getCategoryPathLabel(cat.id, allCategories);
+                return (
+                  <option key={cat.id} value={cat.id}>
+                    {prefix} {label}
+                  </option>
+                );
+              })}
             </FormSelect>
           </FormField>
 

@@ -28,7 +28,7 @@ export default async function PublicLayout({
         // Query authoritative database record from public.profiles
         const { data: profileData, error: profileError } = await supabase
           .from("profiles")
-          .select("id, full_name, email, role")
+          .select("id, full_name, role")
           .eq("id", supabaseUser.id)
           .single();
 
@@ -43,7 +43,7 @@ export default async function PublicLayout({
         const role = profileData?.role || "user";
         user = {
           id: supabaseUser.id,
-          email: profileData?.email || supabaseUser.email,
+          email: supabaseUser.email || (profileData as any)?.email || "",
           role,
         };
         profile = {

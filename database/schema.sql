@@ -607,6 +607,7 @@ create type public.site_policy_type as enum ('privacy','terms','shipping','retur
 -- ============================================================================
 create table public.profiles (
   id          uuid primary key references auth.users(id) on delete cascade,
+  email       text,
   full_name   text,
   avatar_url  text,
   phone       text,
@@ -614,6 +615,7 @@ create table public.profiles (
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now()
 );
+create index if not exists idx_profiles_email on public.profiles(email);
 comment on table public.profiles is 'Extends auth.users. role drives admin-panel access — only 2 roles exist: admin, user.';
 
 
@@ -624,7 +626,7 @@ create table public.categories (
   id                uuid primary key default gen_random_uuid(),
   parent_id         uuid references public.categories(id) on delete cascade,
   name              text not null,
-  slug              text not null unique,
+  slug              text not null,
   description       text,
   image_url         text,
   display_order     int not null default 0,
@@ -635,6 +637,10 @@ create table public.categories (
 );
 create index idx_categories_parent on public.categories(parent_id);
 create index idx_categories_slug   on public.categories(slug);
+create unique index categories_unique_slug_per_parent
+  on public.categories (coalesce(parent_id, '00000000-0000-0000-0000-000000000000'::uuid), lower(slug));
+create unique index categories_unique_name_per_parent
+  on public.categories (coalesce(parent_id, '00000000-0000-0000-0000-000000000000'::uuid), lower(name));
 comment on table public.categories is 'Self-referencing: parent_id null = top category. Supports unlimited depth (category > subcategory > sub-subcategory).';
 
 
@@ -946,13 +952,18 @@ security definer
 set search_path = public
 as $$
 begin
-  insert into public.profiles (id, full_name, avatar_url, role)
+  insert into public.profiles (id, full_name, avatar_url, role, email)
   values (
     new.id,
     new.raw_user_meta_data ->> 'full_name',
     new.raw_user_meta_data ->> 'avatar_url',
-    'user'
-  );
+    'user',
+    new.email
+  )
+  on conflict (id) do update
+  set email = coalesce(excluded.email, public.profiles.email),
+      full_name = coalesce(excluded.full_name, public.profiles.full_name),
+      updated_at = now();
   return new;
 end;
 $$;

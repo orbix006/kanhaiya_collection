@@ -145,53 +145,124 @@ export function saveLocalStoreData(data: StoreData): void {
 // -----------------------------------------------------------------------------
 
 export async function getActiveBanners(): Promise<Banner[]> {
-  const supabase = await createClient();
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 
-  if (supabaseUrl) {
+  if (supabaseUrl && supabaseUrl !== "https://placeholder-project.supabase.co") {
     try {
+      const supabase = await createClient();
       const { data, error } = await supabase
-        .from("banners")
+        .from("hero_banners")
         .select("*")
         .eq("is_active", true)
         .order("display_order", { ascending: true });
 
       if (!error && data && data.length > 0) {
         return data.map((b: any) => ({
-          id: b.id,
-          title: b.title || "Kanhaiya Collection",
-          subtitle: b.description || b.subtitle || "",
-          cta_text: b.cta_text || "Shop Now",
-          cta_link: b.link_url || "/shop",
-          image_url: b.image_url || "/images/hero-flute.jpg",
-          is_active: b.is_active,
-          display_order: b.display_order,
-          start_date: b.start_date || null,
-          end_date: b.end_date || null,
+          id: String(b.id),
+          title: b.title || null,
+          subtitle: b.description || b.subtitle || null,
+          cta_text: b.cta_text || null,
+          cta_link: b.link_url || null,
+          link_url: b.link_url || null,
+          image_url: b.image_url || "",
+          mobile_image_url: b.mobile_image_url || null,
+          image_path: b.image_path || null,
+          is_active: Boolean(b.is_active),
+          display_order: Number(b.display_order) || 0,
           created_at: b.created_at,
           updated_at: b.updated_at,
         }));
       }
-    } catch {
-      // Fallback below
+    } catch (err) {
+      console.warn("[getActiveBanners] Error fetching hero_banners from Supabase:", err);
     }
   }
 
+  // Fallback 1: load from mock-data admin store
+  try {
+    const { loadMockBanners } = await import("@/lib/mock-data/admin-store");
+    const mockBanners = loadMockBanners().filter((b) => b.is_active);
+    if (mockBanners.length > 0) {
+      return mockBanners.map((b: any) => ({
+        id: String(b.id),
+        title: b.title || null,
+        subtitle: b.subtitle || null,
+        cta_text: b.cta_text || null,
+        cta_link: b.link_url || null,
+        link_url: b.link_url || null,
+        image_url: b.image_url || "",
+        mobile_image_url: b.mobile_image_url || null,
+        image_path: b.image_path || null,
+        is_active: Boolean(b.is_active),
+        display_order: Number(b.display_order) || 0,
+        created_at: b.created_at,
+        updated_at: b.updated_at,
+      }));
+    }
+  } catch { }
+
+  // Fallback 2: raw local store
   const store = getLocalStoreData();
-  const now = new Date().toISOString();
-  return store.banners
-    .filter((b) => {
-      if (!b.is_active) return false;
-      if (b.start_date && b.start_date > now) return false;
-      if (b.end_date && b.end_date < now) return false;
-      return true;
-    })
-    .sort((a, b) => a.display_order - b.display_order);
+  const rawList = store.banners || (store as any).hero_banners || [];
+  return rawList
+    .filter((b: any) => b.is_active)
+    .sort((a: any, b: any) => (a.display_order || 0) - (b.display_order || 0))
+    .map((b: any) => ({
+      id: String(b.id),
+      title: b.title || null,
+      subtitle: b.subtitle || null,
+      cta_text: b.cta_text || null,
+      cta_link: b.link_url || null,
+      link_url: b.link_url || null,
+      image_url: b.image_url || "",
+      mobile_image_url: b.mobile_image_url || null,
+      image_path: b.image_path || null,
+      is_active: Boolean(b.is_active),
+      display_order: Number(b.display_order) || 0,
+      created_at: b.created_at,
+      updated_at: b.updated_at,
+    }));
 }
 
 export async function getAllBanners(): Promise<Banner[]> {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (supabaseUrl && supabaseUrl !== "https://placeholder-project.supabase.co") {
+    try {
+      const supabase = await createClient();
+      const { data, error } = await supabase
+        .from("hero_banners")
+        .select("*")
+        .order("display_order", { ascending: true });
+
+      if (!error && data && data.length > 0) {
+        return data.map((b: any) => ({
+          id: String(b.id),
+          title: b.title || null,
+          subtitle: b.description || b.subtitle || null,
+          cta_text: b.cta_text || null,
+          cta_link: b.link_url || null,
+          link_url: b.link_url || null,
+          image_url: b.image_url || "",
+          mobile_image_url: b.mobile_image_url || null,
+          image_path: b.image_path || null,
+          is_active: Boolean(b.is_active),
+          display_order: Number(b.display_order) || 0,
+          created_at: b.created_at,
+          updated_at: b.updated_at,
+        }));
+      }
+    } catch { }
+  }
+
+  try {
+    const { loadMockBanners } = await import("@/lib/mock-data/admin-store");
+    const mockBanners = loadMockBanners();
+    if (mockBanners.length > 0) return mockBanners as any;
+  } catch { }
+
   const store = getLocalStoreData();
-  return store.banners.sort((a, b) => a.display_order - b.display_order);
+  const rawList = store.banners || (store as any).hero_banners || [];
+  return rawList.sort((a: any, b: any) => (a.display_order || 0) - (b.display_order || 0));
 }
 
 export function normalizeCategoryRow(row: any): Category {
@@ -240,7 +311,7 @@ export async function getActiveCategories(): Promise<Category[]> {
   const supabase = await createClient();
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 
-  if (supabaseUrl) {
+  if (supabaseUrl && supabaseUrl !== "https://placeholder-project.supabase.co") {
     try {
       const { data, error } = await supabase
         .from("categories")
@@ -248,104 +319,149 @@ export async function getActiveCategories(): Promise<Category[]> {
         .eq("is_active", true)
         .order("sort_order", { ascending: true });
 
-      if (!error && data) {
+      if (!error && data && data.length > 0) {
         return data.map(normalizeCategoryRow);
       }
     } catch {
-      return [];
+      // Fallback below
     }
   }
 
-  return [];
+  const store = getLocalStoreData();
+  return (store.categories || [])
+    .filter((c) => c.is_active)
+    .sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0))
+    .map(normalizeCategoryRow);
 }
 
 export async function getAllCategories(): Promise<Category[]> {
   const supabase = await createClient();
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 
-  if (supabaseUrl) {
+  if (supabaseUrl && supabaseUrl !== "https://placeholder-project.supabase.co") {
     try {
       const { data, error } = await supabase
         .from("categories")
         .select("*")
         .order("sort_order", { ascending: true });
 
-      if (!error && data) {
+      if (!error && data && data.length > 0) {
         return data.map(normalizeCategoryRow);
       }
     } catch {
-      return [];
+      // Fallback below
     }
   }
 
-  return [];
+  const store = getLocalStoreData();
+  return (store.categories || [])
+    .sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0))
+    .map(normalizeCategoryRow);
+}
+
+function normalizeStoreProduct(p: any): Product {
+  const rawImages = Array.isArray(p.images)
+    ? p.images
+    : Array.isArray(p.product_images)
+      ? p.product_images
+      : [];
+
+  const images = rawImages.map((img: any, idx: number) => ({
+    id: img.id ? String(img.id) : undefined,
+    image_url: img.url || img.image_url || "",
+    url: img.url || img.image_url || "",
+    storage_path: img.storage_path || null,
+    alt_text: img.alt_text || null,
+    display_order: Number(img.sort_order ?? img.display_order ?? idx + 1),
+    sort_order: Number(img.sort_order ?? img.display_order ?? idx + 1),
+    is_primary: Boolean(img.is_primary),
+  }));
+
+  const primaryImg =
+    images.find((img: any) => img.is_primary)?.image_url ||
+    images[0]?.image_url ||
+    p.image_url ||
+    "";
+
+  return {
+    id: String(p.id),
+    category_id: p.category_id || null,
+    name: p.name || p.product_name || "Sacred Item",
+    slug: p.slug || String(p.id),
+    description: p.description || null,
+    brand: p.brand || "Kanhaiya Collection",
+    base_price: Number(p.price ?? p.base_price ?? 0),
+    compare_at_price: p.compare_at_price || p.mrp ? Number(p.compare_at_price || p.mrp) : null,
+    stock_quantity: Number(p.stock ?? p.stock_quantity ?? 0),
+    sold_count: Number(p.sold_count || 0),
+    is_active: Boolean(p.is_active ?? true),
+    is_featured_top_seller: Boolean(p.is_featured_top_seller ?? false),
+    top_seller_display_order: p.top_seller_display_order ?? null,
+    image_url: primaryImg,
+    deleted_at: p.deleted_at || null,
+    created_at: p.created_at || new Date().toISOString(),
+    updated_at: p.updated_at || new Date().toISOString(),
+    sku: p.sku || null,
+    batch_number: p.batch_number || p.batch_no || null,
+    avg_rating: Number(p.avg_rating || 0),
+    review_count: Number(p.review_count || 0),
+    images: images,
+    variants: p.variants || p.product_variants || [],
+    category: p.category || null,
+  };
 }
 
 export async function getAllProducts(): Promise<Product[]> {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 
-  if (supabaseUrl) {
+  if (supabaseUrl && supabaseUrl !== "https://placeholder-project.supabase.co") {
     try {
       const supabase = await createClient();
       const { data, error } = await supabase
         .from("products")
         .select(`
-          *,
+          id,
+          category_id,
+          subcategory_id,
+          sub_subcategory_id,
+          name,
+          slug,
+          description,
+          sku,
+          price,
+          stock,
+          is_active,
+          created_at,
           product_images (
             id,
+            product_id,
             url,
-            image_url,
-            is_primary,
+            storage_path,
             sort_order,
-            display_order
+            is_primary
           )
         `)
         .order("created_at", { ascending: false });
 
-      if (!error && data) {
-        return data.map((p: any) => {
-          const sortedImgs = p.product_images
-            ? [...p.product_images].sort(
-                (a, b) => ((a.sort_order ?? a.display_order) || 0) - ((b.sort_order ?? b.display_order) || 0)
-              )
-            : [];
-          const primaryImg =
-            sortedImgs.find((img) => img.is_primary)?.url ||
-            sortedImgs.find((img) => img.is_primary)?.image_url ||
-            sortedImgs[0]?.url ||
-            sortedImgs[0]?.image_url ||
-            p.image_url ||
-            null;
-
-          return {
-            id: String(p.id),
-            category_id: p.category_id || null,
-            name: p.name || p.product_name || "Sacred Item",
-            slug: p.slug || String(p.id),
-            description: p.description || null,
-            brand: p.brand || "Kanhaiya Collection",
-            base_price: Number(p.price ?? p.base_price ?? 0),
-            compare_at_price: p.compare_at_price || p.mrp ? Number(p.compare_at_price || p.mrp) : null,
-            stock_quantity: Number(p.stock ?? p.stock_quantity ?? 0),
-            sold_count: Number(p.sold_count || 0),
-            is_active: Boolean(p.is_active ?? true),
-            is_featured_top_seller: Boolean(p.is_featured_top_seller ?? false),
-            top_seller_display_order: p.top_seller_display_order ?? null,
-            image_url: primaryImg || "",
-            created_at: p.created_at || new Date().toISOString(),
-            updated_at: p.updated_at || new Date().toISOString(),
-            sku: p.sku || null,
-            avg_rating: Number(p.avg_rating || 0),
-            review_count: Number(p.review_count || 0),
-          };
-        });
+      if (!error && data && data.length > 0) {
+        return data.map(normalizeStoreProduct);
       }
     } catch {
-      return [];
+      // Fallback below
     }
   }
 
-  return [];
+  // Fallback 1: load from mock-data admin store
+  try {
+    const { loadMockStore } = await import("@/lib/mock-data/admin-store");
+    const mockStore = loadMockStore();
+    if (mockStore?.products && mockStore.products.length > 0) {
+      return mockStore.products.filter((p: any) => !p.deleted_at).map(normalizeStoreProduct);
+    }
+  } catch { }
+
+  const store = getLocalStoreData();
+  return (store.products || []).filter((p: any) => !p.deleted_at).map(normalizeStoreProduct);
 }
 
 export async function getProductById(id: string): Promise<Product | null> {
@@ -357,64 +473,32 @@ export async function getProductById(id: string): Promise<Product | null> {
       const { data, error } = await supabase
         .from("products")
         .select(`
-          *,
+          id,
+          category_id,
+          subcategory_id,
+          sub_subcategory_id,
+          name,
+          slug,
+          description,
+          sku,
+          price,
+          stock,
+          is_active,
+          created_at,
           product_images (
             id,
-            image_url,
-            is_primary,
-            display_order
-          ),
-          product_variants (
-            id,
-            variant_name,
-            sku,
-            price,
-            compare_at_price,
-            stock_quantity,
-            image_url,
-            is_active,
-            attributes
+            product_id,
+            url,
+            storage_path,
+            sort_order,
+            is_primary
           )
         `)
         .eq("id", id)
         .maybeSingle();
 
       if (!error && data) {
-        const d = data as any;
-        const sortedImgs = d.product_images
-          ? [...d.product_images].sort(
-              (a: any, b: any) => (a.display_order || 0) - (b.display_order || 0)
-            )
-          : [];
-        const primaryImg =
-          sortedImgs.find((img: any) => img.is_primary)?.image_url ||
-          sortedImgs[0]?.image_url ||
-          d.image_url ||
-          null;
-
-        return {
-          id: String(d.id),
-          category_id: d.category_id || null,
-          name: d.product_name || d.name || "Sacred Item",
-          slug: d.slug || String(d.id),
-          description: d.description || null,
-          brand: d.brand || "Kanhaiya Collection",
-          base_price: Number(d.base_price || d.price || 0),
-          compare_at_price: d.compare_at_price || d.mrp ? Number(d.compare_at_price || d.mrp) : null,
-          stock_quantity: Number(d.stock_quantity ?? 0),
-          sold_count: Number(d.sold_count || 0),
-          is_active: Boolean(d.is_active ?? true),
-          is_featured_top_seller: Boolean(d.is_featured_top_seller ?? false),
-          top_seller_display_order: d.top_seller_display_order ?? null,
-          image_url: primaryImg || "",
-          created_at: d.created_at || new Date().toISOString(),
-          updated_at: d.updated_at || new Date().toISOString(),
-          sku: d.sku || null,
-          avg_rating: Number(d.avg_rating || 0),
-          review_count: Number(d.review_count || 0),
-          images: sortedImgs,
-          variants: d.product_variants || [],
-        };
+        return normalizeStoreProduct(data);
       }
     } catch {
       // Fallback
@@ -422,73 +506,54 @@ export async function getProductById(id: string): Promise<Product | null> {
   }
 
   const store = getLocalStoreData();
-  const prods = Array.isArray(store?.products) ? store.products : [];
+  let prods: any[] = Array.isArray(store?.products) ? store.products : [];
+  if (prods.length === 0) {
+    try {
+      const { loadMockStore } = await import("@/lib/mock-data/admin-store");
+      const mockStore = loadMockStore();
+      if (mockStore?.products) prods = mockStore.products;
+    } catch { }
+  }
   const p = prods.find((p) => p.id === id);
   if (!p) return null;
-  const primaryImg =
-    p.images?.find((img) => img.is_primary)?.image_url ||
-    p.images?.[0]?.image_url ||
-    p.image_url;
-  return {
-    ...p,
-    image_url: primaryImg || "",
-  };
+  return normalizeStoreProduct(p);
 }
 
 export async function getProductBySlug(slug: string): Promise<Product | null> {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 
-  if (supabaseUrl) {
+  if (supabaseUrl && supabaseUrl !== "https://placeholder-project.supabase.co") {
     try {
       const supabase = await createClient();
       const { data, error } = await supabase
         .from("products")
         .select(`
-          *,
+          id,
+          category_id,
+          subcategory_id,
+          sub_subcategory_id,
+          name,
+          slug,
+          description,
+          sku,
+          price,
+          stock,
+          is_active,
+          created_at,
           product_images (
             id,
-            image_url,
-            is_primary,
-            display_order
+            product_id,
+            url,
+            storage_path,
+            sort_order,
+            is_primary
           )
         `)
         .eq("slug", slug)
-        .single();
+        .maybeSingle();
 
       if (!error && data) {
-        const d = data as any;
-        const sortedImgs = d.product_images
-          ? [...d.product_images].sort(
-              (a: any, b: any) => (a.display_order || 0) - (b.display_order || 0)
-            )
-          : [];
-        const primaryImg =
-          sortedImgs.find((img: any) => img.is_primary)?.image_url ||
-          sortedImgs[0]?.image_url ||
-          d.image_url ||
-          null;
-
-        return {
-          id: String(d.id),
-          category_id: d.category_id || null,
-          name: d.product_name || d.name || "Sacred Item",
-          slug: d.slug || String(d.id),
-          description: d.description || null,
-          brand: d.brand || "Kanhaiya Collection",
-          base_price: Number(d.base_price || d.price || 0),
-          compare_at_price: d.compare_at_price || d.mrp ? Number(d.compare_at_price || d.mrp) : null,
-          stock_quantity: Number(d.stock_quantity ?? 0),
-          sold_count: Number(d.sold_count || 0),
-          is_active: Boolean(d.is_active ?? true),
-          is_featured_top_seller: Boolean(d.is_featured_top_seller ?? false),
-          top_seller_display_order: d.top_seller_display_order ?? null,
-          image_url: primaryImg || "",
-          created_at: d.created_at || new Date().toISOString(),
-          updated_at: d.updated_at || new Date().toISOString(),
-          sku: d.sku || null,
-          avg_rating: Number(d.avg_rating || 0),
-          review_count: Number(d.review_count || 0),
-        };
+        return normalizeStoreProduct(data);
       }
     } catch {
       // Fallback
@@ -496,17 +561,17 @@ export async function getProductBySlug(slug: string): Promise<Product | null> {
   }
 
   const store = getLocalStoreData();
-  const prods = Array.isArray(store?.products) ? store.products : [];
+  let prods: any[] = Array.isArray(store?.products) ? store.products : [];
+  if (prods.length === 0) {
+    try {
+      const { loadMockStore } = await import("@/lib/mock-data/admin-store");
+      const mockStore = loadMockStore();
+      if (mockStore?.products) prods = mockStore.products;
+    } catch { }
+  }
   const p = prods.find((p) => p.slug === slug && p.is_active);
   if (!p) return null;
-  const primaryImg =
-    p.images?.find((img) => img.is_primary)?.image_url ||
-    p.images?.[0]?.image_url ||
-    p.image_url;
-  return {
-    ...p,
-    image_url: primaryImg || "",
-  };
+  return normalizeStoreProduct(p);
 }
 
 export async function getProductsByIds(ids: string[]): Promise<Product[]> {
@@ -561,7 +626,7 @@ export async function getBestsellerProducts(limit = 10): Promise<Product[]> {
           if (result.length > 0) return result;
         }
       }
-    } catch {}
+    } catch { }
   }
 
   const store = getLocalStoreData();

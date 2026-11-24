@@ -23,7 +23,12 @@ import {
   ArrowDownToLine,
   Ban,
 } from "lucide-react";
-import { getDescendantCategoryIds } from "@/lib/data/categories";
+import {
+  getDescendantCategoryIds,
+  isSafeParent,
+  getCategoryDepth,
+  getCategoryHeight,
+} from "@/lib/data/categories";
 import type { CategoryTreeNode } from "@/lib/data/categories";
 import type { Category } from "@/lib/data/homepage";
 
@@ -70,22 +75,26 @@ export function CategoryTree({
   const [isOverRootZone, setIsOverRootZone] = useState(false);
 
   // Helper to determine if targetId is an invalid drop target:
-  // 1. Self or descendant
-  // 2. Maximum depth limit: schema only supports 2 levels (category > subcategory).
-  //    Target category cannot already have a parent (cannot nest inside a subcategory).
-  const isInvalidDropTarget = (targetId: string, currentDraggedId: string | null): boolean => {
+  // 1. Self or descendant (circular loop)
+  // 2. Maximum depth limit: schema supports 3 levels (Category → Subcategory → Sub-subcategory).
+  const isInvalidDropTarget = (
+    targetId: string,
+    currentDraggedId: string | null,
+    position: "before" | "after" | "inside" = "inside"
+  ): boolean => {
     if (!currentDraggedId) return false;
     if (targetId === currentDraggedId) return true;
-    const descendantIds = getDescendantCategoryIds(currentDraggedId, allCategories);
-    if (descendantIds.includes(targetId)) return true;
 
-    // Enforce 2-level hierarchy: a subcategory cannot become a parent
     const targetCat = allCategories.find((c) => c.id === targetId);
-    if (targetCat && targetCat.parent_id !== null) {
-      return true; // Target is already a subcategory, cannot nest inside it
-    }
+    if (!targetCat) return true;
 
-    return false;
+    // Prospective parent depends on drop position:
+    // If dropping "inside", the target category becomes the new parent.
+    // If dropping "before" or "after", the target's parent becomes the new parent (sibling drop).
+    const prospectiveParentId = position === "inside" ? targetId : targetCat.parent_id;
+
+    const safety = isSafeParent(currentDraggedId, prospectiveParentId, allCategories);
+    return !safety.safe;
   };
 
   const handleDragStart = (e: React.DragEvent, id: string) => {
@@ -109,8 +118,6 @@ export function CategoryTree({
       return;
     }
 
-    const invalid = isInvalidDropTarget(node.id, draggedId);
-
     const rect = e.currentTarget.getBoundingClientRect();
     const relY = (e.clientY - rect.top) / rect.height;
 
@@ -123,6 +130,7 @@ export function CategoryTree({
       position = "inside";
     }
 
+    const invalid = isInvalidDropTarget(node.id, draggedId, position);
     setDragOverTarget({ id: node.id, position, isInvalid: invalid });
   };
 
@@ -135,14 +143,13 @@ export function CategoryTree({
       return;
     }
 
-    const invalid = isInvalidDropTarget(node.id, draggedId);
+    const targetPos = dragOverTarget?.position || "inside";
+    const invalid = isInvalidDropTarget(node.id, draggedId, targetPos);
     if (invalid) {
       // Disallow invalid drop
       handleDragEnd();
       return;
     }
-
-    const targetPos = dragOverTarget?.position || "inside";
 
     if (targetPos === "inside") {
       onMoveCategory(draggedId, node.id, "inside", node.id);
@@ -180,13 +187,18 @@ export function CategoryTree({
       case 1:
         return (
           <span className="text-[10px] font-bold font-mono text-blue-600 bg-blue-500/10 px-1.5 py-0.5 rounded border border-blue-500/20 dark:text-blue-400">
-            Sub
+            Subcategory
           </span>
         );
       case 2:
-      default:
         return (
           <span className="text-[10px] font-bold font-mono text-purple-600 bg-purple-500/10 px-1.5 py-0.5 rounded border border-purple-500/20 dark:text-purple-400">
+            Sub-Subcategory
+          </span>
+        );
+      default:
+        return (
+          <span className="text-[10px] font-bold font-mono text-muted-foreground bg-muted px-1.5 py-0.5 rounded border border-border">
             Level {level + 1}
           </span>
         );
@@ -307,12 +319,14 @@ export function CategoryTree({
                     {isInvalid ? (
                       <>
                         <Ban className="h-3 w-3" />
-                        <span>Cannot nest in descendant</span>
+                        <span>Cannot exceed 3 levels or loop</span>
                       </>
                     ) : (
                       <>
                         <CornerDownRight className="h-3 w-3" />
-                        <span>Nest as Subcategory</span>
+                        <span>
+                          {node.level === 0 ? "Nest as Subcategory" : "Nest as Sub-Subcategory"}
+                        </span>
                       </>
                     )}
                   </span>
@@ -463,16 +477,31 @@ export function CategoryTree({
                 </button>
               )}
 
-              <button
-                type="button"
-                onClick={() => onAddSubcategory(node.id)}
-                title="Add subcategory inside this category"
-                aria-label={`Add subcategory inside ${node.name}`}
-                className="flex h-8 items-center gap-1 px-2 rounded-lg border border-border bg-card text-xs font-semibold text-muted-foreground hover:bg-primary/10 hover:text-primary hover:border-primary/30 transition-colors cursor-pointer"
-              >
-                <FolderPlus className="h-3.5 w-3.5" />
-                <span className="hidden md:inline text-[11px]">+ Sub</span>
-              </button>
+              {node.level < 2 ? (
+                <button
+                  type="button"
+                  onClick={() => onAddSubcategory(node.id)}
+                  title={
+                    node.level === 0
+                      ? "Add subcategory inside this root category"
+                      : "Add sub-subcategory inside this subcategory"
+                  }
+                  aria-label={`Add child inside ${node.name}`}
+                  className="flex h-8 items-center gap-1 px-2 rounded-lg border border-border bg-card text-xs font-semibold text-muted-foreground hover:bg-primary/10 hover:text-primary hover:border-primary/30 transition-colors cursor-pointer"
+                >
+                  <FolderPlus className="h-3.5 w-3.5" />
+                  <span className="hidden md:inline text-[11px]">
+                    {node.level === 0 ? "+ Sub" : "+ Sub-Sub"}
+                  </span>
+                </button>
+              ) : (
+                <span
+                  title="Maximum 3 category levels reached (Category > Subcategory > Sub-subcategory)"
+                  className="hidden md:inline-flex items-center text-[10px] font-mono text-muted-foreground/60 px-1.5 py-1 rounded bg-muted/30 border border-border/40"
+                >
+                  Max Level
+                </span>
+              )}
 
               <button
                 type="button"

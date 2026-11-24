@@ -18,6 +18,7 @@ import { ImageUploader, type UploadedImageItem } from "@/components/ui/image-upl
 import {
   generateSlug,
   getDescendantCategoryIds,
+  getCategoryDepth,
 } from "@/lib/data/categories";
 import {
   generateProductSku,
@@ -57,9 +58,10 @@ export function ProductModal({
   // 2. Images (Uploaded files with previews, reordering, removal, primary selection)
   const [uploadedImages, setUploadedImages] = useState<UploadedImageItem[]>([]);
 
-  // 3. Category & 4. Subcategory
+  // 3. Category, 4. Subcategory & 5. Sub-subcategory (3 levels)
   const [categoryId, setCategoryId] = useState<string>("");
   const [subcategoryId, setSubcategoryId] = useState<string>("");
+  const [subSubcategoryId, setSubSubcategoryId] = useState<string>("");
 
   // 5. SKU & 6. Batch (Automatically generated, non-manual input)
   const [sku, setSku] = useState("");
@@ -77,17 +79,22 @@ export function ProductModal({
   // Optional status & top seller flag
   const [isActive, setIsActive] = useState<boolean>(true);
 
-  // Eligible parent categories (top-level or parent_id === null)
+  // Eligible parent categories (Level 0: parent_id === null)
   const parentCategories = useMemo(() => {
     return categories.filter((c) => !c.parent_id);
   }, [categories]);
 
-  // Subcategories belonging strictly to the selected parent category
+  // Subcategories belonging strictly to the selected parent category (Level 1)
   const availableSubcategories = useMemo(() => {
     if (!categoryId) return [];
-    const descendantIds = new Set(getDescendantCategoryIds(categoryId, categories));
-    return categories.filter((c) => descendantIds.has(c.id) || c.parent_id === categoryId);
+    return categories.filter((c) => c.parent_id === categoryId);
   }, [categories, categoryId]);
+
+  // Sub-subcategories belonging strictly to the selected subcategory (Level 2)
+  const availableSubSubcategories = useMemo(() => {
+    if (!subcategoryId) return [];
+    return categories.filter((c) => c.parent_id === subcategoryId);
+  }, [categories, subcategoryId]);
 
   // Populate form on open / reset for creation
   useEffect(() => {
@@ -114,18 +121,47 @@ export function ProductModal({
       setSku(product.sku || "");
       setBatchNo((product as any).batch_no || (product as any).batch_number || "");
 
-      // Resolve category & subcategory
-      if ((product as any).subcategory_id) {
-        setCategoryId(product.category_id || "");
-        setSubcategoryId((product as any).subcategory_id || "");
+      // Resolve 3-level category hierarchy
+      const assignedSubSub = (product as any).sub_subcategory_id;
+      const assignedSub = (product as any).subcategory_id;
+      const assignedRoot = product.category_id;
+
+      if (assignedSubSub) {
+        setSubSubcategoryId(assignedSubSub);
+        const subSubCat = categories.find((c) => c.id === assignedSubSub);
+        const subCat = categories.find((c) => c.id === (assignedSub || subSubCat?.parent_id));
+        setSubcategoryId(subCat?.id || "");
+        const rootCat = categories.find((c) => c.id === (assignedRoot || subCat?.parent_id));
+        setCategoryId(rootCat?.id || "");
+      } else if (assignedSub) {
+        setSubSubcategoryId("");
+        setSubcategoryId(assignedSub);
+        const subCat = categories.find((c) => c.id === assignedSub);
+        const rootCat = categories.find((c) => c.id === (assignedRoot || subCat?.parent_id));
+        setCategoryId(rootCat?.id || "");
       } else {
-        const assignedCat = categories.find((c) => c.id === product.category_id);
-        if (assignedCat && assignedCat.parent_id) {
-          setCategoryId(assignedCat.parent_id);
-          setSubcategoryId(assignedCat.id);
+        const catObj = categories.find((c) => c.id === assignedRoot);
+        if (catObj) {
+          const depth = getCategoryDepth(catObj.id, categories);
+          if (depth === 2) {
+            setSubSubcategoryId(catObj.id);
+            const parentCat = categories.find((c) => c.id === catObj.parent_id);
+            setSubcategoryId(parentCat?.id || "");
+            const grandCat = categories.find((c) => c.id === parentCat?.parent_id);
+            setCategoryId(grandCat?.id || "");
+          } else if (depth === 1) {
+            setSubSubcategoryId("");
+            setSubcategoryId(catObj.id);
+            setCategoryId(catObj.parent_id || "");
+          } else {
+            setSubSubcategoryId("");
+            setSubcategoryId("");
+            setCategoryId(catObj.id);
+          }
         } else {
-          setCategoryId(product.category_id || (parentCategories[0]?.id || ""));
+          setCategoryId(parentCategories[0]?.id || "");
           setSubcategoryId("");
+          setSubSubcategoryId("");
         }
       }
 
@@ -151,6 +187,7 @@ export function ProductModal({
       const defaultCatId = parentCategories[0]?.id || categories[0]?.id || "";
       setCategoryId(defaultCatId);
       setSubcategoryId("");
+      setSubSubcategoryId("");
 
       const initialCatObj = categories.find((c) => c.id === defaultCatId);
       setSku(generateProductSku(initialCatObj?.name || initialCatObj?.slug));
@@ -158,14 +195,20 @@ export function ProductModal({
     }
   }, [isOpen, product, categories, parentCategories]);
 
-  // When Parent Category changes: auto-clear subcategory & update SKU prefix for new product
+  // When Parent Category changes: auto-clear subcategory & sub-subcategory & update SKU prefix for new product
   const handleCategoryChange = (newCatId: string) => {
     setCategoryId(newCatId);
-    setSubcategoryId(""); // Automatically clear previous subcategory
+    setSubcategoryId("");
+    setSubSubcategoryId("");
     if (!product) {
       const catObj = categories.find((c) => c.id === newCatId);
       setSku(generateProductSku(catObj?.name || catObj?.slug));
     }
+  };
+
+  const handleSubcategoryChange = (newSubId: string) => {
+    setSubcategoryId(newSubId);
+    setSubSubcategoryId("");
   };
 
   const handleImagesChange = (newImages: UploadedImageItem[]) => {
@@ -237,6 +280,7 @@ export function ProductModal({
       id: product?.id,
       category_id: categoryId || null,
       subcategory_id: subcategoryId || null,
+      sub_subcategory_id: subSubcategoryId || null,
       name: trimmedName,
       slug: computedSlug,
       description: trimmedDescription,
@@ -265,10 +309,29 @@ export function ProductModal({
       }
 
       // 2. Synchronize local store with actual persisted record
-      const persistedProduct = serverRes.product || payload;
-      upsertProductInStore({
+      const rawProduct = serverRes.product || payload;
+      const primaryUrl =
+        (rawProduct as any).image_url ||
+        imagesToSave.find((img) => img.is_primary)?.image_url ||
+        imagesToSave[0]?.image_url ||
+        "";
+
+      const persistedProduct = {
         ...payload,
-        id: (persistedProduct as any).id || payload.id,
+        ...rawProduct,
+        id: (rawProduct as any).id || (serverRes as any).productId || payload.id,
+        base_price: Number(
+          (rawProduct as any).base_price ?? (rawProduct as any).price ?? payload.base_price
+        ),
+        stock_quantity: Number(
+          (rawProduct as any).stock_quantity ?? (rawProduct as any).stock ?? payload.stock_quantity
+        ),
+        image_url: primaryUrl,
+        images: (rawProduct as any).images?.length ? (rawProduct as any).images : imagesToSave,
+      };
+
+      upsertProductInStore({
+        ...persistedProduct,
         images: imagesToSave as any,
       });
 
@@ -369,10 +432,10 @@ export function ProductModal({
               />
             </div>
 
-            {/* FIELD 3: CATEGORY & FIELD 4: SUBCATEGORY */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* FIELD 3: CATEGORY, FIELD 4: SUBCATEGORY & FIELD 5: SUB-SUBCATEGORY (3 Levels) */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {/* FIELD 3: Category */}
-              <div className="space-y-1.5 p-4 rounded-2xl border border-border/70 bg-card shadow-xs">
+              <div className="space-y-1.5 p-3.5 rounded-2xl border border-border/70 bg-card shadow-xs">
                 <label className="text-xs font-bold text-foreground uppercase tracking-wider block">
                   3. Category <span className="text-destructive">*</span>
                 </label>
@@ -380,10 +443,10 @@ export function ProductModal({
                   required
                   value={categoryId}
                   onChange={(e) => handleCategoryChange(e.target.value)}
-                  className="w-full h-11 px-3.5 rounded-xl border border-border bg-background text-xs font-semibold text-foreground focus:border-primary focus:outline-hidden cursor-pointer"
+                  className="w-full h-11 px-3 rounded-xl border border-border bg-background text-xs font-semibold text-foreground focus:border-primary focus:outline-hidden cursor-pointer"
                 >
                   <option value="" disabled>
-                    -- Select Parent Category --
+                    -- Select Root Category --
                   </option>
                   {parentCategories.map((c) => (
                     <option key={c.id} value={c.id}>
@@ -392,25 +455,25 @@ export function ProductModal({
                   ))}
                 </select>
                 <span className="text-[10px] text-muted-foreground block">
-                  Dynamically fetched from Category Management.
+                  Top-level root category.
                 </span>
               </div>
 
               {/* FIELD 4: Subcategory */}
-              <div className="space-y-1.5 p-4 rounded-2xl border border-border/70 bg-card shadow-xs">
+              <div className="space-y-1.5 p-3.5 rounded-2xl border border-border/70 bg-card shadow-xs">
                 <label className="text-xs font-bold text-foreground uppercase tracking-wider block">
                   4. Subcategory (Optional)
                 </label>
                 <select
                   value={subcategoryId}
-                  onChange={(e) => setSubcategoryId(e.target.value)}
+                  onChange={(e) => handleSubcategoryChange(e.target.value)}
                   disabled={!categoryId || availableSubcategories.length === 0}
-                  className="w-full h-11 px-3.5 rounded-xl border border-border bg-background text-xs font-semibold text-foreground focus:border-primary focus:outline-hidden cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full h-11 px-3 rounded-xl border border-border bg-background text-xs font-semibold text-foreground focus:border-primary focus:outline-hidden cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <option value="">
                     {availableSubcategories.length === 0
-                      ? "-- No Subcategories Available --"
-                      : "-- None (Root Category Level) --"}
+                      ? "-- No Subcategories --"
+                      : "-- None (Root Level) --"}
                   </option>
                   {availableSubcategories.map((sc) => (
                     <option key={sc.id} value={sc.id}>
@@ -419,7 +482,36 @@ export function ProductModal({
                   ))}
                 </select>
                 <span className="text-[10px] text-muted-foreground block">
-                  Filtered by selected category. Resets on category change.
+                  Level 2 subcategory.
+                </span>
+              </div>
+
+              {/* FIELD 5: Sub-subcategory */}
+              <div className="space-y-1.5 p-3.5 rounded-2xl border border-border/70 bg-card shadow-xs">
+                <label className="text-xs font-bold text-foreground uppercase tracking-wider block">
+                  5. Sub-Subcategory (Optional)
+                </label>
+                <select
+                  value={subSubcategoryId}
+                  onChange={(e) => setSubSubcategoryId(e.target.value)}
+                  disabled={!subcategoryId || availableSubSubcategories.length === 0}
+                  className="w-full h-11 px-3 rounded-xl border border-border bg-background text-xs font-semibold text-foreground focus:border-primary focus:outline-hidden cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <option value="">
+                    {!subcategoryId
+                      ? "-- Select Subcategory First --"
+                      : availableSubSubcategories.length === 0
+                      ? "-- No Sub-Subcategories --"
+                      : "-- None (Subcategory Level) --"}
+                  </option>
+                  {availableSubSubcategories.map((ssc) => (
+                    <option key={ssc.id} value={ssc.id}>
+                      {ssc.name}
+                    </option>
+                  ))}
+                </select>
+                <span className="text-[10px] text-muted-foreground block">
+                  Level 3 sub-subcategory.
                 </span>
               </div>
             </div>

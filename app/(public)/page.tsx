@@ -19,6 +19,7 @@ import { FestiveOfferSection } from "@/components/home/festive-offer-section";
 import { CategoriesSection } from "@/components/home/categories-section";
 import { TestimonialsSection } from "@/components/home/testimonials-section";
 
+export const dynamic = "force-dynamic";
 export const revalidate = 0; // Dynamic server rendering for live admin updates
 
 export const metadata = {

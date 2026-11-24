@@ -92,6 +92,7 @@ export default async function AdminProductsPage() {
             meta_description: p.meta_description || null,
             created_at: p.created_at,
             category: rawCat || null,
+            image_url: sortedImages.find((img: any) => img.is_primary)?.image_url || sortedImages[0]?.image_url || p.image_url || null,
             images: sortedImages,
             variants: [],
             batch_number: p.batch_no || p.batch_number || null,
@@ -120,13 +121,14 @@ export default async function AdminProductsPage() {
             is_active: Boolean(p.is_active),
             is_featured_top_seller: Boolean(p.is_featured_top_seller),
             top_seller_display_order: null,
+            image_url: p.image_url || null,
             avg_rating: 0,
             review_count: 0,
             meta_title: null,
             meta_description: null,
             created_at: p.created_at,
             category: null,
-            images: [],
+            images: p.image_url ? [{ id: "img-1", product_id: p.id, image_url: p.image_url, is_primary: true, display_order: 1, alt_text: p.name }] : [],
             variants: [],
             batch_number: p.batch_no || null,
           }));
@@ -139,6 +141,42 @@ export default async function AdminProductsPage() {
   } else {
     categories = [];
     products = [];
+  }
+
+  // Fallback to local store if unconfigured or returned no records
+  if (products.length === 0) {
+    const { loadMockStore } = await import("@/lib/mock-data/admin-store");
+    const store = loadMockStore();
+    products = (store.products || []).map((p: any) => {
+      const pImages = Array.isArray(p.images) ? p.images : [];
+      const primaryImg =
+        pImages.find((img: any) => img.is_primary)?.image_url ||
+        pImages.find((img: any) => img.is_primary)?.url ||
+        pImages[0]?.image_url ||
+        pImages[0]?.url ||
+        p.image_url ||
+        null;
+
+      return {
+        ...p,
+        base_price: Number(p.base_price ?? p.price ?? 0),
+        stock_quantity: Number(p.stock_quantity ?? p.stock ?? 0),
+        image_url: primaryImg,
+      };
+    }) as any[];
+    if (categories.length === 0) {
+      categories = (store.categories || []).map((c: any) => ({
+        id: String(c.id),
+        parent_id: c.parent_id || null,
+        name: c.name,
+        slug: c.slug,
+        description: c.description || null,
+        image_url: c.image_url || null,
+        display_order: Number(c.display_order ?? 0),
+        is_active: Boolean(c.is_active ?? true),
+        show_on_homepage: Boolean(c.show_on_homepage ?? true),
+      })) as Category[];
+    }
   }
 
   return (

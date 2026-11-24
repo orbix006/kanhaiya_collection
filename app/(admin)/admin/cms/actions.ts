@@ -70,6 +70,7 @@ export async function updateHomepageSectionsAction(
 export interface BannerPayload {
   id?: string;
   image_url: string;
+  image_path?: string | null;
   title?: string | null;
   link_url?: string | null;
   display_order: number;
@@ -103,39 +104,83 @@ export async function saveBannerAction(payload: BannerPayload) {
   }
 
   const { supabase } = auth;
-  const record = {
+  const baseRecord: Record<string, any> = {
     image_url: imageUrl,
     title: payload.title?.trim() || null,
-    link_url: payload.link_url?.trim() || null,
     display_order: Number(payload.display_order) || 0,
     is_active: Boolean(payload.is_active),
     updated_at: new Date().toISOString(),
   };
 
-  if (payload.id) {
-    const { data, error } = await supabase
-      .from("hero_banners")
-      .update(record)
-      .eq("id", payload.id)
-      .select()
-      .single();
-
-    if (error) return { error: `Failed to update banner: ${error.message}` };
-    revalidatePath("/");
-    revalidatePath("/admin/cms/banners");
-    return { success: true, message: "Banner updated successfully.", banner: data };
-  } else {
-    const { data, error } = await supabase
-      .from("hero_banners")
-      .insert(record)
-      .select()
-      .single();
-
-    if (error) return { error: `Failed to create banner: ${error.message}` };
-    revalidatePath("/");
-    revalidatePath("/admin/cms/banners");
-    return { success: true, message: "Banner created successfully.", banner: data };
+  if (payload.image_path) {
+    baseRecord.image_path = payload.image_path;
   }
+
+  // Execute write helper
+  const executeWrite = async (dataPayload: Record<string, any>) => {
+    if (payload.id) {
+      return await supabase
+        .from("hero_banners")
+        .update(dataPayload)
+        .eq("id", payload.id)
+        .select()
+        .single();
+    } else {
+      return await supabase
+        .from("hero_banners")
+        .insert(dataPayload)
+        .select()
+        .single();
+    }
+  };
+
+  // Only include link_url if destination URL was actually provided
+  const cleanLink = payload.link_url?.trim();
+  let dataPayload = { ...baseRecord };
+  if (cleanLink) {
+    dataPayload.link_url = cleanLink;
+  }
+
+  let { data, error } = await executeWrite(dataPayload);
+
+  // If failed because link_url column does not exist in schema, retry without link_url
+  if (error && (error.message?.includes("link_url") || error.code === "PGRST204" || error.code === "42703")) {
+    console.warn("[saveBannerAction] hero_banners table does not have 'link_url' column; saving without link_url:", error.message);
+    const retryPayload = { ...baseRecord };
+    delete retryPayload.link_url;
+    const retryRes = await executeWrite(retryPayload);
+    data = retryRes.data;
+    error = retryRes.error;
+  }
+
+  if (error) {
+    return { error: `Failed to save banner: ${error.message}` };
+  }
+
+  if (data) {
+    try {
+      const { saveMockBanner } = await import("@/lib/mock-data/admin-store");
+      saveMockBanner({
+        id: data.id,
+        image_url: data.image_url,
+        image_path: data.image_path,
+        title: data.title,
+        link_url: data.link_url,
+        display_order: data.display_order,
+        is_active: data.is_active,
+      });
+    } catch {}
+  }
+
+  revalidatePath("/", "layout");
+  revalidatePath("/", "page");
+  revalidatePath("/admin/cms/banners");
+  revalidatePath("/admin/cms/homepage");
+  return {
+    success: true,
+    message: payload.id ? "Banner updated successfully." : "Banner created successfully.",
+    banner: data,
+  };
 }
 
 export async function toggleBannerStatusAction(id: string, is_active: boolean) {
@@ -152,10 +197,17 @@ export async function toggleBannerStatusAction(id: string, is_active: boolean) {
       .eq("id", id);
 
     if (error) return { error: `Failed to toggle banner: ${error.message}` };
+
+    try {
+      const { toggleMockBannerStatus } = await import("@/lib/mock-data/admin-store");
+      toggleMockBannerStatus(id);
+    } catch {}
   }
 
-  revalidatePath("/");
+  revalidatePath("/", "layout");
+  revalidatePath("/", "page");
   revalidatePath("/admin/cms/banners");
+  revalidatePath("/admin/cms/homepage");
   return { success: true, message: `Banner ${is_active ? "activated" : "hidden"} successfully.` };
 }
 
@@ -169,10 +221,17 @@ export async function deleteBannerAction(id: string) {
   } else {
     const { error } = await auth.supabase.from("hero_banners").delete().eq("id", id);
     if (error) return { error: `Failed to delete banner: ${error.message}` };
+
+    try {
+      const { deleteMockBanner } = await import("@/lib/mock-data/admin-store");
+      deleteMockBanner(id);
+    } catch {}
   }
 
-  revalidatePath("/");
+  revalidatePath("/", "layout");
+  revalidatePath("/", "page");
   revalidatePath("/admin/cms/banners");
+  revalidatePath("/admin/cms/homepage");
   return { success: true, message: "Banner deleted successfully." };
 }
 

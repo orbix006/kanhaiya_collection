@@ -1,6 +1,6 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
 export async function updateProfileAction(prevState: any, formData: FormData) {
@@ -8,32 +8,119 @@ export async function updateProfileAction(prevState: any, formData: FormData) {
   const phone = (formData.get("phone") as string)?.trim() || "";
   const avatarUrl = (formData.get("avatarUrl") as string)?.trim() || "";
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  if (isSupabaseConfigured()) {
+    try {
+      const supabase = await createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
-  if (!user) {
+      if (!user) {
+        return { error: "Authentication required to update profile." };
+      }
+
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          full_name: fullName,
+          phone: phone,
+          avatar_url: avatarUrl,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", user.id);
+
+      if (error) {
+        return { error: error.message };
+      }
+
+      revalidatePath("/account");
+      revalidatePath("/", "layout");
+      return { success: "Profile information updated successfully!" };
+    } catch (err: any) {
+      return { error: err.message || "Failed to update profile." };
+    }
+  }
+
+  // Local development mode
+  const { getLocalSession, getLocalUsers, saveLocalUsers } = await import("@/lib/auth/local-auth");
+  const session = await getLocalSession();
+  if (!session) {
     return { error: "Authentication required to update profile." };
   }
 
-  const { error } = await supabase
-    .from("profiles")
-    .update({
-      full_name: fullName,
-      phone: phone,
-      avatar_url: avatarUrl,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", user.id);
-
-  if (error) {
-    return { error: error.message };
+  const users = getLocalUsers();
+  const user = users.find(
+    (u) => u.id === session.id || u.email.toLowerCase() === session.email.toLowerCase()
+  );
+  if (user) {
+    user.full_name = fullName;
+    (user as any).phone = phone;
+    (user as any).avatar_url = avatarUrl;
+    user.updated_at = new Date().toISOString();
+    saveLocalUsers(users);
   }
 
   revalidatePath("/account");
   revalidatePath("/", "layout");
   return { success: "Profile information updated successfully!" };
+}
+
+export async function changePasswordAction(prevState: any, formData: FormData) {
+  const currentPassword = (formData.get("currentPassword") as string) || "";
+  const newPassword = (formData.get("newPassword") as string) || "";
+  const confirmNewPassword = (formData.get("confirmNewPassword") as string) || "";
+
+  if (!newPassword || newPassword.length < 6) {
+    return { error: "New password must be at least 6 characters long." };
+  }
+
+  if (newPassword !== confirmNewPassword) {
+    return { error: "New passwords do not match. Please re-enter." };
+  }
+
+  if (isSupabaseConfigured()) {
+    try {
+      const supabase = await createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        return { error: "Authentication required to change password." };
+      }
+
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+
+      if (error) {
+        return { error: error.message };
+      }
+
+      return { success: "Password updated successfully!" };
+    } catch (err: any) {
+      return { error: err.message || "Failed to change password." };
+    }
+  }
+
+  // Local development mode
+  const { getLocalSession, updateLocalUserPassword } = await import("@/lib/auth/local-auth");
+  const session = await getLocalSession();
+  if (!session) {
+    return { error: "Authentication required to change password." };
+  }
+
+  const result = await updateLocalUserPassword({
+    userId: session.id,
+    currentPassword: currentPassword || undefined,
+    newPassword,
+  });
+
+  if (!result.success) {
+    return { error: result.error || "Failed to update password." };
+  }
+
+  return { success: "Password updated successfully!" };
 }
 
 export async function addAddressAction(prevState: any, formData: FormData) {

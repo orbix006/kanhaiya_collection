@@ -93,11 +93,11 @@ export function Header({ user, profile, categories = [] }: HeaderProps) {
 
   const [expandedCats, setExpandedCats] = useState<Record<string, boolean>>({});
 
-  const mounted = React.useSyncExternalStore(
-    () => () => {},
-    () => true,
-    () => false
-  );
+  const [mounted, setMounted] = useState<boolean>(false);
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const toggleCategoryExpand = (catId: string, e: React.MouseEvent) => {
     e.preventDefault();
@@ -430,17 +430,53 @@ export function Header({ user, profile, categories = [] }: HeaderProps) {
 
                                 {/* Subcategories revealed on chevron click */}
                                 {hasSubs && isExpanded && (
-                                  <div className="bg-muted/30 pl-6 pr-3 py-1 flex flex-col space-y-1 border-l-2 border-primary/30 ml-3.5 my-0.5">
-                                    {subcats.map((sub) => (
-                                      <Link
-                                        key={sub.id}
-                                        href={`/shop?category=${sub.slug}`}
-                                        onClick={() => setCategoriesDropdownOpen(false)}
-                                        className="py-1 text-[11px] text-muted-foreground hover:text-primary transition-colors truncate"
-                                      >
-                                        {sub.name}
-                                      </Link>
-                                    ))}
+                                  <div className="bg-muted/30 pl-5 pr-3 py-1 flex flex-col space-y-1 border-l-2 border-primary/30 ml-3.5 my-0.5">
+                                    {subcats.map((sub) => {
+                                      const subSubs = getSubcategories(sub.id);
+                                      const hasSubSubs = subSubs.length > 0;
+                                      const isSubExpanded = Boolean(expandedCats[sub.id]);
+
+                                      return (
+                                        <div key={sub.id} className="flex flex-col">
+                                          <div className="flex items-center justify-between py-1 group/sub">
+                                            <Link
+                                              href={`/shop?category=${sub.slug}`}
+                                              onClick={() => setCategoriesDropdownOpen(false)}
+                                              className="text-[11px] font-medium text-muted-foreground hover:text-primary transition-colors flex-1 truncate"
+                                            >
+                                              {sub.name}
+                                            </Link>
+                                            {hasSubSubs && (
+                                              <button
+                                                type="button"
+                                                onClick={(e) => toggleCategoryExpand(sub.id, e)}
+                                                className="p-0.5 rounded text-muted-foreground hover:text-foreground cursor-pointer"
+                                              >
+                                                <ChevronDown
+                                                  className={`h-3 w-3 transition-transform ${
+                                                    isSubExpanded ? "rotate-180 text-primary" : ""
+                                                  }`}
+                                                />
+                                              </button>
+                                            )}
+                                          </div>
+                                          {hasSubSubs && isSubExpanded && (
+                                            <div className="pl-3 py-0.5 flex flex-col space-y-0.5 border-l border-primary/20 ml-2">
+                                              {subSubs.map((ssc) => (
+                                                <Link
+                                                  key={ssc.id}
+                                                  href={`/shop?category=${ssc.slug}`}
+                                                  onClick={() => setCategoriesDropdownOpen(false)}
+                                                  className="py-0.5 text-[10px] text-muted-foreground/80 hover:text-primary transition-colors truncate"
+                                                >
+                                                  • {ssc.name}
+                                                </Link>
+                                              ))}
+                                            </div>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
                                   </div>
                                 )}
                               </div>
@@ -687,17 +723,53 @@ export function Header({ user, profile, categories = [] }: HeaderProps) {
                           )}
                         </div>
                         {hasSubs && isExpanded && (
-                          <div className="pl-5 py-0.5 flex flex-col space-y-1 border-l border-primary/20 ml-2">
-                            {subcats.map((sub) => (
-                              <Link
-                                key={sub.id}
-                                href={`/shop?category=${sub.slug}`}
-                                onClick={() => setMobileMenuOpen(false)}
-                                className="text-[11px] text-muted-foreground hover:text-primary py-0.5 truncate"
-                              >
-                                {sub.name}
-                              </Link>
-                            ))}
+                          <div className="pl-4 py-0.5 flex flex-col space-y-1 border-l border-primary/20 ml-2">
+                            {subcats.map((sub) => {
+                              const subSubs = getSubcategories(sub.id);
+                              const hasSubSubs = subSubs.length > 0;
+                              const isSubExpanded = Boolean(expandedCats[sub.id]);
+
+                              return (
+                                <div key={sub.id} className="flex flex-col py-0.5">
+                                  <div className="flex items-center justify-between">
+                                    <Link
+                                      href={`/shop?category=${sub.slug}`}
+                                      onClick={() => setMobileMenuOpen(false)}
+                                      className="text-[11px] text-muted-foreground hover:text-primary py-0.5 truncate flex-1"
+                                    >
+                                      {sub.name}
+                                    </Link>
+                                    {hasSubSubs && (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => toggleCategoryExpand(sub.id, e)}
+                                        className="p-1 rounded text-muted-foreground hover:text-foreground"
+                                      >
+                                        <ChevronDown
+                                          className={`h-2.5 w-2.5 transition-transform ${
+                                            isSubExpanded ? "rotate-180 text-primary" : ""
+                                          }`}
+                                        />
+                                      </button>
+                                    )}
+                                  </div>
+                                  {hasSubSubs && isSubExpanded && (
+                                    <div className="pl-3 py-0.5 flex flex-col space-y-0.5 border-l border-primary/20 ml-1.5">
+                                      {subSubs.map((ssc) => (
+                                        <Link
+                                          key={ssc.id}
+                                          href={`/shop?category=${ssc.slug}`}
+                                          onClick={() => setMobileMenuOpen(false)}
+                                          className="text-[10px] text-muted-foreground/80 hover:text-primary py-0.5 truncate"
+                                        >
+                                          • {ssc.name}
+                                        </Link>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
                           </div>
                         )}
                       </div>

@@ -41,6 +41,31 @@ interface ProductManagerProps {
 
 type FilterTab = "all" | "active" | "archived" | "top_seller" | "low_stock";
 
+function ProductThumbnail({ src, alt }: { src: string | null | undefined; alt: string }) {
+  const [hasError, setHasError] = useState(false);
+
+  if (!src || hasError) {
+    return (
+      <div className="h-full w-full flex flex-col items-center justify-center bg-muted/60 text-muted-foreground p-1 select-none">
+        <Package className="h-4 w-4 opacity-40 mb-0.5" />
+        <span className="text-[9px] font-medium leading-none opacity-60">No Img</span>
+      </div>
+    );
+  }
+
+  return (
+    <Image
+      src={src}
+      alt={alt}
+      fill
+      className="object-cover"
+      sizes="48px"
+      onError={() => setHasError(true)}
+      unoptimized={src.startsWith("http") || src.startsWith("blob:") || src.startsWith("data:")}
+    />
+  );
+}
+
 export function ProductManager({
   initialProducts,
   categories: initialCategories,
@@ -67,7 +92,30 @@ export function ProductManager({
   // Initial products and categories passed from server component are authoritative
   useEffect(() => {
     if (initialProducts) {
-      setProducts(initialProducts);
+      setProducts(
+        initialProducts.map((p: any) => ({
+          ...p,
+          base_price:
+            p.base_price !== undefined && p.base_price !== null && !isNaN(Number(p.base_price))
+              ? Number(p.base_price)
+              : p.price !== undefined && p.price !== null && !isNaN(Number(p.price))
+                ? Number(p.price)
+                : 0,
+          stock_quantity:
+            p.stock_quantity !== undefined && p.stock_quantity !== null && !isNaN(Number(p.stock_quantity))
+              ? Number(p.stock_quantity)
+              : p.stock !== undefined && p.stock !== null && !isNaN(Number(p.stock))
+                ? Number(p.stock)
+                : 0,
+          image_url:
+            p.image_url ||
+            p.images?.find((i: any) => i.is_primary)?.image_url ||
+            p.images?.find((i: any) => i.is_primary)?.url ||
+            p.images?.[0]?.image_url ||
+            p.images?.[0]?.url ||
+            null,
+        }))
+      );
     }
     if (initialCategories) {
       setCategories(initialCategories);
@@ -81,7 +129,9 @@ export function ProductManager({
       active: products.filter((p) => p.is_active).length,
       archived: products.filter((p) => !p.is_active).length,
       top_seller: products.filter((p) => p.is_featured_top_seller).length,
-      low_stock: products.filter((p) => p.stock_quantity <= 10).length,
+      low_stock: products.filter(
+        (p) => Number(p.stock_quantity ?? (p as any).stock ?? 0) <= 10
+      ).length,
     };
   }, [products]);
 
@@ -92,7 +142,11 @@ export function ProductManager({
       if (activeTab === "active" && !p.is_active) return false;
       if (activeTab === "archived" && p.is_active) return false;
       if (activeTab === "top_seller" && !p.is_featured_top_seller) return false;
-      if (activeTab === "low_stock" && p.stock_quantity > 10) return false;
+      if (
+        activeTab === "low_stock" &&
+        Number(p.stock_quantity ?? (p as any).stock ?? 0) > 10
+      )
+        return false;
 
       // Category filter (includes nested child categories)
       if (selectedCategory !== "all") {
@@ -164,16 +218,39 @@ export function ProductManager({
 
   // Handler: Save Success (Insert or Update)
   const handleSaveSuccess = (savedPayload: any) => {
+    const normalizedSaved = {
+      ...savedPayload,
+      base_price:
+        savedPayload.base_price !== undefined && savedPayload.base_price !== null && !isNaN(Number(savedPayload.base_price))
+          ? Number(savedPayload.base_price)
+          : savedPayload.price !== undefined && savedPayload.price !== null && !isNaN(Number(savedPayload.price))
+            ? Number(savedPayload.price)
+            : 0,
+      stock_quantity:
+        savedPayload.stock_quantity !== undefined && savedPayload.stock_quantity !== null && !isNaN(Number(savedPayload.stock_quantity))
+          ? Number(savedPayload.stock_quantity)
+          : savedPayload.stock !== undefined && savedPayload.stock !== null && !isNaN(Number(savedPayload.stock))
+            ? Number(savedPayload.stock)
+            : 0,
+      image_url:
+        savedPayload.image_url ||
+        savedPayload.images?.find((i: any) => i.is_primary)?.image_url ||
+        savedPayload.images?.find((i: any) => i.is_primary)?.url ||
+        savedPayload.images?.[0]?.image_url ||
+        savedPayload.images?.[0]?.url ||
+        null,
+    };
+
     const store = loadMockStore();
     if (store.products && store.products.length > 0) {
       setProducts(store.products as unknown as ProductDetail[]);
     } else {
       setProducts((prev) => {
-        const exists = prev.some((p) => p.id === savedPayload.id);
+        const exists = prev.some((p) => p.id === normalizedSaved.id);
         if (exists) {
-          return prev.map((p) => (p.id === savedPayload.id ? { ...p, ...savedPayload } : p));
+          return prev.map((p) => (p.id === normalizedSaved.id ? { ...p, ...normalizedSaved } : p));
         }
-        return [savedPayload, ...prev];
+        return [normalizedSaved, ...prev];
       });
     }
 
@@ -214,25 +291,18 @@ export function ProductManager({
       className: "min-w-[260px]",
       render: (item) => {
         const primaryImg =
-          item.images.find((img) => img.is_primary)?.image_url ||
-          item.images[0]?.image_url;
+          item.images?.find((img: any) => img.is_primary)?.image_url ||
+          (item.images?.find((img: any) => img.is_primary) as any)?.url ||
+          item.images?.[0]?.image_url ||
+          (item.images?.[0] as any)?.url ||
+          item.image_url ||
+          (item as any).url ||
+          null;
 
         return (
           <div className="flex items-center gap-3 py-1">
             <div className="relative h-12 w-12 shrink-0 rounded-xl overflow-hidden bg-muted border border-border/80">
-              {primaryImg ? (
-                <Image
-                  src={primaryImg}
-                  alt={item.name}
-                  fill
-                  className="object-cover"
-                  sizes="48px"
-                />
-              ) : (
-                <div className="h-full w-full flex items-center justify-center text-muted-foreground text-[10px]">
-                  No Img
-                </div>
-              )}
+              <ProductThumbnail src={primaryImg} alt={item.name} />
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
@@ -325,23 +395,41 @@ export function ProductManager({
       header: "Price",
       sortable: true,
       className: "w-28",
-      render: (item) => (
-        <div className="space-y-0.5">
-          <div className="font-bold text-xs text-foreground">
-            ₹{item.base_price.toLocaleString("en-IN")}
-          </div>
-          {item.compare_at_price && item.compare_at_price > item.base_price && (
-            <div className="flex items-center gap-1 text-[10px]">
-              <span className="line-through text-muted-foreground">
-                ₹{item.compare_at_price.toLocaleString("en-IN")}
-              </span>
-              <span className="text-emerald-600 dark:text-emerald-400 font-bold">
-                {Math.round(((item.compare_at_price - item.base_price) / item.compare_at_price) * 100)}% off
-              </span>
+      render: (item) => {
+        const effectivePrice = item.base_price ?? (item as any).price;
+        const comparePrice =
+          item.compare_at_price ?? (item as any).compare_price ?? (item as any).mrp;
+        const hasValidPrice =
+          effectivePrice !== undefined &&
+          effectivePrice !== null &&
+          !isNaN(Number(effectivePrice));
+        const numPrice = hasValidPrice ? Number(effectivePrice) : 0;
+        const numCompare =
+          comparePrice !== undefined &&
+            comparePrice !== null &&
+            !isNaN(Number(comparePrice))
+            ? Number(comparePrice)
+            : null;
+        const hasDiscount = numCompare !== null && numCompare > numPrice;
+
+        return (
+          <div className="space-y-0.5">
+            <div className="font-bold text-xs text-foreground">
+              {hasValidPrice ? `₹${numPrice.toLocaleString("en-IN")}` : "—"}
             </div>
-          )}
-        </div>
-      ),
+            {hasDiscount && numCompare !== null && (
+              <div className="flex items-center gap-1 text-[10px]">
+                <span className="line-through text-muted-foreground">
+                  ₹{numCompare.toLocaleString("en-IN")}
+                </span>
+                <span className="text-emerald-600 dark:text-emerald-400 font-bold">
+                  {Math.round(((numCompare - numPrice) / numCompare) * 100)}% off
+                </span>
+              </div>
+            )}
+          </div>
+        );
+      },
     },
     {
       key: "stock_quantity",
@@ -349,26 +437,26 @@ export function ProductManager({
       sortable: true,
       className: "w-28",
       render: (item) => {
-        const isOutOfStock = item.stock_quantity <= 0;
-        const isLowStock = item.stock_quantity > 0 && item.stock_quantity <= 10;
+        const stockQty = Number(item.stock_quantity ?? (item as any).stock ?? 0);
+        const isOutOfStock = stockQty <= 0;
+        const isLowStock = stockQty > 0 && stockQty <= 10;
 
         return (
           <div className="space-y-1">
             <span
-              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                isOutOfStock
-                  ? "bg-destructive/10 text-destructive border border-destructive/20"
-                  : isLowStock
+              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${isOutOfStock
+                ? "bg-destructive/10 text-destructive border border-destructive/20"
+                : isLowStock
                   ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
                   : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
-              }`}
+                }`}
             >
               {isOutOfStock ? (
                 "Out of Stock"
               ) : isLowStock ? (
-                `Low (${item.stock_quantity})`
+                `Low (${stockQty})`
               ) : (
-                `${item.stock_quantity} in stock`
+                `${stockQty} in stock`
               )}
             </span>
           </div>
@@ -388,17 +476,15 @@ export function ProductManager({
             type="button"
             onClick={() => handleToggleActive(item)}
             disabled={isToggling}
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold transition-all cursor-pointer disabled:opacity-50 ${
-              item.is_active
-                ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/20"
-                : "bg-muted text-muted-foreground border border-border hover:bg-muted/80"
-            }`}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold transition-all cursor-pointer disabled:opacity-50 ${item.is_active
+              ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/20"
+              : "bg-muted text-muted-foreground border border-border hover:bg-muted/80"
+              }`}
             title={item.is_active ? "Click to archive (hide from storefront)" : "Click to activate on storefront"}
           >
             <span
-              className={`h-1.5 w-1.5 rounded-full ${
-                item.is_active ? "bg-emerald-500 animate-pulse" : "bg-muted-foreground"
-              }`}
+              className={`h-1.5 w-1.5 rounded-full ${item.is_active ? "bg-emerald-500 animate-pulse" : "bg-muted-foreground"
+                }`}
             />
             <span>
               {isToggling ? "Saving..." : item.is_active ? "Active" : "Archived"}
@@ -447,11 +533,10 @@ export function ProductManager({
       {/* Toast Notification */}
       {notification && (
         <div
-          className={`flex items-center gap-2 p-4 rounded-2xl border text-xs font-semibold animate-in fade-in duration-200 ${
-            notification.type === "success"
-              ? "border-emerald-500/40 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300"
-              : "border-destructive/40 bg-destructive/10 text-destructive"
-          }`}
+          className={`flex items-center gap-2 p-4 rounded-2xl border text-xs font-semibold animate-in fade-in duration-200 ${notification.type === "success"
+            ? "border-emerald-500/40 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300"
+            : "border-destructive/40 bg-destructive/10 text-destructive"
+            }`}
         >
           {notification.type === "success" ? (
             <CheckCircle2 className="h-4 w-4 shrink-0" />
@@ -524,55 +609,50 @@ export function ProductManager({
           <button
             type="button"
             onClick={() => setActiveTab("all")}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
-              activeTab === "all"
-                ? "bg-card text-foreground shadow-xs"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${activeTab === "all"
+              ? "bg-card text-foreground shadow-xs"
+              : "text-muted-foreground hover:text-foreground"
+              }`}
           >
             All Products ({tabCounts.all})
           </button>
           <button
             type="button"
             onClick={() => setActiveTab("active")}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
-              activeTab === "active"
-                ? "bg-card text-emerald-600 dark:text-emerald-400 shadow-xs"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${activeTab === "active"
+              ? "bg-card text-emerald-600 dark:text-emerald-400 shadow-xs"
+              : "text-muted-foreground hover:text-foreground"
+              }`}
           >
             Active ({tabCounts.active})
           </button>
           <button
             type="button"
             onClick={() => setActiveTab("top_seller")}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
-              activeTab === "top_seller"
-                ? "bg-card text-amber-600 dark:text-amber-400 shadow-xs"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${activeTab === "top_seller"
+              ? "bg-card text-amber-600 dark:text-amber-400 shadow-xs"
+              : "text-muted-foreground hover:text-foreground"
+              }`}
           >
             Top Sellers ({tabCounts.top_seller})
           </button>
           <button
             type="button"
             onClick={() => setActiveTab("low_stock")}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
-              activeTab === "low_stock"
-                ? "bg-card text-amber-700 dark:text-amber-300 shadow-xs"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${activeTab === "low_stock"
+              ? "bg-card text-amber-700 dark:text-amber-300 shadow-xs"
+              : "text-muted-foreground hover:text-foreground"
+              }`}
           >
             Low Stock ({tabCounts.low_stock})
           </button>
           <button
             type="button"
             onClick={() => setActiveTab("archived")}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
-              activeTab === "archived"
-                ? "bg-card text-foreground shadow-xs"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${activeTab === "archived"
+              ? "bg-card text-foreground shadow-xs"
+              : "text-muted-foreground hover:text-foreground"
+              }`}
           >
             Archived ({tabCounts.archived})
           </button>

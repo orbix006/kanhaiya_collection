@@ -21,7 +21,7 @@ import {
 import { CategoryTree } from "./category-tree";
 import { CategoryModal } from "./category-modal";
 import { CategoryDeleteModal } from "./category-delete-modal";
-import { buildCategoryTree, getDescendantCategoryIds } from "@/lib/data/categories";
+import { buildCategoryTree, getDescendantCategoryIds, getCategoryDepth } from "@/lib/data/categories";
 import {
   loadMockStore,
   saveMockStore,
@@ -53,7 +53,7 @@ export function CategoryManager({
   const [products, setProducts] = useState<any[]>(initialProducts);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
-  const [levelFilter, setLevelFilter] = useState<"all" | "roots" | "subcategories">("all");
+  const [levelFilter, setLevelFilter] = useState<"all" | "roots" | "subcategories" | "subsubcategories">("all");
 
   // Keep state synchronized whenever server props change (e.g. after router.refresh() or action revalidation)
   useEffect(() => {
@@ -99,10 +99,17 @@ export function CategoryManager({
       let direct = 0;
       let total = 0;
       for (const p of products) {
-        if (p.category_id === c.id) {
+        const pCat = p.category_id;
+        const pSub = p.subcategory_id;
+        const pSubSub = p.sub_subcategory_id;
+        if (pCat === c.id || pSub === c.id || pSubSub === c.id) {
           direct++;
           total++;
-        } else if (p.category_id && descendantIds.has(p.category_id)) {
+        } else if (
+          (pCat && descendantIds.has(pCat)) ||
+          (pSub && descendantIds.has(pSub)) ||
+          (pSubSub && descendantIds.has(pSubSub))
+        ) {
           total++;
         }
       }
@@ -122,11 +129,17 @@ export function CategoryManager({
       filtered = filtered.filter((c) => !c.is_active);
     }
 
-    // 2. Hierarchy Level Filter
+    // 2. Hierarchy Level Filter (supports all 3 levels: Root, Subcategory, Sub-subcategory)
     if (levelFilter === "roots") {
       filtered = filtered.filter((c) => !c.parent_id);
     } else if (levelFilter === "subcategories") {
-      filtered = filtered.filter((c) => Boolean(c.parent_id));
+      filtered = filtered.filter(
+        (c) => Boolean(c.parent_id) && getCategoryDepth(c.id, categories) === 1
+      );
+    } else if (levelFilter === "subsubcategories") {
+      filtered = filtered.filter(
+        (c) => Boolean(c.parent_id) && getCategoryDepth(c.id, categories) === 2
+      );
     }
 
     // 3. Search Term with ancestor preservation
@@ -336,7 +349,12 @@ export function CategoryManager({
   };
 
   const rootCategoriesCount = categories.filter((c) => c.parent_id === null).length;
-  const subCategoriesCount = categories.filter((c) => c.parent_id !== null).length;
+  const subCategoriesCount = categories.filter(
+    (c) => c.parent_id !== null && getCategoryDepth(c.id, categories) === 1
+  ).length;
+  const subSubCategoriesCount = categories.filter(
+    (c) => c.parent_id !== null && getCategoryDepth(c.id, categories) === 2
+  ).length;
   const activeCount = categories.filter((c) => c.is_active).length;
   const inactiveCount = categories.filter((c) => !c.is_active).length;
 
@@ -407,9 +425,10 @@ export function CategoryManager({
               className="h-10 px-3 rounded-xl border border-border bg-background text-xs font-medium text-foreground focus:border-primary focus:outline-hidden cursor-pointer"
               title="Filter by hierarchy depth"
             >
-              <option value="all">All Levels</option>
-              <option value="roots">Root Categories Only ({rootCategoriesCount})</option>
-              <option value="subcategories">Subcategories Only ({subCategoriesCount})</option>
+              <option value="all">All Levels ({categories.length})</option>
+              <option value="roots">Root Categories ({rootCategoriesCount})</option>
+              <option value="subcategories">Subcategories ({subCategoriesCount})</option>
+              <option value="subsubcategories">Sub-subcategories ({subSubCategoriesCount})</option>
             </select>
 
             {/* Expand / Collapse All Toggle */}

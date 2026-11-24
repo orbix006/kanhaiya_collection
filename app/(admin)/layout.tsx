@@ -33,25 +33,29 @@ export default async function AdminLayout({
       }
 
       // Query authoritative database record from public.profiles
-      const { data: dbProfile, error: profileError } = await supabase
+      let dbProfile: any = null;
+      const { data: prof1, error: err1 } = await supabase
         .from("profiles")
-        .select("id, full_name, email, role, avatar_url")
+        .select("id, full_name, role, avatar_url")
         .eq("id", user.id)
         .single();
 
-      if (profileError) {
-        console.error("Profile fetch failed:", profileError);
+      if (!err1 && prof1) {
+        dbProfile = prof1;
+      } else {
+        const { data: prof2 } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", user.id)
+          .single();
+        dbProfile = prof2 || null;
       }
-
-      console.log("Authenticated user ID:", user?.id);
-      console.log("Database profile:", dbProfile);
-      console.log("Database role:", dbProfile?.role);
 
       const profileData = dbProfile;
       const isAdmin = isUserAdmin(user, profileData);
 
       // Enforce strict RBAC: allow access only if role === 'admin'
-      if (!isAdmin) {
+      if (!isAdmin || (profileData && profileData.role !== "admin" && !isAdmin)) {
         redirect("/403");
       }
 

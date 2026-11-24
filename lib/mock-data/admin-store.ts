@@ -51,6 +51,8 @@ export interface MockProductVariant {
 export interface MockProductDetail {
   id: string;
   category_id: string | null;
+  subcategory_id?: string | null;
+  sub_subcategory_id?: string | null;
   name: string;
   slug: string;
   description: string | null;
@@ -65,6 +67,7 @@ export interface MockProductDetail {
   top_seller_display_order: number | null;
   avg_rating: number;
   review_count: number;
+  image_url?: string | null;
   meta_title: string | null;
   meta_description: string | null;
   created_by?: string | null;
@@ -102,6 +105,7 @@ import type {
   AdminReviewFilterParams,
   AdminReviewStats,
 } from "@/lib/data/review-types";
+import { resolveUniqueProductSlug } from "@/lib/data/categories";
 
 export interface MockAddress {
   id: string;
@@ -289,8 +293,9 @@ export interface MockHomepageSection {
 export interface MockBanner {
   id: string;
   image_url: string;
+  image_path?: string | null;
   title: string | null;
-  link_url: string | null;
+  link_url?: string | null;
   display_order: number;
   is_active: boolean;
   created_at: string;
@@ -1597,30 +1602,42 @@ export function upsertCategoryInStore(cat: Partial<MockCategory> & { name: strin
   const slug = (cat.slug?.trim() || name.toLowerCase().replace(/[^a-z0-9]+/g, "-")).replace(/^-|-$/g, "");
   if (!slug) return { success: false, error: "A valid URL slug is required." };
 
-  // 1. Duplicate slug check (case-insensitive)
-  const duplicate = store.categories.find(
-    (c) => c.slug.toLowerCase() === slug.toLowerCase() && c.id !== cat.id
-  );
-  if (duplicate) {
-    return {
-      success: false,
-      error: `A category with the slug "${slug}" already exists (matching "${duplicate.name}"). Please choose a unique slug.`,
-    };
-  }
-
   const existingIdx = cat.id ? store.categories.findIndex((c) => c.id === cat.id) : -1;
   const existing = existingIdx !== -1 ? store.categories[existingIdx] : null;
   if (cat.id && !existing) {
     return { success: false, error: "Category not found." };
   }
 
-  // 2. Parent cycle check
+  // 1. Resolve parent ID
   const parentId =
     cat.parent_id !== undefined
       ? (cat.parent_id || null)
       : existing
       ? existing.parent_id
       : null;
+
+  // 2. Hierarchy-aware duplicate check: unique per parent
+  // Root categories (parentId === null) must be unique among roots.
+  // Subcategories / sub-subcategories must be unique within their own parent.
+  // The exact same name and slug are ALLOWED under different parents.
+  const duplicate = store.categories.find((c) => {
+    const sameParent = (c.parent_id || null) === parentId;
+    const sameSlug = c.slug.toLowerCase() === slug.toLowerCase();
+    const sameName = c.name.toLowerCase() === name.toLowerCase();
+    const isDifferentRecord = c.id !== cat.id;
+    return sameParent && (sameSlug || sameName) && isDifferentRecord;
+  });
+
+  if (duplicate) {
+    return {
+      success: false,
+      error: `A category named "${name}" already exists under ${
+        parentId ? "this parent category" : "main categories"
+      } (matching "${duplicate.name}"). Please choose a unique name.`,
+    };
+  }
+
+  // 3. Parent cycle check
 
   if (cat.id && parentId) {
     if (parentId === cat.id) {
@@ -1678,9 +1695,15 @@ export function upsertCategoryInStore(cat: Partial<MockCategory> & { name: strin
     };
     store.categories[existingIdx] = savedCategory;
   } else {
-    // Create new
+    // Create new with UUID compatibility
+    const generatedId =
+      cat.id ||
+      (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : `cat-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`);
+
     savedCategory = {
-      id: `cat-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      id: generatedId,
       parent_id: parentId,
       name,
       slug,
@@ -2142,19 +2165,11 @@ export function upsertProductInStore(prod: UpsertProductInput): {
     return { success: false, error: "Stock quantity must be a non-negative number." };
   }
 
-  const slug = (prod.slug?.trim() || name.toLowerCase().replace(/[^a-z0-9]+/g, "-")).replace(/^-|-$/g, "");
-  if (!slug) return { success: false, error: "A valid URL slug is required." };
+  const baseSlug = (prod.slug?.trim() || name.toLowerCase().replace(/[^a-z0-9]+/g, "-")).replace(/^-|-$/g, "");
+  if (!baseSlug) return { success: false, error: "A valid URL slug is required." };
 
-  // 2. Slug uniqueness check
-  const duplicateSlug = store.products.find(
-    (p) => p.slug.toLowerCase() === slug.toLowerCase() && p.id !== prod.id
-  );
-  if (duplicateSlug) {
-    return {
-      success: false,
-      error: `A product with slug "${slug}" already exists ("${duplicateSlug.name}"). Please choose a unique slug.`,
-    };
-  }
+  // 2. Resolve guaranteed unique slug with incremental suffix on collision
+  const slug = resolveUniqueProductSlug(baseSlug, prod.id, store.products);
 
   // 3. Resolve category snapshot
   const categorySnapshot = store.categories.find((c) => c.id === categoryId) || null;
@@ -2278,6 +2293,7 @@ export function upsertProductInStore(prod: UpsertProductInput): {
     });
   }
 
+  const primaryImageUrl = sanitizedImages.find((img) => img.is_primary)?.image_url || sanitizedImages[0]?.image_url || "";
   const now = new Date().toISOString();
   let savedProduct: MockProductDetail;
 
@@ -2292,11 +2308,14 @@ export function upsertProductInStore(prod: UpsertProductInput): {
       ...prod,
       name,
       slug,
+      image_url: primaryImageUrl,
       description,
       brand,
       sku,
       batch_number: batchNumber,
       category_id: categoryId || existing.category_id || null,
+      subcategory_id: prod.subcategory_id !== undefined ? prod.subcategory_id : (existing as any).subcategory_id || null,
+      sub_subcategory_id: prod.sub_subcategory_id !== undefined ? prod.sub_subcategory_id : (existing as any).sub_subcategory_id || null,
       base_price: Number(prod.base_price),
       compare_at_price: prod.compare_at_price ? Number(prod.compare_at_price) : null,
       stock_quantity: Number(prod.stock_quantity) || 0,
@@ -2316,8 +2335,11 @@ export function upsertProductInStore(prod: UpsertProductInput): {
     savedProduct = {
       id: newId,
       category_id: categoryId || null,
+      subcategory_id: prod.subcategory_id || null,
+      sub_subcategory_id: prod.sub_subcategory_id || null,
       name,
       slug,
+      image_url: primaryImageUrl,
       description,
       brand,
       sku,
@@ -3204,6 +3226,7 @@ export function saveMockBanner(
       return { success: false, error: `Banner '${payload.id}' was not found.` };
     }
     existing.image_url = imageUrl;
+    existing.image_path = payload.image_path !== undefined ? payload.image_path : (existing.image_path || null);
     existing.title = payload.title?.trim() || null;
     existing.link_url = linkUrl;
     existing.display_order = Number(payload.display_order) ?? existing.display_order;
@@ -3214,6 +3237,7 @@ export function saveMockBanner(
     banner = {
       id: `ban-${Date.now()}`,
       image_url: imageUrl,
+      image_path: payload.image_path || null,
       title: payload.title?.trim() || null,
       link_url: linkUrl,
       display_order: Number(payload.display_order) || (store.banners.length + 1),

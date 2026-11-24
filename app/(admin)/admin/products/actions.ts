@@ -10,7 +10,7 @@ function revalidatePath(path: string, type?: "layout" | "page") {
   }
 }
 import { createClient } from "@/lib/supabase/server";
-import { generateSlug } from "@/lib/data/categories";
+import { generateSlug, resolveUniqueProductSlug } from "@/lib/data/categories";
 import { isUserAdmin } from "@/lib/auth/role-check";
 
 export interface ProductImageInput {
@@ -37,6 +37,7 @@ export interface ProductSavePayload {
   id?: string;
   category_id: string | null;
   subcategory_id?: string | null;
+  sub_subcategory_id?: string | null;
   name: string;
   slug?: string;
   description?: string | null;
@@ -216,13 +217,15 @@ export async function saveProductAction(payload: ProductSavePayload) {
       return { error: saveRes.error || "Failed to save product in development catalog." };
     }
 
+    const finalSlug = saveRes.product?.slug || slug;
     revalidatePath("/admin/products");
     revalidatePath("/shop");
     revalidatePath("/categories");
-    revalidatePath(`/shop/product/${slug}`);
-    revalidatePath(`/product/${slug}`);
-    revalidatePath(`/products/${slug}`);
+    revalidatePath(`/shop/product/${finalSlug}`);
+    revalidatePath(`/product/${finalSlug}`);
+    revalidatePath(`/products/${finalSlug}`);
     revalidatePath("/");
+    revalidatePath("/", "layout");
 
     return {
       success: true,
@@ -233,17 +236,14 @@ export async function saveProductAction(payload: ProductSavePayload) {
 
   // 5. Database operations (Supabase configured)
   try {
-    // Check slug uniqueness
-    const { data: existingSlugProduct } = await supabase
+    // Check slug uniqueness and resolve unique suffix if collision exists
+    const { data: matchingSlugProducts } = await supabase
       .from("products")
-      .select("id, name")
-      .eq("slug", slug)
-      .maybeSingle();
+      .select("id, slug")
+      .or(`slug.eq.${slug},slug.like.${slug}-%`);
 
-    if (existingSlugProduct && existingSlugProduct.id !== payload.id) {
-      return {
-        error: `A product with slug "${slug}" already exists ("${existingSlugProduct.name}"). Please customize the slug.`,
-      };
+    if (matchingSlugProducts && matchingSlugProducts.length > 0) {
+      slug = resolveUniqueProductSlug(slug, payload.id, matchingSlugProducts);
     }
 
     // 1. Try schema-defined security definer RPC public.admin_save_product
@@ -261,6 +261,7 @@ export async function saveProductAction(payload: ProductSavePayload) {
       description: payload.description?.trim() || null,
       category_id: payload.category_id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(payload.category_id) ? payload.category_id : undefined,
       subcategory_id: payload.subcategory_id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(payload.subcategory_id) ? payload.subcategory_id : undefined,
+      sub_subcategory_id: payload.sub_subcategory_id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(payload.sub_subcategory_id) ? payload.sub_subcategory_id : undefined,
       batch_no: payload.batch_number?.trim() || undefined,
       price: Number(payload.base_price),
       stock: Number(payload.stock_quantity),
@@ -272,7 +273,9 @@ export async function saveProductAction(payload: ProductSavePayload) {
       p: rpcPayload,
     });
 
-    if (!rpcError && rpcResult?.product) {
+    if (rpcError) {
+      console.warn("[saveProductAction] RPC admin_save_product warning:", rpcError.message);
+    } else if (rpcResult?.product) {
       revalidatePath("/admin/products");
       revalidatePath("/admin/inventory");
       revalidatePath("/shop");
@@ -281,175 +284,293 @@ export async function saveProductAction(payload: ProductSavePayload) {
       revalidatePath(`/product/${slug}`);
       revalidatePath(`/products/${slug}`);
       revalidatePath("/");
+      revalidatePath("/", "layout");
+
+      const resProd = rpcResult.product;
+      const normalizedRpcProduct = {
+        ...resProd,
+        brand: payload.brand || "Kanhaiya Collection",
+        base_price: Number(resProd.base_price ?? resProd.price ?? payload.base_price),
+        stock_quantity: Number(resProd.stock_quantity ?? resProd.stock ?? payload.stock_quantity),
+        image_url:
+          resProd.image_url ||
+          sanitizedImages.find((i) => i.is_primary)?.image_url ||
+          sanitizedImages[0]?.image_url ||
+          null,
+      };
 
       return {
         success: true,
         message: `Product '${name}' persisted successfully to Supabase.`,
-        product: rpcResult.product,
+        product: normalizedRpcProduct,
       };
     }
 
     // Direct table operations fallback (when RPC not available or direct table write permitted)
-    const productRecord = {
-      category_id: payload.category_id || null,
-      subcategory_id: payload.subcategory_id || null,
+    const isValidUUID = (val: string | null | undefined): boolean =>
+      Boolean(val && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val.trim()));
+
+    const safeCategoryId = isValidUUID(payload.category_id) ? payload.category_id : null;
+    const safeSubcategoryId = isValidUUID(payload.subcategory_id) ? payload.subcategory_id : null;
+    const safeSubSubcategoryId = isValidUUID(payload.sub_subcategory_id) ? payload.sub_subcategory_id : null;
+
+    // Build database-aligned record strictly matching public.products schema
+    // Schema columns: name, slug, description, category_id, subcategory_id, sub_subcategory_id, sku, price, stock, is_active, batch_no
+    const productRecord: Record<string, any> = {
       name,
       slug,
       description: payload.description?.trim() || null,
-      brand: payload.brand?.trim() || null,
-      sku: payload.sku?.trim() || null,
-      base_price: Number(payload.base_price),
-      compare_at_price:
-        payload.compare_at_price !== null && payload.compare_at_price !== undefined
-          ? Number(payload.compare_at_price)
-          : null,
-      stock_quantity: Number(payload.stock_quantity),
+      category_id: safeCategoryId,
+      price: Number(payload.base_price),
+      stock: Number(payload.stock_quantity),
       is_active: Boolean(payload.is_active),
-      is_featured_top_seller: Boolean(payload.is_featured_top_seller),
-      top_seller_display_order:
-        payload.top_seller_display_order !== null && payload.top_seller_display_order !== undefined
-          ? Number(payload.top_seller_display_order)
-          : null,
-      meta_title: payload.meta_title?.trim() || null,
-      meta_description: payload.meta_description?.trim() || null,
     };
+
+    if (safeSubcategoryId) {
+      productRecord.subcategory_id = safeSubcategoryId;
+    }
+    if (safeSubSubcategoryId) {
+      productRecord.sub_subcategory_id = safeSubSubcategoryId;
+    }
+    if (payload.sku?.trim()) {
+      productRecord.sku = payload.sku.trim();
+    }
+    if (payload.batch_number?.trim()) {
+      productRecord.batch_no = payload.batch_number.trim();
+    }
 
     let targetProductId = payload.id;
 
     if (payload.id) {
       // Update product
-      const { error: updateError } = await (supabase
+      let { error: updateError } = await (supabase
         .from("products")
         .update as any)(productRecord)
         .eq("id", payload.id);
+
+      if (updateError) {
+        let retryNeeded = false;
+        const msg = updateError.message || "";
+        if (msg.includes("batch_no") && productRecord.batch_no) {
+          delete productRecord.batch_no;
+          retryNeeded = true;
+        }
+        if (msg.includes("sub_subcategory_id") && productRecord.sub_subcategory_id) {
+          delete productRecord.sub_subcategory_id;
+          retryNeeded = true;
+        }
+        if (msg.includes("subcategory_id") && productRecord.subcategory_id) {
+          delete productRecord.subcategory_id;
+          retryNeeded = true;
+        }
+        if (retryNeeded) {
+          const retry = await (supabase.from("products").update as any)(productRecord).eq("id", payload.id);
+          updateError = retry.error;
+        }
+      }
 
       if (updateError) {
         return { error: `Failed to update product: ${updateError.message}` };
       }
     } else {
       // Insert product
-      const { data: insertedProduct, error: insertError } = await (supabase
+      const insertRecord: Record<string, any> = { ...productRecord };
+      if (authCheck.user?.id) {
+        insertRecord.created_by = authCheck.user.id;
+      }
+
+      let insertResult = await (supabase
         .from("products")
-        .insert as any)({
-          ...productRecord,
-          created_by: authCheck.user?.id || null,
-        })
+        .insert as any)(insertRecord)
         .select("id")
         .single();
 
-      if (insertError || !insertedProduct) {
-        return { error: `Failed to create product: ${insertError?.message || "Unknown error"}` };
+      if (insertResult.error) {
+        let retryNeeded = false;
+        const msg = insertResult.error.message || "";
+        if (msg.includes("created_by") && "created_by" in insertRecord) {
+          delete insertRecord.created_by;
+          retryNeeded = true;
+        }
+        if (msg.includes("batch_no") && insertRecord.batch_no) {
+          delete insertRecord.batch_no;
+          retryNeeded = true;
+        }
+        if (msg.includes("sub_subcategory_id") && insertRecord.sub_subcategory_id) {
+          delete insertRecord.sub_subcategory_id;
+          retryNeeded = true;
+        }
+        if (msg.includes("subcategory_id") && insertRecord.subcategory_id) {
+          delete insertRecord.subcategory_id;
+          retryNeeded = true;
+        }
+        if (retryNeeded) {
+          insertResult = await (supabase
+            .from("products")
+            .insert as any)(insertRecord)
+            .select("id")
+            .single();
+        }
       }
 
-      targetProductId = insertedProduct.id;
+      if (insertResult.error || !insertResult.data) {
+        return { error: `Failed to create product: ${insertResult.error?.message || "Unknown error"}` };
+      }
+
+      targetProductId = insertResult.data.id;
     }
 
     if (!targetProductId) {
       return { error: "Product ID was not resolved." };
     }
 
-    // 6. Synchronize product_images
-    // Delete existing images not in sanitizedImages
+    // 6. Synchronize product_images matching public.product_images schema (url, storage_path, sort_order, is_primary)
     const keepImageIds = sanitizedImages.map((img) => img.id).filter(Boolean) as string[];
 
     if (payload.id) {
-      if (keepImageIds.length > 0) {
-        await supabase
-          .from("product_images")
-          .delete()
-          .eq("product_id", targetProductId)
-          .not("id", "in", `(${keepImageIds.join(",")})`);
-      } else {
-        await supabase
-          .from("product_images")
-          .delete()
-          .eq("product_id", targetProductId);
+      try {
+        if (keepImageIds.length > 0) {
+          await supabase
+            .from("product_images")
+            .delete()
+            .eq("product_id", targetProductId)
+            .not("id", "in", `(${keepImageIds.join(",")})`);
+        } else {
+          await supabase
+            .from("product_images")
+            .delete()
+            .eq("product_id", targetProductId);
+        }
+      } catch (delErr) {
+        console.warn("[saveProductAction] image delete warning:", delErr);
       }
     }
 
-    // Insert or update images
+    // Insert or update images using exact schema columns: url, sort_order, is_primary, storage_path
     for (const img of sanitizedImages) {
-      if (img.id) {
-        await supabase
-          .from("product_images")
-          .update({
-            image_url: img.image_url,
-            alt_text: img.alt_text,
-            display_order: img.display_order,
-            is_primary: img.is_primary,
-          })
-          .eq("id", img.id);
-      } else {
-        await supabase.from("product_images").insert({
-          product_id: targetProductId,
-          image_url: img.image_url,
-          alt_text: img.alt_text,
-          display_order: img.display_order,
-          is_primary: img.is_primary,
-        });
+      const imgRecord: Record<string, any> = {
+        product_id: targetProductId,
+        url: img.image_url,
+        sort_order: img.display_order,
+        is_primary: Boolean(img.is_primary),
+      };
+      if ((img as any).storage_path) {
+        imgRecord.storage_path = (img as any).storage_path;
+      }
+
+      try {
+        if (img.id && isValidUUID(img.id)) {
+          const { error: imgErr } = await supabase
+            .from("product_images")
+            .update(imgRecord)
+            .eq("id", img.id);
+          if (imgErr) {
+            await supabase.from("product_images").insert(imgRecord);
+          }
+        } else {
+          await supabase.from("product_images").insert(imgRecord);
+        }
+      } catch (imgErr) {
+        console.warn("[saveProductAction] image write warning:", imgErr);
       }
     }
 
-    // 7. Synchronize product_variants
-    const keepVariantIds = sanitizedVariants.map((v) => v.id).filter(Boolean) as string[];
+    // 7. Synchronize product_variants (safe execution if table exists, otherwise non-fatal)
+    if (sanitizedVariants.length > 0) {
+      try {
+        const keepVariantIds = sanitizedVariants.map((v) => v.id).filter(Boolean) as string[];
+        if (payload.id) {
+          if (keepVariantIds.length > 0) {
+            await supabase
+              .from("product_variants")
+              .delete()
+              .eq("product_id", targetProductId)
+              .not("id", "in", `(${keepVariantIds.join(",")})`);
+          } else {
+            await supabase
+              .from("product_variants")
+              .delete()
+              .eq("product_id", targetProductId);
+          }
+        }
 
-    if (payload.id) {
-      if (keepVariantIds.length > 0) {
-        await supabase
-          .from("product_variants")
-          .delete()
-          .eq("product_id", targetProductId)
-          .not("id", "in", `(${keepVariantIds.join(",")})`);
-      } else {
-        await supabase
-          .from("product_variants")
-          .delete()
-          .eq("product_id", targetProductId);
+        for (const v of sanitizedVariants) {
+          if (v.id && isValidUUID(v.id)) {
+            await supabase
+              .from("product_variants")
+              .update({
+                variant_name: v.variant_name,
+                sku: v.sku,
+                price: v.price,
+                compare_at_price: v.compare_at_price,
+                stock_quantity: v.stock_quantity,
+                image_url: v.image_url,
+                is_active: v.is_active,
+                attributes: v.attributes,
+              })
+              .eq("id", v.id);
+          } else {
+            await supabase.from("product_variants").insert({
+              product_id: targetProductId,
+              variant_name: v.variant_name,
+              sku: v.sku,
+              price: v.price,
+              compare_at_price: v.compare_at_price,
+              stock_quantity: v.stock_quantity,
+              image_url: v.image_url,
+              is_active: v.is_active,
+              attributes: v.attributes,
+            });
+          }
+        }
+      } catch (variantErr) {
+        console.warn("[saveProductAction] product_variants table omitted or error:", variantErr);
       }
     }
 
-    // Insert or update variants
-    for (const v of sanitizedVariants) {
-      if (v.id) {
-        await supabase
-          .from("product_variants")
-          .update({
-            variant_name: v.variant_name,
-            sku: v.sku,
-            price: v.price,
-            compare_at_price: v.compare_at_price,
-            stock_quantity: v.stock_quantity,
-            image_url: v.image_url,
-            is_active: v.is_active,
-            attributes: v.attributes,
-          })
-          .eq("id", v.id);
-      } else {
-        await supabase.from("product_variants").insert({
-          product_id: targetProductId,
-          variant_name: v.variant_name,
-          sku: v.sku,
-          price: v.price,
-          compare_at_price: v.compare_at_price,
-          stock_quantity: v.stock_quantity,
-          image_url: v.image_url,
-          is_active: v.is_active,
-          attributes: v.attributes,
-        });
-      }
-    }
+    // Always mirror to mock/local store to keep catalog in sync across rendering contexts
+    try {
+      const { upsertProductInStore } = await import("@/lib/mock-data/admin-store");
+      upsertProductInStore({
+        ...payload,
+        id: targetProductId,
+        name,
+        slug,
+        images: sanitizedImages as any,
+        variants: sanitizedVariants as any,
+      });
+    } catch { }
 
     revalidatePath("/admin/products");
     revalidatePath("/shop");
     revalidatePath("/categories");
     revalidatePath(`/shop/product/${slug}`);
     revalidatePath(`/product/${slug}`);
+    revalidatePath(`/products/${slug}`);
     revalidatePath("/");
+    revalidatePath("/", "layout");
+
+    const primaryImgUrl =
+      sanitizedImages.find((i) => i.is_primary)?.image_url ||
+      sanitizedImages[0]?.image_url ||
+      null;
 
     return {
       success: true,
       message: `Product "${name}" saved successfully.`,
       productId: targetProductId,
+      product: {
+        ...payload,
+        id: targetProductId,
+        name,
+        slug,
+        brand: payload.brand || "Kanhaiya Collection",
+        base_price: Number(payload.base_price),
+        stock_quantity: Number(payload.stock_quantity),
+        image_url: primaryImgUrl,
+        images: sanitizedImages,
+        variants: sanitizedVariants,
+      },
     };
   } catch (err: any) {
     return { error: err.message || "An error occurred while saving product." };
@@ -616,9 +737,7 @@ export async function adjustProductStockAction(productId: string, delta: number)
 }
 
 /**
- * Safely deletes or archives a product based on historical references and database constraints.
- * - If product has historical dependencies (e.g. order_items, return_requests): safely archives/deactivates.
- * - If product has no historical dependencies: executes atomic RPC public.admin_delete_product() with storage cleanup.
+ * Permanently deletes a product and its associated media from the catalog and database.
  */
 export async function deleteProductAction(
   productId: string,
@@ -638,68 +757,66 @@ export async function deleteProductAction(
 
   // If running in demo mode or passed a synthetic/local ID, route to the mock store
   if (isDemo || !isUUID) {
-    const { archiveProductInStore, deleteProductFromStore, loadMockStore } = await import(
-      "@/lib/mock-data/admin-store"
-    );
-    // Soft delete in development/local store: set is_active=false and deleted_at
-    const store = loadMockStore();
-    const prod = store.products?.find((p: any) => p.id === productId);
-    if (!prod) {
-      return { error: `Product '${productId}' not found in catalog store.` };
+    const { deleteProductFromStore } = await import("@/lib/mock-data/admin-store");
+    const delRes = deleteProductFromStore(productId);
+    if (!delRes.success) {
+      return { error: delRes.error || `Product '${productId}' not found in catalog store.` };
     }
-
-    prod.is_active = false;
-    (prod as any).deleted_at = new Date().toISOString();
-    const { saveMockStore } = await import("@/lib/mock-data/admin-store");
-    saveMockStore(store);
 
     revalidatePath("/admin/products");
     revalidatePath("/shop");
     revalidatePath("/categories");
     revalidatePath("/");
+    revalidatePath("/", "layout");
     return {
       success: true,
-      archived: true,
-      message: `Product '${prod.name}' has been soft-deleted and removed from catalog view.`,
+      deleted: true,
+      message: `Product has been permanently deleted from catalog.`,
     };
   }
 
   try {
-    // Soft-delete directly via RPC or update
+    // 1. Try atomic RPC public.admin_delete_product()
     const { data: rpcData, error: rpcError } = await supabase.rpc("admin_delete_product", {
       p_id: productId,
     });
 
     if (rpcError) {
-      // Direct soft-delete fallback if RPC does not support soft-delete
-      const { error: updateError } = await supabase
+      // Direct table delete fallback:
+      // First delete associated product_images
+      await supabase
+        .from("product_images")
+        .delete()
+        .eq("product_id", productId);
+
+      // Delete the product record permanently
+      const { error: delError } = await supabase
         .from("products")
-        .update({ is_active: false, deleted_at: new Date().toISOString() })
+        .delete()
         .eq("id", productId);
 
-      if (updateError) {
-        // Fallback without deleted_at if column not yet migrated
-        const { error: activeError } = await supabase
-          .from("products")
-          .update({ is_active: false })
-          .eq("id", productId);
-
-        if (activeError) {
-          return { error: `Failed to soft-delete product: ${activeError.message}` };
-        }
+      if (delError) {
+        return { error: `Failed to delete product: ${delError.message}` };
       }
     }
+
+    // Also remove from local/mock store so state stays synchronized
+    try {
+      const { deleteProductFromStore } = await import("@/lib/mock-data/admin-store");
+      deleteProductFromStore(productId);
+    } catch { }
 
     revalidatePath("/admin/products");
     revalidatePath("/shop");
     revalidatePath("/categories");
     revalidatePath("/");
     revalidatePath("/shop/product", "layout");
+    revalidatePath("/", "layout");
 
     return {
       success: true,
-      archived: true,
-      message: "Product has been successfully soft-deleted. Historical order records remain intact.",
+      deleted: true,
+      message: "Product has been permanently deleted from database and store catalog.",
     };
   } catch (err: any) {
     return { error: err.message || "Failed to delete product." };

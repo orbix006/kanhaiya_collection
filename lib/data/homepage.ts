@@ -9,8 +9,9 @@ export interface HomepageSection {
 export interface Banner {
   id: string;
   image_url: string;
+  image_path?: string | null;
   title: string | null;
-  link_url: string | null;
+  link_url?: string | null;
   display_order: number;
   is_active: boolean;
 }
@@ -267,73 +268,67 @@ export async function getHomepageSections(): Promise<HomepageSection[]> {
 }
 
 export async function getActiveBanners(): Promise<Banner[]> {
-  if (!isSupabaseConfigured()) {
-    return [];
-  }
-  try {
-    const supabase = await createClient();
-    const { data, error } = await supabase
-      .from("hero_banners")
-      .select("id, image_url, title, link_url, display_order, is_active")
-      .eq("is_active", true)
-      .order("display_order", { ascending: true });
+  if (isSupabaseConfigured()) {
+    try {
+      const supabase = await createClient();
+      const { data, error } = await supabase
+        .from("hero_banners")
+        .select("*")
+        .eq("is_active", true)
+        .order("display_order", { ascending: true });
 
-    if (error || !data) {
-      return [];
+      if (!error && data && data.length > 0) {
+        return data as unknown as Banner[];
+      }
+    } catch {
+      // Continue to fallback
     }
-    return data as unknown as Banner[];
-  } catch {
-    return [];
   }
+
+  try {
+    const { loadMockBanners } = await import("@/lib/mock-data/admin-store");
+    const banners = loadMockBanners().filter((b) => b.is_active);
+    if (banners.length > 0) return banners as Banner[];
+  } catch {}
+
+  return [];
 }
 
 export async function getHomepageCategories(): Promise<Category[]> {
-  if (!isSupabaseConfigured()) {
-    return [];
-  }
-  try {
-    const supabase = await createClient();
-    const { data, error } = await supabase
-      .from("categories")
-      .select("*")
-      .eq("is_active", true)
-      .order("sort_order", { ascending: true });
+  if (isSupabaseConfigured()) {
+    try {
+      const supabase = await createClient();
+      const { data, error } = await supabase
+        .from("categories")
+        .select("*")
+        .eq("is_active", true)
+        .order("sort_order", { ascending: true });
 
-    if (error || !data) {
-      return [];
+      if (!error && data && data.length > 0) {
+        return data
+          .map((c: any) => ({
+            id: String(c.id),
+            parent_id: c.parent_id || null,
+            name: c.name || "Collection",
+            slug: c.slug || String(c.id),
+            description: c.description || null,
+            image_url: c.thumbnail_url || c.image_url || null,
+            display_order: Number(c.sort_order ?? c.display_order ?? 0),
+            is_active: Boolean(c.is_active ?? true),
+            show_on_homepage: Boolean(c.is_visible ?? c.show_on_homepage ?? true),
+          }))
+          .filter((c) => c.is_active && c.show_on_homepage && c.parent_id === null);
+      }
+    } catch {
+      // Fallback below
     }
-    return data.map((c: any) => ({
-      id: String(c.id),
-      parent_id: c.parent_id || null,
-      name: c.name || "Collection",
-      slug: c.slug || String(c.id),
-      description: c.description || null,
-      image_url: c.thumbnail_url || c.image_url || null,
-      display_order: Number(c.sort_order ?? c.display_order ?? 0),
-      is_active: Boolean(c.is_active ?? true),
-      show_on_homepage: Boolean(c.is_visible ?? c.show_on_homepage ?? true),
-    })).filter((c) => c.is_active && c.show_on_homepage && c.parent_id === null);
-  } catch {
-    return [];
   }
-}
 
-export async function getAllActiveCategories(): Promise<Category[]> {
-  if (!isSupabaseConfigured()) {
-    return [];
-  }
-  try {
-    const supabase = await createClient();
-    const { data, error } = await supabase
-      .from("categories")
-      .select("*")
-      .eq("is_active", true)
-      .order("sort_order", { ascending: true });
-
-    if (error || !data) {
-      return [];
-    }
-    return data.map((c: any) => ({
+  const { loadMockStore } = await import("@/lib/mock-data/admin-store");
+  const store = loadMockStore();
+  return (store.categories || [])
+    .filter((c) => c.is_active && c.show_on_homepage && c.parent_id === null)
+    .map((c: any) => ({
       id: String(c.id),
       parent_id: c.parent_id || null,
       name: c.name || "Collection",
@@ -344,9 +339,51 @@ export async function getAllActiveCategories(): Promise<Category[]> {
       is_active: Boolean(c.is_active ?? true),
       show_on_homepage: Boolean(c.is_visible ?? c.show_on_homepage ?? true),
     }));
-  } catch {
-    return [];
+}
+
+export async function getAllActiveCategories(): Promise<Category[]> {
+  if (isSupabaseConfigured()) {
+    try {
+      const supabase = await createClient();
+      const { data, error } = await supabase
+        .from("categories")
+        .select("*")
+        .eq("is_active", true)
+        .order("sort_order", { ascending: true });
+
+      if (!error && data && data.length > 0) {
+        return data.map((c: any) => ({
+          id: String(c.id),
+          parent_id: c.parent_id || null,
+          name: c.name || "Collection",
+          slug: c.slug || String(c.id),
+          description: c.description || null,
+          image_url: c.thumbnail_url || c.image_url || null,
+          display_order: Number(c.sort_order ?? c.display_order ?? 0),
+          is_active: Boolean(c.is_active ?? true),
+          show_on_homepage: Boolean(c.is_visible ?? c.show_on_homepage ?? true),
+        }));
+      }
+    } catch {
+      // Fallback below
+    }
   }
+
+  const { loadMockStore } = await import("@/lib/mock-data/admin-store");
+  const store = loadMockStore();
+  return (store.categories || [])
+    .filter((c) => c.is_active)
+    .map((c: any) => ({
+      id: String(c.id),
+      parent_id: c.parent_id || null,
+      name: c.name || "Collection",
+      slug: c.slug || String(c.id),
+      description: c.description || null,
+      image_url: c.thumbnail_url || c.image_url || null,
+      display_order: Number(c.sort_order ?? c.display_order ?? 0),
+      is_active: Boolean(c.is_active ?? true),
+      show_on_homepage: Boolean(c.is_visible ?? c.show_on_homepage ?? true),
+    }));
 }
 
 export async function getContinueBrowsingProducts(userId?: string | null): Promise<ProductItem[]> {
@@ -362,15 +399,11 @@ export async function getContinueBrowsingProducts(userId?: string | null): Promi
           id,
           name,
           slug,
-          brand,
-          base_price,
-          compare_at_price,
-          avg_rating,
-          review_count,
-          stock_quantity,
+          price,
+          stock,
           is_active,
           product_images (
-            image_url,
+            url,
             is_primary
           )
         )
@@ -388,20 +421,20 @@ export async function getContinueBrowsingProducts(userId?: string | null): Promi
       const p = row.product as any;
       if (!p || p.is_active === false) continue;
       const primaryImg =
-        p.product_images?.find((img: any) => img.is_primary)?.image_url ||
-        p.product_images?.[0]?.image_url ||
+        p.product_images?.find((img: any) => img.is_primary)?.url ||
+        p.product_images?.[0]?.url ||
         null;
 
       items.push({
         id: p.id,
         name: p.name,
         slug: p.slug,
-        brand: p.brand,
-        base_price: Number(p.base_price),
-        compare_at_price: p.compare_at_price ? Number(p.compare_at_price) : null,
-        avg_rating: Number(p.avg_rating || 0),
-        review_count: Number(p.review_count || 0),
-        stock_quantity: Number(p.stock_quantity || 0),
+        brand: "Kanhaiya Collection",
+        base_price: Number(p.price ?? 0),
+        compare_at_price: null,
+        avg_rating: 5,
+        review_count: 0,
+        stock_quantity: Number(p.stock ?? 0),
         image_url: primaryImg,
       });
     }
@@ -430,25 +463,25 @@ export async function getTopSellers(): Promise<ProductItem[]> {
     const productIds = topSellers.map((p) => p.id).filter(Boolean) as string[];
     const { data: images } = await supabase
       .from("product_images")
-      .select("product_id, image_url, is_primary")
+      .select("product_id, url, is_primary")
       .in("product_id", productIds);
 
     return topSellers.map((p) => {
       const matchingImg =
-        images?.find((img) => img.product_id === p.id && img.is_primary)?.image_url ||
-        images?.find((img) => img.product_id === p.id)?.image_url ||
+        images?.find((img) => img.product_id === p.id && img.is_primary)?.url ||
+        images?.find((img) => img.product_id === p.id)?.url ||
         null;
 
       return {
         id: p.id || "",
         name: p.name || "",
         slug: p.slug || "",
-        brand: p.brand || null,
-        base_price: Number(p.base_price || 0),
+        brand: p.brand || "Kanhaiya Collection",
+        base_price: Number(p.base_price ?? p.price ?? 0),
         compare_at_price: p.compare_at_price ? Number(p.compare_at_price) : null,
         avg_rating: Number(p.avg_rating || 0),
         review_count: Number(p.review_count || 0),
-        stock_quantity: Number(p.stock_quantity || 0),
+        stock_quantity: Number(p.stock_quantity ?? p.stock ?? 0),
         image_url: matchingImg,
         is_featured_top_seller: Boolean(p.is_featured_top_seller),
         category_id: p.category_id,
@@ -485,43 +518,50 @@ export async function getCategoryProductSections(): Promise<CategoryProductSecti
       .select(`
         id,
         category_id,
+        subcategory_id,
+        sub_subcategory_id,
         name,
         slug,
-        brand,
-        base_price,
-        compare_at_price,
-        avg_rating,
-        review_count,
-        stock_quantity,
+        price,
+        stock,
         is_active,
         product_images (
-          image_url,
-          is_primary
+          url,
+          is_primary,
+          sort_order
         )
       `)
       .eq("is_active", true);
 
-    let productItems: ProductItem[] = [];
+    let productItems: (ProductItem & { subcategory_id?: string | null; sub_subcategory_id?: string | null })[] = [];
 
     if (productsData && productsData.length > 0) {
       productItems = productsData.map((p: any) => {
+        const sortedImages = p.product_images
+          ? [...p.product_images].sort(
+              (a: any, b: any) => (a.sort_order || 0) - (b.sort_order || 0)
+            )
+          : [];
+
         const primaryImg =
-          p.product_images?.find((img: any) => img.is_primary)?.image_url ||
-          p.product_images?.[0]?.image_url ||
+          sortedImages.find((img: any) => img.is_primary)?.url ||
+          sortedImages[0]?.url ||
           null;
 
         return {
           id: p.id,
           name: p.name,
           slug: p.slug,
-          brand: p.brand,
-          base_price: Number(p.base_price),
-          compare_at_price: p.compare_at_price ? Number(p.compare_at_price) : null,
-          avg_rating: Number(p.avg_rating || 0),
-          review_count: Number(p.review_count || 0),
-          stock_quantity: Number(p.stock_quantity || 0),
+          brand: "Kanhaiya Collection",
+          base_price: Number(p.price ?? 0),
+          compare_at_price: null,
+          avg_rating: 5,
+          review_count: 0,
+          stock_quantity: Number(p.stock ?? 0),
           image_url: primaryImg,
           category_id: p.category_id,
+          subcategory_id: p.subcategory_id || null,
+          sub_subcategory_id: p.sub_subcategory_id || null,
         };
       });
     } else {
@@ -531,15 +571,20 @@ export async function getCategoryProductSections(): Promise<CategoryProductSecti
     const sections: CategoryProductSection[] = [];
 
     for (const hpCat of homepageCategories) {
-      // Find subcategories belonging to this category
+      // Find descendant categories belonging to this category
       const subCategoryIds = categoriesList
         .filter((c) => c.parent_id === hpCat.id)
         .map((c) => c.id);
-      const targetCategoryIds = [hpCat.id, ...subCategoryIds];
+      const subSubCategoryIds = categoriesList
+        .filter((c) => subCategoryIds.includes(c.parent_id || ""))
+        .map((c) => c.id);
+      const targetCategoryIds = [hpCat.id, ...subCategoryIds, ...subSubCategoryIds];
 
       const matchingProducts = productItems.filter(
         (p) =>
           (p.category_id && targetCategoryIds.includes(p.category_id)) ||
+          (p.subcategory_id && targetCategoryIds.includes(p.subcategory_id)) ||
+          (p.sub_subcategory_id && targetCategoryIds.includes(p.sub_subcategory_id)) ||
           p.category_slug === hpCat.slug
       );
 

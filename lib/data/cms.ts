@@ -10,8 +10,9 @@ export interface HomepageSection {
 export interface Banner {
   id: string;
   image_url: string;
+  image_path?: string | null;
   title: string | null;
-  link_url: string | null;
+  link_url?: string | null;
   display_order: number;
   is_active: boolean;
   created_at?: string;

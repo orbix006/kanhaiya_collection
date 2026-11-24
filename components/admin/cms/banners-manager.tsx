@@ -56,6 +56,7 @@ export function BannersManager({ initialBanners }: BannersManagerProps) {
 
   // Form State
   const [imageUrl, setImageUrl] = useState("");
+  const [imagePath, setImagePath] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [linkUrl, setLinkUrl] = useState("");
   const [displayOrder, setDisplayOrder] = useState<number>(1);
@@ -100,6 +101,17 @@ export function BannersManager({ initialBanners }: BannersManagerProps) {
       .sort((a, b) => a.display_order - b.display_order);
   }, [banners]);
 
+  // Lock background page scroll when modal is open
+  useEffect(() => {
+    if (modalOpen || deleteModalOpen) {
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = originalOverflow;
+      };
+    }
+  }, [modalOpen, deleteModalOpen]);
+
   // Adjust carousel index if it exceeds active banners count
   useEffect(() => {
     if (carouselIndex >= activeBanners.length && activeBanners.length > 0) {
@@ -136,22 +148,26 @@ export function BannersManager({ initialBanners }: BannersManagerProps) {
   const openCreateModal = () => {
     setActiveBanner(null);
     setImageUrl("");
+    setImagePath(null);
     setTitle("");
     setLinkUrl("");
     setDisplayOrder(banners.length + 1);
     setIsActive(true);
     setFormError(null);
+    setModalObjectFit("cover");
     setModalOpen(true);
   };
 
   const openEditModal = (banner: Banner) => {
     setActiveBanner(banner);
     setImageUrl(banner.image_url);
+    setImagePath(banner.image_path || null);
     setTitle(banner.title || "");
     setLinkUrl(banner.link_url || "");
     setDisplayOrder(banner.display_order);
     setIsActive(banner.is_active);
     setFormError(null);
+    setModalObjectFit("cover");
     setModalOpen(true);
   };
 
@@ -216,6 +232,7 @@ export function BannersManager({ initialBanners }: BannersManagerProps) {
     const payload: BannerPayload = {
       id: activeBanner?.id,
       image_url: cleanImageUrl,
+      image_path: imagePath || (activeBanner as any)?.image_path || null,
       title: title.trim() || null,
       link_url: cleanLinkUrl || null,
       display_order: Number(displayOrder) || 1,
@@ -786,182 +803,144 @@ export function BannersManager({ initialBanners }: BannersManagerProps) {
 
       {/* CREATE / EDIT BANNER MODAL */}
       {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in">
-          <div className="w-full max-w-lg p-6 sm:p-7 rounded-3xl border border-border/80 bg-card shadow-2xl space-y-5 animate-in zoom-in-95">
-            <div className="flex items-center justify-between pb-3 border-b border-border/70">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 sm:p-6 animate-in fade-in"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setModalOpen(false);
+            }
+          }}
+        >
+          <div className="w-full max-w-lg max-h-[85vh] sm:max-h-[90vh] flex flex-col rounded-3xl border border-border/80 bg-card shadow-2xl animate-in zoom-in-95 my-auto overflow-hidden">
+            {/* Modal Header (Sticky) */}
+            <div className="flex items-center justify-between p-5 sm:p-6 pb-4 border-b border-border/70 shrink-0 bg-card">
               <h3 className="font-black text-lg text-foreground">
                 {activeBanner ? "Edit Hero Banner" : "Add New Hero Banner"}
               </h3>
               <button
                 type="button"
                 onClick={() => setModalOpen(false)}
-                className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted cursor-pointer"
+                className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted cursor-pointer transition-colors"
+                aria-label="Close modal"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
-            {formError && (
-              <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/30 text-destructive text-xs font-semibold flex items-center gap-2">
-                <AlertCircle className="h-4 w-4 shrink-0" />
-                <span>{formError}</span>
-              </div>
-            )}
-
-            <form onSubmit={handleSubmit} className="space-y-4 text-xs">
-              {/* File Image Upload */}
-              <div className="space-y-1.5">
-                <label className="font-bold text-foreground">
-                  Banner Image File <span className="text-destructive">*</span>
-                </label>
-                <ImageUploader
-                  bucket="hero-banners"
-                  folderPath="banners"
-                  aspectRatio="banner"
-                  currentImageUrl={imageUrl}
-                  onUploadComplete={(url) => setImageUrl(url)}
-                  label=""
-                />
-                <span className="text-[11px] text-muted-foreground block">
-                  Select a high-resolution hero photo from your device (JPEG, PNG, WebP up to 8MB).
-                </span>
-              </div>
-
-              {/* Real-time Pre-Save Image Preview with Aspect Ratio & Fit Controls */}
-              {imageUrl.trim() && (
-                <div className="space-y-1.5 p-3 rounded-2xl border border-border/80 bg-muted/30">
-                  <div className="flex items-center justify-between text-[11px] font-bold">
-                    <span className="text-muted-foreground uppercase flex items-center gap-1.5">
-                      <ImageIcon className="h-3.5 w-3.5 text-primary" />
-                      Pre-Save Live Image Preview
-                    </span>
-                    <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => setModalObjectFit("cover")}
-                        className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold cursor-pointer ${
-                          modalObjectFit === "cover"
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-muted text-muted-foreground hover:text-foreground"
-                        }`}
-                      >
-                        Cover
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setModalObjectFit("contain")}
-                        className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold cursor-pointer ${
-                          modalObjectFit === "contain"
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-muted text-muted-foreground hover:text-foreground"
-                        }`}
-                      >
-                        Contain
-                      </button>
-                    </div>
+            {/* Modal Form Container with Scrollable Body & Sticky Footer */}
+            <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+              {/* Scrollable Form Body */}
+              <div className="flex-1 overflow-y-auto overscroll-contain p-5 sm:p-6 space-y-4 text-xs">
+                {formError && (
+                  <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/30 text-destructive text-xs font-semibold flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4 shrink-0" />
+                    <span>{formError}</span>
                   </div>
-                  <div className="relative aspect-[21/9] w-full rounded-xl border border-border overflow-hidden bg-black/90">
-                    <img
-                      src={imageUrl.trim()}
-                      alt="Pre-save banner preview"
-                      style={{ objectFit: modalObjectFit }}
-                      className="h-full w-full"
-                      onError={(e) => {
-                        (e.target as any).src =
-                          "https://images.unsplash.com/photo-1599707367072-cd6ada2bc375?auto=format&fit=crop&w=800&q=80";
-                      }}
-                    />
-                    <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded bg-black/75 text-white text-[10px] font-mono">
-                      Aspect Ratio 21:9 — Fit: {modalObjectFit}
-                    </div>
-                  </div>
-                  <p className="text-[10px] text-muted-foreground">
-                    Verifies that the banner renders cleanly without unexpected distortion or vertical stretching.
-                  </p>
-                </div>
-              )}
+                )}
 
-              {/* Title / Caption */}
-              <div className="space-y-1.5">
-                <label className="font-bold text-foreground">
-                  Title / Caption (Optional)
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Divine Brass Radha Krishna Murtis"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background focus:outline-hidden focus:ring-2 focus:ring-primary/20 text-xs"
-                />
-              </div>
-
-              {/* Destination Link URL */}
-              <div className="space-y-1.5">
-                <label className="font-bold text-foreground">
-                  Destination Link URL (Optional)
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. /shop?category=idols or https://..."
-                  value={linkUrl}
-                  onChange={(e) => setLinkUrl(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background focus:outline-hidden focus:ring-2 focus:ring-primary/20 text-xs"
-                />
-                <span className="text-[11px] text-muted-foreground block">
-                  Relative catalog route (e.g. /shop) or external link.
-                </span>
-              </div>
-
-              {/* Display Order & Active Toggle */}
-              <div className="grid grid-cols-2 gap-4 pt-2">
+                {/* File Image Upload */}
                 <div className="space-y-1.5">
-                  <label className="font-bold text-foreground">Display Order</label>
+                  <label className="font-bold text-foreground">
+                    Banner Image File <span className="text-destructive">*</span>
+                  </label>
+                  <ImageUploader
+                    bucket="hero-banners"
+                    folderPath="banners"
+                    aspectRatio="banner"
+                    currentImageUrl={imageUrl}
+                    onUploadComplete={(url, storagePath) => {
+                      setImageUrl(url);
+                      if (storagePath) setImagePath(storagePath);
+                    }}
+                    label=""
+                  />
+                  <span className="text-[11px] text-muted-foreground block">
+                    Select a high-resolution hero photo from your device (JPEG, PNG, WebP up to 8MB).
+                  </span>
+                </div>
+
+                {/* Title / Caption */}
+                <div className="space-y-1.5">
+                  <label className="font-bold text-foreground">
+                    Title / Caption (Optional)
+                  </label>
                   <input
-                    type="number"
-                    min="1"
-                    value={displayOrder}
-                    onChange={(e) => setDisplayOrder(parseInt(e.target.value) || 1)}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-xs font-mono font-bold"
+                    type="text"
+                    placeholder="e.g. Divine Brass Radha Krishna Murtis"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background focus:outline-hidden focus:ring-2 focus:ring-primary/20 text-xs"
                   />
                 </div>
 
-                <div className="space-y-1.5 flex flex-col justify-end">
-                  <label className="font-bold text-foreground">Active Status</label>
-                  <button
-                    type="button"
-                    onClick={() => setIsActive(!isActive)}
-                    className={`w-full py-2.5 px-3 rounded-xl border font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-colors ${
-                      isActive
-                        ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30"
-                        : "bg-muted text-muted-foreground border-border"
-                    }`}
-                  >
-                    {isActive ? (
-                      <>
-                        <Eye className="h-3.5 w-3.5" /> Published
-                      </>
-                    ) : (
-                      <>
-                        <EyeOff className="h-3.5 w-3.5" /> Hidden
-                      </>
-                    )}
-                  </button>
+                {/* Destination Link URL */}
+                <div className="space-y-1.5">
+                  <label className="font-bold text-foreground">
+                    Destination Link URL (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. /shop (Optional - leave empty to display image only)"
+                    value={linkUrl}
+                    onChange={(e) => setLinkUrl(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background focus:outline-hidden focus:ring-2 focus:ring-primary/20 text-xs"
+                  />
+                  <span className="text-[11px] text-muted-foreground block">
+                    Optional storefront destination link. Leave empty if you only want to showcase the image without a click link.
+                  </span>
+                </div>
+
+                {/* Display Order & Active Toggle */}
+                <div className="grid grid-cols-2 gap-4 pt-2">
+                  <div className="space-y-1.5">
+                    <label className="font-bold text-foreground">Display Order</label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={displayOrder}
+                      onChange={(e) => setDisplayOrder(parseInt(e.target.value) || 1)}
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-xs font-mono font-bold"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5 flex flex-col justify-end">
+                    <label className="font-bold text-foreground">Active Status</label>
+                    <button
+                      type="button"
+                      onClick={() => setIsActive(!isActive)}
+                      className={`w-full py-2.5 px-3 rounded-xl border font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-colors ${
+                        isActive
+                          ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30"
+                          : "bg-muted text-muted-foreground border-border"
+                      }`}
+                    >
+                      {isActive ? (
+                        <>
+                          <Eye className="h-3.5 w-3.5" /> Published
+                        </>
+                      ) : (
+                        <>
+                          <EyeOff className="h-3.5 w-3.5" /> Hidden
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
               </div>
 
-              {/* Modal Buttons */}
-              <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-border/70">
+              {/* Modal Buttons (Sticky Footer) */}
+              <div className="flex items-center justify-end gap-2.5 p-4 sm:px-6 border-t border-border/70 shrink-0 bg-card">
                 <button
                   type="button"
                   onClick={() => setModalOpen(false)}
-                  className="px-4 py-2.5 rounded-xl border border-border text-xs font-semibold hover:bg-muted cursor-pointer"
+                  className="px-4 py-2.5 rounded-xl border border-border text-xs font-semibold hover:bg-muted cursor-pointer transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground font-bold text-xs shadow-xs hover:bg-primary/90 disabled:opacity-50 cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground font-bold text-xs shadow-xs hover:bg-primary/90 disabled:opacity-50 cursor-pointer transition-colors"
                 >
                   {isSubmitting ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -978,8 +957,16 @@ export function BannersManager({ initialBanners }: BannersManagerProps) {
 
       {/* DELETE CONFIRMATION MODAL */}
       {deleteModalOpen && bannerToDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in">
-          <div className="w-full max-w-md p-6 rounded-3xl border border-border/80 bg-card shadow-2xl space-y-4 animate-in zoom-in-95">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setDeleteModalOpen(false);
+              setBannerToDelete(null);
+            }
+          }}
+        >
+          <div className="w-full max-w-md p-6 rounded-3xl border border-border/80 bg-card shadow-2xl space-y-4 animate-in zoom-in-95 my-auto">
             <div className="flex items-center gap-3 text-destructive">
               <div className="h-10 w-10 rounded-2xl bg-destructive/10 flex items-center justify-center shrink-0">
                 <Trash2 className="h-5 w-5" />

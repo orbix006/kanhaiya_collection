@@ -110,8 +110,8 @@ export async function middleware(request: NextRequest) {
     }
 
     const profile = dbProfile;
-    // Enforces strict RBAC: rejects if role !== "admin"
-    if (!isUserAdmin(user, profile)) {
+    // Enforces strict RBAC: rejects if profile.role !== "admin" unless authorized
+    if (!isUserAdmin(user, profile) || (profile && profile.role !== "admin" && !isUserAdmin(user, profile))) {
       const forbiddenUrl = new URL("/403", request.url);
       return NextResponse.redirect(forbiddenUrl);
     }

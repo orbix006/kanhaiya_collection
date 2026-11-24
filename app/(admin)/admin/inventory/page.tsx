@@ -85,6 +85,29 @@ export default async function AdminInventoryPage() {
     }
   }
 
+  // Fallback to local store if unconfigured or returned no records
+  if (inventoryItems.length === 0) {
+    const { loadMockStore } = await import("@/lib/mock-data/admin-store");
+    const store = loadMockStore();
+    inventoryItems = (store.products || []).map((p: any) => {
+      const rawCat = store.categories.find((c: any) => c.id === p.category_id);
+      return {
+        id: p.id,
+        name: p.name,
+        slug: p.slug,
+        sku: p.sku || null,
+        batch_no: p.batch_number || p.batch_no || null,
+        hsn_code: p.hsn_code || "7419",
+        price: Number(p.base_price ?? p.price ?? 0),
+        stock: Number(p.stock_quantity ?? p.stock ?? 0),
+        low_stock_threshold: 5,
+        is_low_stock: Number(p.stock_quantity ?? p.stock ?? 0) <= 5,
+        category_name: rawCat?.name || null,
+        primary_image: p.images?.[0]?.image_url || p.image_url || null,
+      };
+    });
+  }
+
   return (
     <div className="space-y-8">
       {/* Page Header */}

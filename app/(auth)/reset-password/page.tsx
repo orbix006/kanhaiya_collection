@@ -1,15 +1,20 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, Suspense } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { resetPasswordAction } from "../actions";
-import { Store, Loader2, CheckCircle2 } from "lucide-react";
+import { Store, Loader2, CheckCircle2, ArrowRight } from "lucide-react";
 
-export default function ResetPasswordPage() {
+function ResetPasswordForm() {
+  const searchParams = useSearchParams();
+  const emailParam = searchParams.get("email") || "";
+  const tokenParam = searchParams.get("token") || "";
+
   const [state, formAction, isPending] = useActionState(resetPasswordAction, null);
 
   return (
-    <div className="w-full max-w-md p-6 sm:p-8 space-y-6 bg-card border border-border rounded-2xl shadow-xl">
+    <div className="w-full max-w-md p-6 sm:p-8 space-y-6 bg-card border border-border rounded-2xl shadow-xl font-sans">
       <div className="flex flex-col items-center text-center space-y-2">
         <Link href="/" className="flex items-center gap-2 font-bold text-2xl tracking-tight text-foreground">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
@@ -17,8 +22,8 @@ export default function ResetPasswordPage() {
           </div>
           <span>Kanhaiya Collection</span>
         </Link>
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">Reset Password</h1>
-        <p className="text-sm text-muted-foreground">Enter a new password for your account</p>
+        <h1 className="text-2xl font-bold tracking-tight text-foreground">Set New Password</h1>
+        <p className="text-sm text-muted-foreground">Enter and confirm a secure password for your account</p>
       </div>
 
       {state?.error && (
@@ -27,58 +32,90 @@ export default function ResetPasswordPage() {
         </div>
       )}
 
-      {state?.success && (
-        <div className="p-3 text-sm rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400">
-          {state.success}
+      {state?.success ? (
+        <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 space-y-4 text-center">
+          <div className="flex items-center justify-center gap-2 font-semibold text-sm">
+            <CheckCircle2 className="h-5 w-5" />
+            <span>Password Updated!</span>
+          </div>
+          <p className="text-xs text-muted-foreground">{state.success}</p>
+          <Link
+            href="/login"
+            className="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-colors shadow-xs"
+          >
+            <span>Proceed to Sign In</span>
+            <ArrowRight className="h-4 w-4" />
+          </Link>
         </div>
-      )}
+      ) : (
+        <form action={formAction} className="space-y-4">
+          <input type="hidden" name="token" value={tokenParam} />
 
-      <form action={formAction} className="space-y-4">
-        <div className="space-y-1.5">
-          <label className="text-sm font-medium text-foreground" htmlFor="password">
-            New Password
-          </label>
-          <input
-            id="password"
-            name="password"
-            type="password"
-            required
-            placeholder="Minimum 6 characters"
-            className="w-full h-11 px-3.5 rounded-lg border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
-          />
-        </div>
-
-        <div className="space-y-1.5">
-          <label className="text-sm font-medium text-foreground" htmlFor="confirmPassword">
-            Confirm New Password
-          </label>
-          <input
-            id="confirmPassword"
-            name="confirmPassword"
-            type="password"
-            required
-            placeholder="Re-enter new password"
-            className="w-full h-11 px-3.5 rounded-lg border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
-          />
-        </div>
-
-        <button
-          type="submit"
-          disabled={isPending}
-          className="w-full h-11 inline-flex items-center justify-center gap-2 rounded-lg bg-primary text-primary-foreground font-medium text-sm hover:bg-primary/90 transition-colors disabled:opacity-50"
-        >
-          {isPending ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Updating password...
-            </>
+          {emailParam ? (
+            <input type="hidden" name="email" value={emailParam} />
           ) : (
-            <>
-              Set New Password <CheckCircle2 className="h-4 w-4" />
-            </>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-foreground" htmlFor="email">
+                Account Email Address
+              </label>
+              <input
+                id="email"
+                name="email"
+                type="email"
+                required
+                placeholder="you@example.com"
+                className="w-full h-11 px-3.5 rounded-lg border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+            </div>
           )}
-        </button>
-      </form>
+
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium text-foreground" htmlFor="password">
+              New Password
+            </label>
+            <input
+              id="password"
+              name="password"
+              type="password"
+              required
+              placeholder="Minimum 6 characters"
+              className="w-full h-11 px-3.5 rounded-lg border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium text-foreground" htmlFor="confirmPassword">
+              Confirm New Password
+            </label>
+            <input
+              id="confirmPassword"
+              name="confirmPassword"
+              type="password"
+              required
+              placeholder="Re-enter new password"
+              className="w-full h-11 px-3.5 rounded-lg border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={isPending}
+            className="w-full h-11 inline-flex items-center justify-center gap-2 rounded-lg bg-primary text-primary-foreground font-medium text-sm hover:bg-primary/90 transition-colors disabled:opacity-50 cursor-pointer shadow-sm"
+          >
+            {isPending ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>Saving Password...</span>
+              </>
+            ) : (
+              <>
+                <span>Save New Password</span>
+                <CheckCircle2 className="h-4 w-4" />
+              </>
+            )}
+          </button>
+        </form>
+      )}
 
       <div className="text-center text-sm text-muted-foreground pt-2">
         <Link href="/login" className="font-semibold text-primary hover:underline">
@@ -86,5 +123,13 @@ export default function ResetPasswordPage() {
         </Link>
       </div>
     </div>
+  );
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Loading password reset form...</div>}>
+      <ResetPasswordForm />
+    </Suspense>
   );
 }

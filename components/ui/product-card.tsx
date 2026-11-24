@@ -27,28 +27,44 @@ export function ProductCard<T extends ProductCardItem>({
   className = "",
   onView,
 }: ProductCardProps<T>) {
+  const effectiveBasePrice = Number(product.base_price ?? (product as any).price ?? 0);
+  const effectiveComparePrice =
+    product.compare_at_price !== undefined && product.compare_at_price !== null
+      ? Number(product.compare_at_price)
+      : (product as any).compare_price !== undefined && (product as any).compare_price !== null
+        ? Number((product as any).compare_price)
+        : null;
+
   const formattedPrice = new Intl.NumberFormat("en-IN", {
     style: "currency",
     currency: "INR",
     maximumFractionDigits: 0,
-  }).format(product.base_price);
+  }).format(effectiveBasePrice);
 
-  const formattedComparePrice = product.compare_at_price
+  const formattedComparePrice = effectiveComparePrice
     ? new Intl.NumberFormat("en-IN", {
-        style: "currency",
-        currency: "INR",
-        maximumFractionDigits: 0,
-      }).format(product.compare_at_price)
+      style: "currency",
+      currency: "INR",
+      maximumFractionDigits: 0,
+    }).format(effectiveComparePrice)
     : null;
 
   const discountPercent =
-    product.compare_at_price && product.compare_at_price > product.base_price
+    effectiveComparePrice && effectiveComparePrice > effectiveBasePrice
       ? Math.round(
-          ((product.compare_at_price - product.base_price) /
-            product.compare_at_price) *
-            100
-        )
+        ((effectiveComparePrice - effectiveBasePrice) /
+          effectiveComparePrice) *
+        100
+      )
       : null;
+
+  const displayImageUrl =
+    product.image_url ||
+    (product as any).images?.find((img: any) => img.is_primary)?.image_url ||
+    (product as any).images?.find((img: any) => img.is_primary)?.url ||
+    (product as any).images?.[0]?.image_url ||
+    (product as any).images?.[0]?.url ||
+    null;
 
   const handleClick = () => {
     // Record view in recently viewed
@@ -78,12 +94,17 @@ export function ProductCard<T extends ProductCardItem>({
     >
       {/* Product Image Area */}
       <div className="relative aspect-square w-full overflow-hidden bg-[#F8F1E3] flex items-center justify-center">
-        {product.image_url ? (
+        {displayImageUrl ? (
           <Image
-            src={product.image_url}
+            src={displayImageUrl}
             alt={product.name}
             fill
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+            unoptimized={
+              displayImageUrl.startsWith("http") ||
+              displayImageUrl.startsWith("blob:") ||
+              displayImageUrl.startsWith("data:")
+            }
             className="object-cover transition-transform duration-500 group-hover:scale-105"
           />
         ) : (

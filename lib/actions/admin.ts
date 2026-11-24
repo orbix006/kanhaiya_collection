@@ -211,7 +211,7 @@ export async function saveCategoryAction(formData: FormData) {
     }
   } else {
     const newCat: Category = {
-      id: `cat-${Date.now()}`,
+      id: typeof crypto !== "undefined" && typeof crypto.randomUUID === "function" ? crypto.randomUUID() : `cat-${Date.now()}`,
       name,
       slug,
       description,
